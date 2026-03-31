@@ -779,7 +779,7 @@ export function PaymentManager({
               filteredPayments.map((payment) => (
                 <div
                   key={payment.id}
-                  className="border-border bg-secondary/70 min-w-0 rounded-3xl border p-5"
+                  className="border-border bg-secondary/70 min-w-0 rounded-3xl border p-5 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997]"
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
@@ -858,7 +858,7 @@ export function PaymentManager({
                   </div>
 
                   {payment.notes ? (
-                    <p className="text-muted mt-4 break-words text-sm leading-7">
+                    <p className="text-muted mt-4 rounded-[1.25rem] border border-white/70 bg-white/70 px-4 py-3 break-words text-sm leading-7 transition-colors duration-200 ease-out">
                       {payment.notes}
                     </p>
                   ) : null}

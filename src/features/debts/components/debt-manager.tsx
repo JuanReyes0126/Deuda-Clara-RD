@@ -853,7 +853,10 @@ export function DebtManager({
 
             {filteredDebts.length ? (
               filteredDebts.map((debt) => (
-                <div key={debt.id} className="min-w-0 rounded-[1.9rem] border border-border bg-secondary/50 p-5 sm:p-6">
+                <div
+                  key={debt.id}
+                  className="min-w-0 rounded-[1.9rem] border border-border bg-secondary/50 p-5 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:p-6"
+                >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
                       <div className="flex min-w-0 flex-wrap items-center gap-3">

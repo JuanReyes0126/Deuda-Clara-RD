@@ -4,11 +4,11 @@ test("registro y onboarding inicial", async ({ page }) => {
   const uniqueEmail = `qa-${Date.now()}@example.com`;
 
   await page.goto("/registro");
-  await page.getByLabel("Nombre").fill("QA");
-  await page.getByLabel("Apellido").fill("Tester");
-  await page.getByLabel("Correo electrónico").fill(uniqueEmail);
-  await page.getByLabel("Contraseña").fill("DeudaClara123!");
-  await page.getByLabel("Confirmar contraseña").fill("DeudaClara123!");
+  await page.getByPlaceholder("Nombre").fill("QA");
+  await page.getByPlaceholder("Apellido").fill("Tester");
+  await page.getByPlaceholder("Correo electrónico").fill(uniqueEmail);
+  await page.getByPlaceholder("Contraseña").fill("DeudaClara123!");
+  await page.getByPlaceholder("Confirmar contraseña").fill("DeudaClara123!");
   await page.getByRole("button", { name: "Crear cuenta" }).click();
 
   await expect(page).toHaveURL(/onboarding/);
@@ -19,9 +19,9 @@ test("registro y onboarding inicial", async ({ page }) => {
 
 test("login con usuario demo", async ({ page }) => {
   await page.goto("/login");
-  await page.getByLabel("Correo electrónico").fill("demo@deudaclarard.com");
-  await page.getByLabel("Contraseña").fill("DeudaClara123!");
-  await page.getByRole("button", { name: "Iniciar sesión" }).click();
+  await page.getByPlaceholder("Correo electrónico").fill("demo@deudaclarard.com");
+  await page.getByPlaceholder("Contraseña").fill("DeudaClara123!");
+  await page.locator('button[type="submit"]').click();
 
   await expect(page).toHaveURL(/dashboard/);
 });

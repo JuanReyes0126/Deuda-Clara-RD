@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 
+import { BrandLockup } from "@/components/shared/brand-logo";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 type AuthPageShellProps = {
@@ -28,13 +29,12 @@ export function AuthPageShell({
       <div className="relative mx-auto grid min-h-screen w-full max-w-7xl gap-10 px-4 py-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
         <div className="space-y-6">
           <Link href="/" className="inline-flex items-center gap-3">
-            <div className="grid size-12 place-items-center rounded-2xl bg-primary text-white">
-              <span className="font-display text-lg font-semibold">DC</span>
-            </div>
-            <div>
-              <p className="font-display text-xl font-semibold text-foreground">Deuda Clara RD</p>
-              <p className="text-sm text-muted">Control real de deudas personales</p>
-            </div>
+            <BrandLockup
+              className="gap-3.5"
+              markClassName="size-11 sm:size-12"
+              titleClassName="text-[1.72rem] sm:text-[2.02rem]"
+              subtitleClassName="text-sm sm:text-base"
+            />
           </Link>
 
           <div className="space-y-4">

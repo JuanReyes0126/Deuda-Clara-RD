@@ -1082,7 +1082,7 @@ export function MembershipPanel({
                       planLabel: plan.label,
                     });
           const planCardClassName = isCurrent
-            ? "border-primary/25 ring-2 ring-primary/10"
+            ? "border-primary/25 ring-2 ring-primary/10 shadow-[0_24px_48px_rgba(15,88,74,0.1)]"
             : isHighlighted
               ? "border-primary/25 ring-2 ring-primary/10 shadow-[0_22px_44px_rgba(15,88,74,0.09)]"
               : isPremium
@@ -1090,7 +1090,10 @@ export function MembershipPanel({
                 : "";
 
           return (
-            <Card key={plan.id} className={`p-6 ${planCardClassName}`}>
+            <Card
+              key={plan.id}
+              className={`p-6 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:shadow-[0_24px_44px_rgba(23,56,74,0.1)] ${planCardClassName}`}
+            >
               <CardHeader className="gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -1116,7 +1119,7 @@ export function MembershipPanel({
                 </div>
               </CardHeader>
               <CardContent className="pt-4">
-                <div className="rounded-[1.6rem] border border-border/80 bg-white/80 px-5 py-5">
+                <div className="rounded-[1.6rem] border border-border/80 bg-white/80 px-5 py-5 transition-all duration-200 ease-out">
                   <p className="text-muted text-xs font-semibold uppercase tracking-[0.16em]">
                     Precio
                   </p>
@@ -1131,16 +1134,16 @@ export function MembershipPanel({
                       : "Ideal para gestión básica y uso inicial"}
                   </p>
                 </div>
-                <div className="border-border/70 text-foreground mt-4 rounded-3xl border bg-white/80 px-4 py-3 text-sm leading-7">
+                <div className="border-border/70 text-foreground mt-4 rounded-3xl border bg-white/80 px-4 py-3 text-sm leading-7 transition-all duration-200 ease-out">
                   <span className="font-semibold">Resultado esperado:</span>{" "}
                   {plan.outcome}
                 </div>
-                <div className="mt-3 rounded-3xl border border-border/70 bg-secondary/45 px-4 py-3 text-sm leading-7 text-foreground">
+                <div className="mt-3 rounded-3xl border border-border/70 bg-secondary/45 px-4 py-3 text-sm leading-7 text-foreground transition-all duration-200 ease-out">
                   <span className="font-semibold">Mejor para:</span>{" "}
                   {plan.bestFor}
                 </div>
                 {plan.monthlyPriceUsd > 0 ? (
-                  <div className="border-primary/12 text-foreground mt-3 rounded-3xl border bg-[rgba(240,248,245,0.9)] px-4 py-3 text-sm leading-7">
+                  <div className="border-primary/12 text-foreground mt-3 rounded-3xl border bg-[rgba(240,248,245,0.9)] px-4 py-3 text-sm leading-7 transition-all duration-200 ease-out">
                     {getPlanValueSignal({
                       planId: plan.id,
                       conversionSnapshot,
@@ -1152,7 +1155,7 @@ export function MembershipPanel({
                   {plan.features.map((feature) => (
                     <div
                       key={feature}
-                      className="border-border bg-secondary/55 text-muted rounded-2xl border px-4 py-3 text-sm"
+                      className="border-border bg-secondary/55 text-muted rounded-2xl border px-4 py-3 text-sm transition-all duration-200 ease-out hover:border-primary/14 hover:bg-white/86 hover:text-foreground"
                     >
                       {feature}
                     </div>

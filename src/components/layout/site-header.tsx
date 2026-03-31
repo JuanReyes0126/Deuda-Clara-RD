@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { BrandBadge } from "@/components/shared/brand-logo";
 import { buttonClasses } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 
@@ -17,9 +18,7 @@ export function SiteHeader() {
     <header className="sticky top-4 z-30 w-full">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 rounded-full border border-white/70 bg-white/85 px-4 py-3 shadow-soft backdrop-blur sm:gap-6 sm:px-5">
         <Link href="/" className="flex items-center gap-3">
-          <div className="grid size-12 place-items-center rounded-2xl bg-primary text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3)]">
-            <span className="font-display text-lg font-semibold">DC</span>
-          </div>
+          <BrandBadge className="size-12 rounded-2xl" markClassName="size-7" />
           <div className="min-w-0">
             <p className="font-display text-lg font-semibold text-foreground">Deuda Clara RD</p>
             <p className="hidden text-sm text-muted sm:block">Control real de deudas personales</p>

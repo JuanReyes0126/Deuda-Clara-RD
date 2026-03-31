@@ -718,7 +718,7 @@ export function ReportsPanel({
               summary.debtSummary.map((row) => (
                 <div
                   key={row.debtId}
-                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-[1.75rem] border p-5 sm:grid-cols-[minmax(0,1fr)_190px] sm:items-center"
+                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-[1.75rem] border p-5 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:grid-cols-[minmax(0,1fr)_190px] sm:items-center"
                 >
                   <div className="min-w-0">
                     <p className="text-foreground min-w-0 font-semibold">
@@ -770,7 +770,7 @@ export function ReportsPanel({
               summary.categorySummary.map((row) => (
                 <div
                   key={row.type}
-                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-[1.75rem] border p-5 sm:grid-cols-[minmax(0,1fr)_190px] sm:items-center"
+                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-[1.75rem] border p-5 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:grid-cols-[minmax(0,1fr)_190px] sm:items-center"
                 >
                   <div className="min-w-0">
                     <p className="text-foreground min-w-0 font-semibold">

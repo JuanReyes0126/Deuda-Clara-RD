@@ -7,7 +7,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "min-w-0 overflow-hidden rounded-3xl border border-border/80 bg-card/95 backdrop-blur-md shadow-soft ring-1 ring-white/60",
+        "min-w-0 overflow-hidden rounded-3xl border border-border/80 bg-card/95 backdrop-blur-md shadow-soft ring-1 ring-white/60 transition-[box-shadow,border-color,background-color] duration-200 ease-out motion-reduce:transition-none",
         className,
       )}
       {...props}

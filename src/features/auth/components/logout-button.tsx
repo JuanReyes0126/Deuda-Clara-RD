@@ -1,12 +1,18 @@
 "use client";
 
+import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { cn } from "@/lib/utils/cn";
 import { buttonClasses } from "@/components/ui/button";
 
-export function LogoutButton() {
+type LogoutButtonProps = {
+  compact?: boolean;
+};
+
+export function LogoutButton({ compact = false }: LogoutButtonProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -42,10 +48,22 @@ export function LogoutButton() {
     >
       <button
         type="submit"
-        className={buttonClasses({ variant: "secondary", size: "sm" })}
+        aria-label={isLoading ? "Saliendo" : "Cerrar sesión"}
+        title="Cerrar sesión"
+        className={cn(
+          buttonClasses({ variant: "secondary", size: "sm" }),
+          compact &&
+            "size-10 rounded-2xl px-0 py-0 shadow-none sm:size-11",
+        )}
         disabled={isLoading}
       >
-        {isLoading ? "Saliendo..." : "Cerrar sesión"}
+        {compact ? (
+          <LogOut className="size-[1.125rem]" />
+        ) : isLoading ? (
+          "Saliendo..."
+        ) : (
+          "Cerrar sesión"
+        )}
       </button>
     </form>
   );

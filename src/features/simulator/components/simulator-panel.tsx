@@ -877,10 +877,10 @@ export function SimulatorPanel({
                     <button
                       key={scenario.id}
                       type="button"
-                      className={`min-w-0 rounded-[1.5rem] border p-4 text-left transition sm:p-5 ${
+                      className={`min-w-0 rounded-[1.5rem] border p-4 text-left transition-all duration-200 ease-out active:scale-[0.985] sm:p-5 ${
                         isSelected
-                          ? "border-primary/25 bg-[rgba(240,248,245,0.92)] shadow-[0_16px_36px_rgba(15,88,74,0.08)]"
-                          : "border-border bg-white hover:border-primary/15"
+                          ? "border-primary/24 bg-[rgba(240,248,245,0.94)] shadow-[0_18px_36px_rgba(15,88,74,0.08)] ring-2 ring-primary/10"
+                          : "border-border bg-white hover:-translate-y-[1px] hover:border-primary/18 hover:bg-[rgba(255,255,255,0.98)] hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)]"
                       } ${shouldSpanFullWidth ? "md:col-span-2" : ""}`}
                       onClick={() => setSelectedScenarioId(scenario.id)}
                     >
@@ -913,7 +913,7 @@ export function SimulatorPanel({
                         {getScenarioSupportCopy(scenario.id, extraPaymentValue)}
                       </p>
                       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                        <div className="rounded-[1.2rem] border border-border/70 bg-secondary/35 px-4 py-3">
+                        <div className="rounded-[1.2rem] border border-border/70 bg-secondary/35 px-4 py-3 transition-colors duration-200 ease-out">
                           <p className="text-[11px] uppercase tracking-[0.18em] text-muted">
                             Intereses
                           </p>
@@ -921,7 +921,7 @@ export function SimulatorPanel({
                             {formatSimulatorCurrency(scenario.totalInterest)}
                           </p>
                         </div>
-                        <div className="rounded-[1.2rem] border border-border/70 bg-secondary/35 px-4 py-3">
+                        <div className="rounded-[1.2rem] border border-border/70 bg-secondary/35 px-4 py-3 transition-colors duration-200 ease-out">
                           <p className="text-[11px] uppercase tracking-[0.18em] text-muted">
                             Total pagado
                           </p>
@@ -930,7 +930,7 @@ export function SimulatorPanel({
                           </p>
                         </div>
                         {scenario.id !== "BASE" ? (
-                          <div className="rounded-[1.2rem] border border-primary/12 bg-[rgba(240,248,245,0.92)] px-4 py-3 sm:col-span-2">
+                          <div className="rounded-[1.2rem] border border-primary/12 bg-[rgba(240,248,245,0.92)] px-4 py-3 transition-all duration-200 ease-out sm:col-span-2">
                             <p className="text-foreground text-sm font-semibold">
                               {delta.monthsSaved !== null && delta.monthsSaved > 0
                                 ? `${formatMonthsValue(delta.monthsSaved)} menos`
@@ -975,7 +975,7 @@ export function SimulatorPanel({
                               ? "bg-amber-400"
                               : "bg-emerald-500"
                         }`}
-                        style={{ width: relativeWidth }}
+                        style={{ width: relativeWidth, transition: "width 200ms ease-out" }}
                       />
                     </div>
                   </div>

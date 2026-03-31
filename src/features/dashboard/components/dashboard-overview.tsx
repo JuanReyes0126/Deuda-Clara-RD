@@ -2077,7 +2077,7 @@ export function DashboardOverview({
             )}
 
             {priorityOne ? (
-              <div className="rounded-[1.85rem] border border-primary/20 bg-[linear-gradient(145deg,rgba(240,248,245,0.96),rgba(255,248,241,0.92))] p-5 shadow-[0_22px_48px_rgba(15,88,74,0.1)]">
+              <div className="rounded-[1.85rem] border border-primary/20 bg-[linear-gradient(145deg,rgba(240,248,245,0.96),rgba(255,248,241,0.92))] p-5 shadow-[0_22px_48px_rgba(15,88,74,0.1)] transition-all duration-200 ease-out hover:-translate-y-[1px] hover:shadow-[0_24px_46px_rgba(15,88,74,0.12)]">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="max-w-4xl">
                     <div className="flex flex-wrap items-center gap-3">
@@ -2146,10 +2146,10 @@ export function DashboardOverview({
               remainingRecommendedOrder.map((item) => (
                 <div
                   key={item.id}
-                  className={`rounded-[1.75rem] border p-5 ${
+                  className={`rounded-[1.75rem] border p-5 transition-all duration-200 ease-out ${
                     item.priorityRank === 1
-                      ? "border-primary/20 bg-[rgba(240,248,245,0.92)] shadow-[0_18px_42px_rgba(15,88,74,0.08)]"
-                      : "border-border bg-secondary/70"
+                      ? "border-primary/20 bg-[rgba(240,248,245,0.92)] shadow-[0_18px_42px_rgba(15,88,74,0.08)] hover:shadow-[0_22px_44px_rgba(15,88,74,0.11)]"
+                      : "border-border bg-secondary/70 hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)]"
                   }`}
                 >
                   <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_260px] 2xl:items-start">
@@ -2260,10 +2260,10 @@ export function DashboardOverview({
             <CardContent className="space-y-4 pt-4">
               {data.riskAlerts.length ? (
                 data.riskAlerts.map((alert) => (
-                  <div
-                    key={alert.title}
-                    className="border-border bg-secondary/70 rounded-3xl border p-5"
-                  >
+                <div
+                  key={alert.title}
+                  className="border-border bg-secondary/70 rounded-3xl border p-5 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997]"
+                >
                     <p className="text-foreground font-semibold">
                       {alert.title}
                     </p>
@@ -2295,7 +2295,7 @@ export function DashboardOverview({
               data.dueSoonDebts.map((debt) => (
                 <div
                   key={debt.id}
-                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-3xl border p-4 sm:grid-cols-[minmax(0,1fr)_170px] sm:items-center"
+                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-3xl border p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:grid-cols-[minmax(0,1fr)_170px] sm:items-center"
                 >
                   <div className="min-w-0">
                     <p className="text-foreground font-semibold">{debt.name}</p>
@@ -2335,7 +2335,7 @@ export function DashboardOverview({
               data.recentPayments.map((payment) => (
                 <div
                   key={payment.id}
-                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-3xl border p-4 sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center"
+                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-3xl border p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center"
                 >
                   <div className="min-w-0">
                     <p className="text-foreground font-semibold">
