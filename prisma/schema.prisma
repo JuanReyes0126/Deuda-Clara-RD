@@ -1,0 +1,361 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum CurrencyCode {
+  DOP
+  USD
+}
+
+enum DebtType {
+  CREDIT_CARD
+  PERSONAL_LOAN
+  VEHICLE
+  MORTGAGE
+  INFORMAL
+  OTHER
+}
+
+enum DebtStatus {
+  CURRENT
+  LATE
+  NEGOTIATING
+  PAID
+  ARCHIVED
+}
+
+enum InterestRateType {
+  ANNUAL
+  MONTHLY
+}
+
+enum StrategyMethod {
+  SNOWBALL
+  AVALANCHE
+  HYBRID
+}
+
+enum MembershipTier {
+  FREE
+  NORMAL
+  PRO
+}
+
+enum MembershipBillingStatus {
+  FREE
+  PENDING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INACTIVE
+}
+
+enum NotificationType {
+  DUE_SOON
+  OVERDUE
+  MINIMUM_PAYMENT_RISK
+  STRATEGY_RECOMMENDATION
+  MONTHLY_REPORT
+  SECURITY
+  SYSTEM
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+}
+
+enum NotificationSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum PaymentSource {
+  MANUAL
+  IMPORT
+  SYSTEM
+}
+
+enum BalanceSnapshotSource {
+  MUTATION
+  DAILY_JOB
+  SEED
+}
+
+enum AuditAction {
+  LOGIN_SUCCESS
+  LOGIN_FAILURE
+  PASSWORD_RESET_REQUESTED
+  PASSWORD_RESET_COMPLETED
+  PASSWORD_CHANGED
+  PROFILE_UPDATED
+  USER_REGISTERED
+  USER_STATUS_CHANGED
+  DEBT_CREATED
+  DEBT_UPDATED
+  DEBT_ARCHIVED
+  DEBT_DELETED
+  PAYMENT_CREATED
+  PAYMENT_UPDATED
+  PAYMENT_DELETED
+  SETTINGS_UPDATED
+  BILLING_CHECKOUT_CREATED
+  BILLING_PORTAL_OPENED
+  BILLING_WEBHOOK_SYNCED
+  NOTIFICATION_READ
+  EMAIL_TEMPLATE_UPDATED
+}
+
+model User {
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  passwordHash        String
+  firstName           String
+  lastName            String
+  role                UserRole             @default(USER)
+  status              UserStatus           @default(ACTIVE)
+  locale              String               @default("es-DO")
+  timezone            String               @default("America/Santo_Domingo")
+  emailVerifiedAt     DateTime?
+  onboardingCompleted Boolean              @default(false)
+  lastLoginAt         DateTime?
+  avatarUrl           String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  accounts            Account[]
+  sessions            Session[]
+  settings            UserSettings?
+  debts               Debt[]
+  payments            Payment[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  passwordResetTokens PasswordResetToken[]
+  balanceSnapshots    BalanceSnapshot[]
+
+  @@index([role, status])
+  @@index([createdAt])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expires])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@index([expires])
+}
+
+model PasswordResetToken {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model UserSettings {
+  id                    String         @id @default(cuid())
+  userId                String         @unique
+  defaultCurrency       CurrencyCode   @default(DOP)
+  preferredStrategy     StrategyMethod @default(AVALANCHE)
+  membershipTier        MembershipTier @default(FREE)
+  membershipBillingStatus MembershipBillingStatus @default(FREE)
+  membershipActivatedAt DateTime?
+  membershipCurrentPeriodEnd DateTime?
+  membershipCancelAtPeriodEnd Boolean @default(false)
+  stripeCustomerId      String?        @unique
+  stripeSubscriptionId  String?        @unique
+  stripePriceId         String?
+  hybridRateWeight      Int            @default(70)
+  hybridBalanceWeight   Int            @default(30)
+  monthlyDebtBudget     Decimal?       @db.Decimal(14, 2)
+  notifyDueSoon         Boolean        @default(true)
+  notifyOverdue         Boolean        @default(true)
+  notifyMinimumRisk     Boolean        @default(true)
+  notifyMonthlyReport   Boolean        @default(true)
+  emailRemindersEnabled Boolean        @default(false)
+  upcomingDueDays       Int            @default(3)
+  language              String         @default("es")
+  timezone              String         @default("America/Santo_Domingo")
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  user                  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Debt {
+  id                    String           @id @default(cuid())
+  userId                String
+  name                  String
+  creditorName          String
+  type                  DebtType
+  status                DebtStatus       @default(CURRENT)
+  currency              CurrencyCode     @default(DOP)
+  currentBalance        Decimal          @db.Decimal(14, 2)
+  creditLimit           Decimal?         @db.Decimal(14, 2)
+  interestRate          Decimal          @db.Decimal(7, 4)
+  interestRateType      InterestRateType @default(ANNUAL)
+  minimumPayment        Decimal          @db.Decimal(14, 2)
+  statementDay          Int?
+  dueDay                Int?
+  nextDueDate           DateTime?
+  lateFeeAmount         Decimal          @default(0) @db.Decimal(14, 2)
+  extraChargesAmount    Decimal          @default(0) @db.Decimal(14, 2)
+  notes                 String?          @db.Text
+  startedAt             DateTime?
+  estimatedEndAt        DateTime?
+  paidOffAt             DateTime?
+  archivedAt            DateTime?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments              Payment[]
+  notifications         Notification[]
+  auditLogs             AuditLog[]
+
+  @@index([userId, status])
+  @@index([userId, type])
+  @@index([userId, nextDueDate])
+  @@index([archivedAt])
+}
+
+model Payment {
+  id                    String        @id @default(cuid())
+  userId                String
+  debtId                String
+  amount                Decimal       @db.Decimal(14, 2)
+  principalAmount       Decimal?      @db.Decimal(14, 2)
+  interestAmount        Decimal?      @db.Decimal(14, 2)
+  lateFeeAmount         Decimal?      @db.Decimal(14, 2)
+  extraChargesAmount    Decimal?      @db.Decimal(14, 2)
+  remainingBalanceAfter Decimal?      @db.Decimal(14, 2)
+  source                PaymentSource @default(MANUAL)
+  notes                 String?       @db.Text
+  paidAt                DateTime
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  debt                  Debt          @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  auditLogs             AuditLog[]
+
+  @@index([userId, paidAt])
+  @@index([debtId, paidAt])
+}
+
+model Notification {
+  id         String               @id @default(cuid())
+  userId     String
+  debtId     String?
+  type       NotificationType
+  channel    NotificationChannel  @default(IN_APP)
+  severity   NotificationSeverity @default(INFO)
+  title      String
+  message    String               @db.Text
+  data       Json?
+  dueAt      DateTime?
+  readAt     DateTime?
+  sentAt     DateTime?
+  createdAt  DateTime             @default(now())
+  debt       Debt?                @relation(fields: [debtId], references: [id], onDelete: SetNull)
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+  @@index([userId, dueAt])
+  @@index([debtId])
+}
+
+model AuditLog {
+  id           String      @id @default(cuid())
+  userId       String?
+  debtId       String?
+  paymentId    String?
+  action       AuditAction
+  resourceType String
+  resourceId   String?
+  ipAddress    String?
+  userAgent    String?
+  metadata     Json?
+  createdAt    DateTime    @default(now())
+  debt         Debt?       @relation(fields: [debtId], references: [id], onDelete: SetNull)
+  payment      Payment?    @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  user         User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@index([resourceType, resourceId])
+}
+
+model EmailTemplate {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  subject     String
+  htmlContent String   @db.Text
+  textContent String   @db.Text
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model BalanceSnapshot {
+  id                           String                @id @default(cuid())
+  userId                       String
+  source                       BalanceSnapshotSource @default(MUTATION)
+  totalBalance                 Decimal               @db.Decimal(14, 2)
+  totalMinimumPayment          Decimal               @db.Decimal(14, 2)
+  totalMonthlyInterestEstimate Decimal               @db.Decimal(14, 2)
+  capturedAt                   DateTime              @default(now())
+  user                         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, capturedAt])
+}

@@ -1,0 +1,50 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: deuda-clara-rd-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: deuda_clara_rd
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d deuda_clara_rd"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: deuda-clara-rd-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      APP_URL: http://localhost:3000
+      AUTH_SECRET: change-me-with-at-least-32-characters
+      CRON_SECRET: change-me-with-at-least-24-characters
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/deuda_clara_rd?schema=public
+      DIRECT_DATABASE_URL: postgresql://postgres:postgres@db:5432/deuda_clara_rd?schema=public
+      RESEND_API_KEY: ""
+      RESEND_FROM_EMAIL: no-reply@deudaclarard.com
+      UPSTASH_REDIS_REST_URL: ""
+      UPSTASH_REDIS_REST_TOKEN: ""
+    ports:
+      - "3000:3000"
+    command: >
+      sh -c "npx prisma migrate deploy &&
+             npm run db:seed &&
+             npm run start"
+
+volumes:
+  postgres_data:

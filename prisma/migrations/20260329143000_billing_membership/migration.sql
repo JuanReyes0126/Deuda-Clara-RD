@@ -1,0 +1,32 @@
+-- CreateEnum
+CREATE TYPE "MembershipBillingStatus" AS ENUM ('FREE', 'PENDING', 'ACTIVE', 'PAST_DUE', 'CANCELED', 'INACTIVE');
+
+-- AlterEnum
+ALTER TYPE "AuditAction" ADD VALUE IF NOT EXISTS 'BILLING_CHECKOUT_CREATED';
+ALTER TYPE "AuditAction" ADD VALUE IF NOT EXISTS 'BILLING_PORTAL_OPENED';
+ALTER TYPE "AuditAction" ADD VALUE IF NOT EXISTS 'BILLING_WEBHOOK_SYNCED';
+
+-- AlterTable
+ALTER TABLE "UserSettings"
+ADD COLUMN "membershipBillingStatus" "MembershipBillingStatus" NOT NULL DEFAULT 'FREE',
+ADD COLUMN "membershipCurrentPeriodEnd" TIMESTAMP(3),
+ADD COLUMN "membershipCancelAtPeriodEnd" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "stripeCustomerId" TEXT,
+ADD COLUMN "stripeSubscriptionId" TEXT,
+ADD COLUMN "stripePriceId" TEXT;
+
+-- Backfill
+UPDATE "UserSettings"
+SET
+  "membershipBillingStatus" = CASE
+    WHEN "membershipTier" = 'FREE' THEN 'FREE'
+    ELSE 'ACTIVE'
+  END,
+  "membershipActivatedAt" = CASE
+    WHEN "membershipTier" = 'FREE' THEN "membershipActivatedAt"
+    ELSE COALESCE("membershipActivatedAt", NOW())
+  END;
+
+-- CreateIndex
+CREATE UNIQUE INDEX "UserSettings_stripeCustomerId_key" ON "UserSettings"("stripeCustomerId");
+CREATE UNIQUE INDEX "UserSettings_stripeSubscriptionId_key" ON "UserSettings"("stripeSubscriptionId");
