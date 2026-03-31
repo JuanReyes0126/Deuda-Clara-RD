@@ -13,6 +13,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ModuleSectionHeader } from "@/components/shared/module-section-header";
+import { PrimaryActionCard } from "@/components/shared/primary-action-card";
+import { TrustInlineNote } from "@/components/shared/trust-inline-note";
 import {
   membershipPlanCatalog,
   type MembershipBillingStatus,
@@ -535,21 +538,27 @@ export function MembershipPanel({
   const suggestedPlanId =
     highlightPlanId ?? (conversionSnapshot.hasDebts ? "NORMAL" : "FREE");
   const suggestedPlan = membershipPlanCatalog[suggestedPlanId];
+  const planComparisonRef = useRef<HTMLElement | null>(null);
+  const scrollToPlans = () => {
+    planComparisonRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
 
   return (
     <div className="flex flex-col gap-6">
       <section className="border-border shadow-soft rounded-[2rem] border bg-white/90 p-6 sm:p-8">
-        <p className="section-kicker">
-          Planes
-        </p>
-        <h1 className="font-display text-foreground mt-3 break-words text-[clamp(2rem,5vw,2.75rem)] tracking-tight">
-          Desbloquea la capa premium de Deuda Clara RD
-        </h1>
-        <p className="section-summary mt-4 max-w-5xl">
-          Tu cuenta ya es personalizada por usuario. Aquí eliges si quieres
-          mantener la experiencia base o activar los planes que liberan el
-          módulo recomendado y el acompañamiento guiado.
-        </p>
+        <ModuleSectionHeader
+          kicker="Planes"
+          title="Elige la capa de ayuda que mejor encaja con tu momento."
+          description="Base te organiza. Premium te dice qué pagar primero y te ayuda a salir más rápido. Pro mantiene esa lógica con más seguimiento."
+          action={
+            <Button className="w-full sm:w-auto" onClick={scrollToPlans}>
+              Ver comparación
+            </Button>
+          }
+        />
         <div className="border-primary/12 text-foreground mt-5 inline-flex max-w-5xl rounded-3xl border bg-[rgba(240,248,245,0.86)] px-5 py-4 text-sm leading-7">
           <span>
             <span className="text-primary font-semibold">Premium</span> es la
@@ -612,6 +621,47 @@ export function MembershipPanel({
               </div>
             </div>
           </div>
+        ) : null}
+        {highlightedPlan ? (
+          <PrimaryActionCard
+            className="mt-5"
+            eyebrow="Recomendación principal"
+            title={
+              highlightedPlan.id === "NORMAL"
+                ? "Premium es el punto natural si quieres dejar de improvisar."
+                : `Pro tiene más sentido si ya quieres acompañamiento más largo.`
+            }
+            description={
+              highlightedPlan.id === "NORMAL"
+                ? "Te dice qué pagar primero, te ayuda a salir más rápido y convierte el ahorro visible en una ruta concreta."
+                : "Mantiene la lógica premium, pero la extiende con más contexto y seguimiento durante 12 meses."
+            }
+            badgeLabel={`Plan sugerido ${highlightedPlan.label}`}
+            badgeVariant="warning"
+            primaryAction={{
+              label: `Elegir ${highlightedPlan.label}`,
+              onClick: scrollToPlans,
+            }}
+            secondaryAction={{
+              label: currentTier === highlightedPlan.id ? "Ir al dashboard" : "Abrir simulador",
+              onClick: () =>
+                router.push(
+                  currentTier === highlightedPlan.id
+                    ? "/dashboard?focus=optimization"
+                    : "/simulador",
+                ),
+              variant: "secondary",
+            }}
+            notes={[
+              conversionSnapshot.monthsSaved && conversionSnapshot.monthsSaved > 0
+                ? `Podrías recortar ${conversionSnapshot.monthsSaved} meses.`
+                : "La propuesta se basa en tus deudas y pagos actuales.",
+              conversionSnapshot.interestSavings && conversionSnapshot.interestSavings > 0
+                ? `Ahorro potencial: ${formatCurrency(conversionSnapshot.interestSavings)}.`
+                : "La idea es reducir improvisación y ordenar mejor tu flujo.",
+            ]}
+            tone="premium"
+          />
         ) : null}
         {checkoutOutcome === "success" ? (
           <div className="mt-4 rounded-[1.9rem] border border-emerald-200 bg-[linear-gradient(135deg,rgba(236,253,245,0.96),rgba(240,248,245,0.92))] p-5">
@@ -824,7 +874,10 @@ export function MembershipPanel({
         </div>
       </section>
 
-      <section className="grid gap-6 2xl:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)]">
+      <section
+        ref={planComparisonRef}
+        className="grid gap-6 2xl:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)]"
+      >
         <div className="border-border shadow-soft rounded-[2rem] border bg-white/90 p-6">
           <p className="section-kicker">
             Qué cambia entre planes
@@ -987,6 +1040,15 @@ export function MembershipPanel({
           </div>
         </div>
       </section>
+
+      <TrustInlineNote
+        title="Antes de activar"
+        notes={[
+          "Tus datos siguen bajo tu control.",
+          "No conectamos cuentas bancarias para recomendarte.",
+          "Puedes cambiar de plan cuando lo necesites.",
+        ]}
+      />
 
       <section className="grid gap-6 2xl:grid-cols-2">
         {orderedPlans.map((planId) => {

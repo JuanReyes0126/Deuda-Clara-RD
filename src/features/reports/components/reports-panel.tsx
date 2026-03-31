@@ -13,6 +13,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ExecutiveSummaryStrip } from "@/components/shared/executive-summary-strip";
+import { ModuleSectionHeader } from "@/components/shared/module-section-header";
+import { PrimaryActionCard } from "@/components/shared/primary-action-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { readJsonPayload } from "@/lib/http/read-json-payload";
@@ -245,9 +248,37 @@ export function ReportsPanel({
               href: "/dashboard?focus=optimization",
             }
           : {
-              label: "Desbloquear Premium",
-              href: premiumPlanHref,
-            };
+          label: "Desbloquear Premium",
+          href: premiumPlanHref,
+        };
+  const reportSummaryItems = [
+    {
+      label: "Pagado total",
+      value: formatCurrency(summary.totalPaid),
+      support: hasPayments
+        ? "Todo lo que moviste en este rango, incluyendo capital y costo financiero."
+        : "Todavía no hay pagos en este período.",
+      featured: true,
+      badgeLabel: hasPayments ? "Período activo" : "Sin movimiento",
+      badgeVariant: hasPayments ? ("success" as const) : ("default" as const),
+    },
+    {
+      label: "A principal",
+      value: formatCurrency(summary.totalPrincipalPaid),
+      support: "Lo que de verdad bajó capital.",
+    },
+    {
+      label: "Intereses y cargos",
+      value: formatCurrency(feesAndInterest),
+      support: "Lo que se quedó en costo financiero.",
+    },
+    {
+      label: "Tu siguiente mejor paso",
+      value: reportAction.label,
+      support: summary.recommendedNextStep,
+      valueKind: "text" as const,
+    },
+  ];
 
   const reload = () => {
     if (from > to) {
@@ -273,12 +304,54 @@ export function ReportsPanel({
 
   return (
     <div className="flex flex-col gap-6">
+      <ModuleSectionHeader
+        kicker="Reportes"
+        title="Lee rápido cómo rindió tu dinero y qué conviene ajustar ahora."
+        description="Primero ves el resultado del período. Luego una sola recomendación útil. Los filtros quedan aparte para no mezclar lectura con configuración."
+        action={
+          <Button className="w-full sm:w-auto" onClick={() => navigate(reportAction.href)}>
+            {reportAction.label}
+          </Button>
+        }
+      />
+
+      <ExecutiveSummaryStrip items={reportSummaryItems} />
+
+      <PrimaryActionCard
+        eyebrow="Así vas este mes"
+        title={reportStatus.title}
+        description={summary.recommendedNextStep}
+        badgeLabel={reportStatus.badgeLabel}
+        badgeVariant={reportStatus.badgeVariant}
+        primaryAction={{
+          label: reportAction.label,
+          onClick: () => navigate(reportAction.href),
+        }}
+        secondaryAction={{
+          label: "Registrar avance",
+          onClick: () => navigate("/pagos"),
+          variant: "secondary",
+        }}
+        notes={[
+          hasPayments
+            ? `${summary.principalSharePct}% de lo pagado fue a capital.`
+            : "Todavía no hay pagos dentro del rango.",
+          summary.comparison.headline,
+        ]}
+        tone={
+          summary.comparison.signal === "REGRESSION"
+            ? "warning"
+            : summary.comparison.signal === "IMPROVING"
+              ? "premium"
+              : "default"
+        }
+      />
+
       <Card className="p-6">
         <CardHeader>
-          <CardTitle>Reporte mensual</CardTitle>
+          <CardTitle>Filtros y exportación</CardTitle>
           <CardDescription>
-            Resume cuánto pagaste, cuánto fue a principal, intereses y cargos, y
-            exporta CSV o PDF.
+            Ajusta el rango, actualiza la lectura y exporta cuando quieras compartir o revisar con más calma.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 pt-4">
@@ -631,58 +704,6 @@ export function ReportsPanel({
           )}
         </CardContent>
       </Card>
-
-      <section className="grid gap-5 2xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
-        <Card className="min-w-0 p-6 sm:p-8">
-          <CardHeader className="gap-3">
-            <CardDescription>Pagado total</CardDescription>
-            <CardTitle className="value-stable mt-2 text-[clamp(2rem,4.8vw,3rem)] leading-none">
-              {formatCurrency(summary.totalPaid)}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-2 text-sm leading-7 text-muted">
-            Lo que ya moviste en este rango, sumando capital, intereses y
-            cargos.
-          </CardContent>
-        </Card>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          {[
-            {
-              label: "Principal",
-              value: formatCurrency(summary.totalPrincipalPaid),
-              support: "Lo que realmente bajó capital.",
-            },
-            {
-              label: "Intereses",
-              value: formatCurrency(summary.totalInterestPaid),
-              support: "Costo financiero del período.",
-            },
-            {
-              label: "Cargos",
-              value: formatCurrency(summary.totalFeesPaid),
-              support: "Moras y cargos cubiertos.",
-            },
-            {
-              label: "Cantidad de pagos",
-              value: String(summary.paymentCount),
-              support: "Movimientos dentro de este rango.",
-            },
-          ].map((item) => (
-            <Card key={item.label} className="min-w-0 p-5 sm:p-6">
-              <CardHeader className="gap-3">
-                <CardDescription>{item.label}</CardDescription>
-                <CardTitle className="value-stable mt-1 text-[clamp(1.3rem,3vw,1.8rem)] leading-tight">
-                  {item.value}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-1 text-sm leading-6 text-muted">
-                {item.support}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
 
       <section className="grid gap-6 2xl:grid-cols-2">
         <Card className="p-6">

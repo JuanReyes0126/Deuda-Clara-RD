@@ -24,8 +24,10 @@
     "test:e2e": "playwright test",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "auth:bootstrap-admin": "node scripts/bootstrap-admin.mjs",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate"
   },

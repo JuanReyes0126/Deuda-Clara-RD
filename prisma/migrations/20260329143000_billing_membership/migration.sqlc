@@ -1,3 +1,10 @@
+"membershipBillingStatus" = CASE
+  WHEN "membershipTier" = 'FREE' THEN 'FREE'::"MembershipBillingStatus"
+  ELSE 'ACTIVE'::"MembershipBillingStatus"
+"membershipBillingStatus" = CASE
+  WHEN "membershipTier" = 'FREE' THEN 'FREE'::"MembershipBillingStatus"
+  ELSE 'ACTIVE'::"MembershipBillingStatus"
+END,
 -- CreateEnum
 CREATE TYPE "MembershipBillingStatus" AS ENUM ('FREE', 'PENDING', 'ACTIVE', 'PAST_DUE', 'CANCELED', 'INACTIVE');
 
@@ -19,8 +26,8 @@ ADD COLUMN "stripePriceId" TEXT;
 UPDATE "UserSettings"
 SET
   "membershipBillingStatus" = CASE
-    WHEN "membershipTier" = 'FREE' THEN 'FREE'::"MembershipBillingStatus"
-    ELSE 'ACTIVE'::"MembershipBillingStatus"
+    WHEN "membershipTier" = 'FREE' THEN 'FREE'
+    ELSE 'ACTIVE'
   END,
   "membershipActivatedAt" = CASE
     WHEN "membershipTier" = 'FREE' THEN "membershipActivatedAt"

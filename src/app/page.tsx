@@ -32,7 +32,8 @@ const heroPrimaryMetric = heroPrimaryMetricFallback ?? {
 
 const trustPills = [
   "Empieza gratis",
-  "Sin conectar bancos para arrancar",
+  "Sin conectar bancos para empezar",
+  "Tú controlas lo que registras",
   "Premium desde US$5/mes",
 ];
 
@@ -40,32 +41,32 @@ const howItWorks = [
   {
     step: "1",
     title: "Registra tus deudas reales",
-    copy: "Carga tarjetas, prestamos y pagos minimos para construir una base clara desde el primer dia.",
+    copy: "Carga tarjetas, préstamos y pagos mínimos para ver tu panorama real desde el primer día.",
   },
   {
     step: "2",
     title: "Ve lo urgente y lo caro",
-    copy: "La app separa vencimientos, intereses y riesgo de pagar solo minimos para que no decidas a ciegas.",
+    copy: "La app separa vencimientos, intereses y riesgo de pagar solo mínimos para que no decidas a ciegas.",
   },
   {
     step: "3",
     title: "Activa Premium si quieres salir mas rapido",
-    copy: "Desbloquea el orden recomendado y compara tu ritmo actual contra una ruta mas corta.",
+    copy: "Desbloquea la prioridad recomendada y compara tu ritmo actual contra una ruta más corta.",
   },
 ] as const;
 
 const strategyCards = [
   {
     title: "Avalanche",
-    copy: "Prioriza la tasa mas cara para recortar intereses cuanto antes.",
+    copy: "Prioriza la tasa más cara para recortar intereses cuanto antes.",
   },
   {
     title: "Snowball",
-    copy: "Ataca primero los saldos mas pequenos para ganar traccion y reducir carga mental.",
+    copy: "Ataca primero los saldos más pequeños para ganar tracción y reducir carga mental.",
   },
   {
     title: "Hibrido configurable",
-    copy: "Equilibra tasa, urgencia y tamano para una estrategia mas humana y accionable.",
+    copy: "Equilibra tasa, urgencia y tamaño para una estrategia más humana y accionable.",
   },
 ];
 
@@ -84,12 +85,12 @@ const pricingPlans = [
   {
     name: "Premium",
     price: "US$5/mes",
-    highlight: "La ruta rápida de 6 meses",
-    idealFor: "Te da una ruta clara si tu prioridad es salir mas rapido y dejar de improvisar.",
+    highlight: "Te dice qué pagar primero y cómo salir más rápido",
+    idealFor: "Ideal si ya tienes deudas reales y quieres reducir improvisación con una ruta clara de 6 meses.",
     features: [
       "Plan recomendado desbloqueado",
       "Orden de pago optimizado",
-      "Guía premium para salir más rápido",
+      "Guía clara para salir más rápido",
     ],
     featured: true,
   },
@@ -107,10 +108,10 @@ const pricingPlans = [
 ] as const;
 
 const features = [
-  "Dashboard claro con deuda total, urgencia y progreso real.",
-  "Registro completo de deudas, pagos, mora, corte, interes y notas.",
-  "Simulador para ver cuanto tardas y cuanto ahorras si pagas mas.",
-  "Alertas, auditoria y una base seria para operar con confianza.",
+  "Dashboard claro con deuda total, interés del mes y siguiente mejor paso.",
+  "Registro de deudas y pagos sin ruido ni tecnicismos innecesarios.",
+  "Simulador para ver cuánto tardas y cuánto ahorras si pagas más.",
+  "Alertas y seguimiento para que no se te escape lo importante.",
 ];
 
 export default function HomePage() {
@@ -136,12 +137,11 @@ export default function HomePage() {
 
               <div className="space-y-5">
                 <h1 className="max-w-4xl font-display text-5xl leading-[0.95] tracking-tight text-foreground md:text-7xl">
-                  Entiende cuanto debes de verdad y sal con un plan inteligente.
+                  Entiende cuánto debes y qué te conviene hacer ahora.
                 </h1>
                 <p className="max-w-2xl text-lg leading-8 text-muted md:text-xl">
-                  Deuda Clara RD centraliza tus tarjetas, prestamos y pagos para
-                  mostrar el costo real, priorizar lo urgente y convertir una
-                  situacion caotica en pasos claros.
+                  Deuda Clara RD organiza tus deudas, muestra el costo real y te
+                  guía con un siguiente paso claro para salir más rápido.
                 </p>
               </div>
 
@@ -200,11 +200,11 @@ export default function HomePage() {
                   </span>
                 </div>
                 <CardTitle className="max-w-sm text-4xl text-white">
-                  Situacion real, riesgo claro y siguiente mejor pago.
+                  Panorama claro. Prioridad clara. Siguiente paso claro.
                 </CardTitle>
                 <CardDescription className="max-w-lg text-base leading-7 text-white/72">
-                  El producto esta pensado para personas estresadas por deudas:
-                  menos ruido, menos jerga y decisiones mas accionables.
+                  Pensado para personas con deudas reales: menos ruido, menos
+                  jerga y decisiones más accionables.
                 </CardDescription>
               </CardHeader>
 
@@ -246,7 +246,7 @@ export default function HomePage() {
                       Panorama
                     </p>
                     <p className="mt-2 text-sm font-semibold text-white">
-                      Ves todo junto
+                      Todo en una sola vista
                     </p>
                     <p className="mt-1 text-sm leading-6 text-white/70">
                       Sin hojas sueltas ni cuentas separadas.
@@ -257,10 +257,10 @@ export default function HomePage() {
                       Prioridad
                     </p>
                     <p className="mt-2 text-sm font-semibold text-white">
-                      Lo urgente primero
+                      Lo que más te conviene hoy
                     </p>
                     <p className="mt-1 text-sm leading-6 text-white/70">
-                      Vencimientos, minimo y costo visible.
+                      Vencimientos, mínimo y costo visible.
                     </p>
                   </div>
                   <div className="min-w-0">
@@ -268,10 +268,10 @@ export default function HomePage() {
                       Premium
                     </p>
                     <p className="mt-2 text-sm font-semibold text-white">
-                      Ruta mas corta
+                      Ruta más clara
                     </p>
                     <p className="mt-1 text-sm leading-6 text-white/70">
-                      Si quieres salir mas rapido, el plan te lo dice.
+                      Si quieres salir más rápido, el plan te lo dice.
                     </p>
                   </div>
                 </div>
@@ -354,7 +354,7 @@ export default function HomePage() {
                 Planes claros
               </p>
               <h2 className="font-display text-4xl tracking-tight text-foreground">
-                Empieza gratis y sube a Premium solo si quieres salir mas rapido.
+                Empieza gratis y sube a Premium solo si quieres salir más rápido.
               </h2>
               <p className="section-summary">
                 La capa premium no es humo visual. Desbloquea el orden recomendado de pago,

@@ -24,6 +24,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  ExecutiveSummaryStrip,
+  type ExecutiveSummaryItem,
+} from "@/components/shared/executive-summary-strip";
+import { ModuleSectionHeader } from "@/components/shared/module-section-header";
+import { NarrativeInsightCard } from "@/components/shared/narrative-insight-card";
+import { PrimaryActionCard } from "@/components/shared/primary-action-card";
+import { TrustInlineNote } from "@/components/shared/trust-inline-note";
 import type {
   DashboardDto,
   DashboardPlanSnapshotDto,
@@ -993,192 +1001,248 @@ export function DashboardOverview({
 
     return formatCurrency(rawValue);
   };
+  const dailyFocusTone =
+    dailyFocus.badgeVariant === "danger" || dailyFocus.badgeVariant === "warning"
+      ? "warning"
+      : isPremiumUnlocked
+        ? "premium"
+        : "default";
+  const dailyFocusIcon =
+    data.summary.totalDebt <= 0
+      ? CreditCard
+      : data.urgentDebt?.status === "LATE"
+        ? AlertTriangle
+        : isPremiumUnlocked
+          ? Sparkles
+          : Wallet;
+  const dashboardSummaryItems: ExecutiveSummaryItem[] = [
+    {
+      label: "Deuda total",
+      value: formatCurrency(data.summary.totalDebt),
+      support: hasDebts
+        ? "Saldo, mora y cargos que hoy están compitiendo por tu flujo."
+        : "Todavía no hay deudas activas para construir una ruta real.",
+      icon: CircleDollarSign,
+      featured: true,
+      badgeLabel: hasDebts ? "Panorama real" : "Activa tu base",
+      badgeVariant: hasDebts ? "success" : "default",
+    },
+    {
+      label: "Pago mínimo del mes",
+      value: formatCurrency(data.summary.totalMinimumPayment),
+      support: "Lo mínimo para que el mes no se te complique más.",
+      icon: CalendarClock,
+    },
+    {
+      label: "Interés estimado del mes",
+      value: formatCurrency(data.summary.estimatedMonthlyInterest),
+      support:
+        data.summary.estimatedMonthlyInterest > 0
+          ? "Esto es lo que te está costando sostener la estructura actual."
+          : "Cuando registres deuda activa, aquí verás el costo financiero del mes.",
+      icon: AlertTriangle,
+      badgeLabel:
+        data.summary.estimatedMonthlyInterest > 0 ? "Costo visible" : undefined,
+      badgeVariant: "warning" as const,
+    },
+    {
+      label: "Tiempo estimado de salida",
+      value: formatMonthsLabel(data.summary.monthsToDebtFree),
+      support: data.summary.projectedDebtFreeDate
+        ? `Si mantienes este ritmo, apuntas a ${formatDate(
+            data.summary.projectedDebtFreeDate,
+            "MMM yyyy",
+          )}.`
+        : "Completa deudas y pagos para proyectar una salida más clara.",
+      icon: Sparkles,
+      valueKind: "text" as const,
+      badgeLabel:
+        premiumMonthsSaved !== null && premiumMonthsSaved > 0
+          ? `${premiumMonthsSaved} meses menos`
+          : undefined,
+      badgeVariant: "success" as const,
+    },
+    {
+      label: "Prioridad actual",
+      value:
+        data.summary.recommendedDebtName ??
+        data.urgentDebt?.name ??
+        (hasDebts ? "Revisa tu prioridad" : "Registra tu primera deuda"),
+      support: data.summary.recommendedDebtName
+        ? "Hoy es la deuda que más conviene proteger o acelerar."
+        : hasDebts
+          ? "Aún falta una señal más clara para decirte cuál va primero."
+          : "Con una deuda registrada ya activamos la prioridad principal.",
+      icon: CreditCard,
+      valueKind: "text" as const,
+    },
+  ];
+  const firstSecondaryQuickAction = secondaryQuickActions[0] ?? null;
+  const dashboardSecondaryAction = firstSecondaryQuickAction
+    ? {
+        label: firstSecondaryQuickAction.actionLabel,
+        onClick: () => navigateTo(firstSecondaryQuickAction.href),
+        variant: "secondary" as const,
+      }
+    : isPremiumUnlocked
+      ? {
+          label: "Revisar mi plan",
+          onClick: revealOptimization,
+          variant: "secondary" as const,
+        }
+      : {
+          label: "Ver planes",
+          onClick: () => navigateTo(upgradePlanHref),
+          variant: "secondary" as const,
+        };
 
   return (
     <div className="flex flex-col gap-6">
       <section className="border-border shadow-soft rounded-[2rem] border bg-white/90 p-5 sm:p-8">
         <div className="flex flex-col gap-6">
-          <div className="border-primary/12 rounded-[1.75rem] border bg-[rgba(240,248,245,0.95)] p-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0 max-w-4xl">
-                <div className="flex flex-wrap items-center gap-3">
-                  <Badge variant={dailyFocus.badgeVariant}>
-                    {dailyFocus.badgeLabel}
-                  </Badge>
-                  <Badge variant="default">{dailyFocus.eyebrow}</Badge>
-                </div>
-                <p className="text-foreground mt-4 break-words text-2xl font-semibold">
-                  {dailyFocus.title}
-                </p>
-                <p className="text-muted mt-3 text-sm leading-7">
-                  {dailyFocus.description}
-                </p>
-              </div>
-              <div className="w-full sm:w-auto">
-                <Button
-                  size="lg"
-                  className="w-full sm:w-auto"
-                  onClick={() => navigateTo(dailyFocus.primaryHref)}
-                >
-                  {dailyFocus.primaryLabel}
-                </Button>
-              </div>
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {dailyFocus.notes.map((note) => (
-                <div
-                  key={note}
-                  className="text-foreground rounded-3xl border border-white/70 bg-white/85 px-4 py-3 text-sm"
-                >
-                  {note}
-                </div>
-              ))}
-            </div>
-          </div>
+          <ModuleSectionHeader
+            kicker="Dashboard"
+            title="Tu tablero ya no solo informa: te dice qué conviene hacer ahora."
+            description="Primero ves tu panorama real. Luego una sola recomendación clara para mover el plan sin abrir demasiados frentes."
+            action={
+              <Button
+                onClick={revealOptimization}
+                size="lg"
+                variant={isPremiumUnlocked ? "secondary" : "primary"}
+                className="w-full sm:w-auto"
+              >
+                {isPremiumUnlocked ? "Ver mi plan" : "Activar Premium"}
+              </Button>
+            }
+          />
 
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div className="min-w-0">
-              <p className="text-primary text-sm font-semibold tracking-[0.18em] uppercase">
-                Copiloto financiero
-              </p>
-              <h1 className="font-display text-foreground mt-3 break-words text-[clamp(2rem,5vw,2.75rem)] tracking-tight">
-                Tu panorama real de deudas, con una ruta clara para salir.
-              </h1>
-              <p className="text-muted mt-4 max-w-5xl text-base leading-8">
-                El sistema consolida saldo, intereses y urgencia para decirte
-                qué pagar primero, cuánto podrías ahorrar y cuándo podrías
-                quedar libre de deudas.
-              </p>
-              <div className="mt-5 flex flex-wrap items-center gap-3">
-                <Button
-                  onClick={revealOptimization}
-                  size="lg"
-                  variant="secondary"
-                  className="w-full sm:w-auto"
-                >
-                  {isPremiumUnlocked
-                    ? "Optimizar mi plan"
-                    : "Ver planes premium"}
-                </Button>
-                <Badge variant={isPremiumUnlocked ? "success" : "default"}>
-                  {data.membership.guidanceLabel}
-                </Badge>
-                {isPremiumUnlocked &&
-                premiumMonthsSaved !== null &&
-                premiumMonthsSaved > 0 ? (
-                  <Badge variant="default">
-                    {premiumMonthsSaved} meses menos
-                  </Badge>
-                ) : null}
-              </div>
-            </div>
+          <ExecutiveSummaryStrip items={dashboardSummaryItems} />
 
-            <div className="min-w-0 rounded-[2rem] bg-[linear-gradient(160deg,rgba(12,88,74,0.98),rgba(33,132,113,0.92))] p-6 text-white shadow-[0_24px_60px_rgba(15,88,74,0.24)] lg:min-w-[22rem]">
+          <PrimaryActionCard
+            eyebrow="Tu siguiente mejor paso"
+            title={dailyFocus.title}
+            description={dailyFocus.description}
+            badgeLabel={dailyFocus.badgeLabel}
+            badgeVariant={dailyFocus.badgeVariant}
+            primaryAction={{
+              label: dailyFocus.primaryLabel,
+              onClick: () => navigateTo(dailyFocus.primaryHref),
+            }}
+            secondaryAction={dashboardSecondaryAction}
+            notes={dailyFocus.notes}
+            tone={dailyFocusTone}
+            icon={dailyFocusIcon}
+          />
+
+          <TrustInlineNote
+            notes={[
+              "Tus datos están protegidos.",
+              "No conectamos cuentas bancarias.",
+              "Tú controlas lo que registras.",
+            ]}
+          />
+
+          <div className="grid gap-5 2xl:grid-cols-[1.05fr_0.95fr]">
+            <NarrativeInsightCard
+              kicker="Así va tu plan"
+              title={momentumSummary.title}
+              description={momentumSummary.description}
+              badges={[
+                {
+                  label: momentumSummary.badgeLabel,
+                  variant: momentumSummary.badgeVariant,
+                },
+                {
+                  label: `${debtProgressPct}% de avance visible`,
+                  variant: "default",
+                },
+              ]}
+              tone="soft"
+              footer={
+                <div className="space-y-4">
+                  <div className="rounded-[1.5rem] border border-white/70 bg-white/85 p-4">
+                    <div className="flex min-w-0 items-end justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-muted text-xs tracking-[0.16em] uppercase">
+                          Progreso hacia la salida
+                        </p>
+                        <p className="text-foreground mt-2 text-[clamp(1.1rem,3vw,1.35rem)] font-semibold leading-tight">
+                          {debtProgressPct}%
+                        </p>
+                      </div>
+                      <p className="support-copy min-w-0 max-w-xs text-right">
+                        {momentumSummary.progressLabel}
+                      </p>
+                    </div>
+                    <div className="bg-secondary mt-4 h-3 overflow-hidden rounded-full">
+                      <div
+                        className="h-full rounded-full bg-[linear-gradient(135deg,#0f584a_0%,#f08a5d_140%)]"
+                        style={{ width: `${debtProgressPct}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {progressMilestones.map((milestone) => (
+                      <div
+                        key={milestone.label}
+                        className="rounded-3xl border border-white/70 bg-white/82 px-4 py-4"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-foreground text-sm font-semibold">
+                            {milestone.label}
+                          </p>
+                          <Badge
+                            variant={milestone.complete ? "success" : "default"}
+                          >
+                            {milestone.complete ? "Listo" : "Pendiente"}
+                          </Badge>
+                        </div>
+                        <p className="support-copy mt-2">{milestone.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              }
+            />
+
+            <div className="min-w-0 rounded-[2rem] bg-[linear-gradient(160deg,rgba(12,88,74,0.98),rgba(33,132,113,0.92))] p-6 text-white shadow-[0_24px_60px_rgba(15,88,74,0.24)]">
               <p className="text-sm font-medium text-white/78">
                 {isPremiumUnlocked
-                  ? "Fecha estimada de salida de deudas"
-                  : "Fecha estimada al ritmo actual"}
+                  ? "Fecha estimada de salida"
+                  : "Salida al ritmo actual"}
               </p>
-              <p className="date-stable font-display mt-3 text-[clamp(1.7rem,4.5vw,2.5rem)] tracking-tight">
+              <p className="date-stable font-display mt-3 text-[clamp(1.8rem,4.8vw,2.7rem)] tracking-tight">
                 {data.summary.projectedDebtFreeDate
                   ? formatDate(data.summary.projectedDebtFreeDate, "MMM yyyy")
                   : "Sin proyección"}
               </p>
-              <p className="mt-2 text-sm text-white/78">
+              <p className="mt-2 text-sm leading-7 text-white/78">
                 {data.summary.monthsToDebtFree !== null
-                  ? `${data.summary.monthsToDebtFree} meses ${isPremiumUnlocked ? "siguiendo el plan recomendado" : "si mantienes tu ritmo actual"}`
-                  : "No hay datos suficientes para proyectar"}
+                  ? `Si sostienes este ritmo, sales en ${data.summary.monthsToDebtFree} meses.`
+                  : "Aún faltan datos para proyectar una salida confiable."}
               </p>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-3xl bg-white/10 p-4">
                   <p className="text-xs tracking-[0.16em] text-white/70 uppercase">
-                    {isPremiumUnlocked
-                      ? "Ahorro estimado"
-                      : "Intereses visibles"}
+                    {isPremiumUnlocked ? "Ahorro estimado" : "Intereses visibles"}
                   </p>
-                  <p className="value-stable mt-2 text-[clamp(0.95rem,2.6vw,1.15rem)] font-semibold leading-tight">
+                  <p className="value-stable mt-2 text-[clamp(1rem,2.8vw,1.2rem)] font-semibold leading-tight">
                     {isPremiumUnlocked
-                      ? formatCurrency(
-                          data.planComparison?.interestSavings ?? 0,
-                        )
+                      ? formatCurrency(data.planComparison?.interestSavings ?? 0)
                       : formatCurrency(data.summary.estimatedMonthlyInterest)}
                   </p>
                 </div>
                 <div className="rounded-3xl bg-white/10 p-4">
                   <p className="text-xs tracking-[0.16em] text-white/70 uppercase">
-                    {isPremiumUnlocked ? "Acción inmediata" : "Con Premium"}
+                    Recomendación principal
                   </p>
                   <p className="mt-2 text-sm leading-6 text-white/84">
                     {isPremiumUnlocked
                       ? data.planComparison?.immediateAction
                       : premiumConversionMessage}
-                    {isPremiumUnlocked
-                      ? ""
-                      : ` ${data.membership.label === "Base" ? "Premium te guía por 6 meses para salir más rápido y Pro extiende el acompañamiento a 12." : ""}`}
                   </p>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-4">
-            <div className="border-border/80 bg-secondary/55 rounded-[1.75rem] border p-5">
-              <div className="flex flex-wrap items-center gap-3">
-                <Badge variant={momentumSummary.badgeVariant}>
-                  {momentumSummary.badgeLabel}
-                </Badge>
-                <Badge variant="default">
-                  {debtProgressPct}% de avance visible
-                </Badge>
-              </div>
-              <p className="text-foreground mt-4 break-words text-2xl font-semibold">
-                {momentumSummary.title}
-              </p>
-              <p className="text-muted mt-3 text-sm leading-7">
-                {momentumSummary.description}
-              </p>
-              <div className="mt-4 rounded-[1.5rem] border border-white/70 bg-white/85 p-4">
-                <div className="flex min-w-0 items-end justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="text-muted text-xs tracking-[0.16em] uppercase">
-                      Progreso hacia salida
-                    </p>
-                    <p className="text-foreground mt-2 break-words text-[clamp(1rem,3vw,1.25rem)] font-semibold leading-tight">
-                      {debtProgressPct}%
-                    </p>
-                  </div>
-                  <p className="text-muted min-w-0 break-words text-right text-xs leading-6">
-                    {momentumSummary.progressLabel}
-                  </p>
-                </div>
-                <div className="bg-secondary mt-4 h-3 overflow-hidden rounded-full">
-                  <div
-                    className="h-full rounded-full bg-[linear-gradient(135deg,#0f584a_0%,#f08a5d_140%)]"
-                    style={{ width: `${debtProgressPct}%` }}
-                  />
-                </div>
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {progressMilestones.map((milestone) => (
-                  <div
-                    key={milestone.label}
-                    className="rounded-3xl border border-white/70 bg-white/80 px-4 py-3"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-foreground text-sm font-semibold">
-                        {milestone.label}
-                      </p>
-                      <Badge
-                        variant={milestone.complete ? "success" : "default"}
-                      >
-                        {milestone.complete ? "Listo" : "Pendiente"}
-                      </Badge>
-                    </div>
-                    <p className="text-muted mt-2 text-sm leading-6">
-                      {milestone.detail}
-                    </p>
-                  </div>
-                ))}
               </div>
             </div>
           </div>

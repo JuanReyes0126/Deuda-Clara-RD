@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Pencil, WalletCards, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -16,6 +16,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ContextMetricsGrid } from "@/components/shared/context-metrics-grid";
+import { ExecutiveSummaryStrip } from "@/components/shared/executive-summary-strip";
+import { ModuleSectionHeader } from "@/components/shared/module-section-header";
+import { PrimaryActionCard } from "@/components/shared/primary-action-card";
+import { TrustInlineNote } from "@/components/shared/trust-inline-note";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -278,6 +283,65 @@ export function PaymentManager({
     }),
     [payments],
   );
+  const combinedInterestAndCharges = paymentTotals.interestPaid + paymentTotals.chargesPaid;
+  const inferredPrincipalAmount =
+    watchedPrincipal > 0
+      ? watchedPrincipal
+      : Math.max(0, watchedAmount - watchedInterest - watchedLateFee - watchedExtraCharges);
+  const estimatedRemainingBalance =
+    selectedDebt && watchedAmount > 0
+      ? Math.max(0, Number((selectedDebt.effectiveBalance - watchedAmount).toFixed(2)))
+      : selectedDebt?.effectiveBalance ?? null;
+  const paymentSummaryItems = [
+    {
+      label: "Pagado total",
+      value: formatCurrency(paymentTotals.totalPaid),
+      support: payments.length
+        ? "Lo que ya registraste entre capital, intereses y cargos."
+        : "Tu historial empezará a respirar apenas captures el primer pago.",
+      featured: true,
+      badgeLabel: `${paymentTotals.count} pago${paymentTotals.count === 1 ? "" : "s"}`,
+      badgeVariant: paymentTotals.count > 0 ? ("success" as const) : ("default" as const),
+    },
+    {
+      label: "A principal",
+      value: formatCurrency(paymentTotals.principalPaid),
+      support: "Lo que de verdad bajó capital hasta ahora.",
+    },
+    {
+      label: "Intereses y cargos",
+      value: formatCurrency(combinedInterestAndCharges),
+      support: "Lo que el flujo ha absorbido en costo financiero.",
+    },
+    {
+      label: "Próximo movimiento",
+      value: selectedDebt?.name ?? debtOptions[0]?.name ?? "Carga una deuda primero",
+      support: selectedDebt
+        ? "Es la deuda que estás a punto de actualizar."
+        : debtOptions.length
+          ? "Selecciona una deuda y registra el pago más reciente."
+          : "Primero necesitas una deuda activa para capturar pagos.",
+      valueKind: "text" as const,
+    },
+  ];
+  const paymentImpactTitle = !selectedDebt
+    ? "Primero elige una deuda activa."
+    : watchedAmount <= 0
+      ? `Registra el pago de ${selectedDebt.name} para ver el cambio real.`
+      : pendingSplitAmount < 0
+        ? "El desglose está por encima del pago total."
+        : inferredPrincipalAmount <= watchedAmount * 0.35
+          ? "Este pago todavía se va mucho a intereses y cargos."
+          : "Este pago ya está empujando capital de verdad.";
+  const paymentImpactDescription = !selectedDebt
+    ? "En cuanto elijas una deuda, aquí verás cuánto baja el saldo y cómo se reparte el pago."
+    : watchedAmount <= 0
+      ? "Captura el monto total y la app te muestra de inmediato cuánto baja el saldo visible."
+      : pendingSplitAmount < 0
+        ? "Ajusta principal, interés o cargos para que el reparto coincida con el pago registrado."
+        : inferredPrincipalAmount <= watchedAmount * 0.35
+          ? "Conviene revisar la estrategia si este patrón se repite, porque el dinero todavía rinde poco contra el saldo."
+          : `Si lo guardas así, el saldo visible bajaría a ${formatCurrency(estimatedRemainingBalance ?? 0)}.`;
 
   return (
     <div className="flex flex-col gap-6">
@@ -313,74 +377,73 @@ export function PaymentManager({
         </section>
       ) : null}
 
-      <section className="grid gap-4 2xl:grid-cols-[1.08fr_0.92fr]">
-        <Card className="min-w-0 p-6">
-          <CardHeader className="gap-3">
-            <CardDescription className="text-[11px] font-semibold uppercase tracking-[0.2em]">
-              Resumen de pagos
-            </CardDescription>
-            <CardTitle className="text-foreground text-2xl">
-              Lo que ya has movido en esta deuda
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="rounded-[1.9rem] border border-primary/12 bg-[rgba(240,248,245,0.92)] p-5 sm:p-6">
-              <div className="flex flex-wrap items-center gap-3">
-                <Badge variant="success">{paymentTotals.count} pagos registrados</Badge>
-                <Badge variant="default">Vista acumulada</Badge>
-              </div>
-              <p className="text-muted mt-4 text-[11px] font-semibold uppercase tracking-[0.22em]">
-                Pagado total
-              </p>
-              <p className="value-stable text-foreground mt-3 text-[clamp(1.9rem,5vw,2.8rem)] font-semibold leading-none">
-                {formatCurrency(paymentTotals.totalPaid)}
-              </p>
-              <p className="text-muted mt-3 max-w-xl text-sm leading-7">
-                Este es el monto total que ya has registrado. Abajo ves cuánto se fue a principal, intereses y cargos.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+      <ModuleSectionHeader
+        kicker="Pagos"
+        title="Registra pagos con contexto claro y entiende qué cambia antes de guardar."
+        description="Arriba ves el historial acumulado. Luego una sola acción guiada para la deuda elegida y un resumen claro de cómo se reparte el pago."
+        action={
+          <Button
+            className="w-full sm:w-auto"
+            onClick={() =>
+              debtOptions.length ? form.setFocus("amount") : router.push("/deudas")
+            }
+          >
+            {debtOptions.length ? "Registrar pago" : "Ir a deudas"}
+          </Button>
+        }
+      />
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          {[
-            {
-              label: "Abono a principal",
-              value: formatCurrency(paymentTotals.principalPaid),
-              support: "Lo que realmente bajó capital.",
-            },
-            {
-              label: "Intereses",
-              value: formatCurrency(paymentTotals.interestPaid),
-              support: "Costo financiero absorbido.",
-            },
-            {
-              label: "Cargos",
-              value: formatCurrency(paymentTotals.chargesPaid),
-              support: "Mora y cargos extras cubiertos.",
-            },
-            {
-              label: "Pagos registrados",
-              value: String(paymentTotals.count),
-              support: "Movimientos ya capturados.",
-            },
-          ].map((item) => (
-            <Card key={item.label} className="min-w-0 p-5 sm:p-6">
-              <CardHeader className="gap-3">
-                <CardDescription className="text-[11px] font-semibold uppercase tracking-[0.2em]">
-                  {item.label}
-                </CardDescription>
-                <CardTitle className="value-stable mt-0 text-[clamp(1.2rem,3vw,1.7rem)] leading-tight">
-                  {item.value}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-1 text-sm leading-6 text-muted">
-                {item.support}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
+      <ExecutiveSummaryStrip items={paymentSummaryItems} />
+
+      <PrimaryActionCard
+        eyebrow="Qué hacer ahora"
+        title={
+          selectedDebt
+            ? `Registra el pago más reciente de ${selectedDebt.name}.`
+            : debtOptions.length
+              ? "Selecciona una deuda y registra el movimiento más reciente."
+              : "Primero necesitas una deuda para empezar a capturar pagos."
+        }
+        description={
+          selectedDebt
+            ? "Antes de guardar, verás cómo se reparte el pago y cuánto cambia el saldo visible de esa deuda."
+            : debtOptions.length
+              ? "En cuanto elijas una deuda, la app te dirá si el pago empuja capital o se sigue yendo demasiado en costo."
+              : "Sin una deuda activa, el historial y el cálculo posterior al pago no pueden arrancar."
+        }
+        badgeLabel={selectedDebt ? "Captura guiada" : "Paso previo"}
+        badgeVariant={selectedDebt ? "success" : "default"}
+        primaryAction={{
+          label: selectedDebt ? "Capturar pago" : debtOptions.length ? "Elegir deuda" : "Registrar deuda",
+          onClick: () =>
+            selectedDebt
+              ? form.setFocus("amount")
+              : debtOptions.length
+                ? form.setFocus("debtId")
+                : router.push("/deudas"),
+        }}
+        secondaryAction={
+          selectedDebt
+            ? {
+                label: "Pagar mínimo",
+                onClick: () => applyQuickAmount(selectedDebt.minimumPayment),
+                variant: "secondary",
+              }
+            : undefined
+        }
+        notes={
+          selectedDebt
+            ? [
+                `Saldo actual: ${formatCurrency(selectedDebt.effectiveBalance)}.`,
+                `Pago mínimo: ${formatCurrency(selectedDebt.minimumPayment)}.`,
+              ]
+            : [
+                "La app estima el reparto si no conoces todo el desglose.",
+                "El historial se mantiene visible aunque falten campos parciales.",
+              ]
+        }
+        tone={selectedDebt ? "default" : "warning"}
+      />
 
       <section className="grid gap-6 xl:grid-cols-[1fr_1.15fr]">
         <Card className="min-w-0 p-6">
@@ -429,8 +492,7 @@ export function PaymentManager({
                       {selectedDebt.creditorName}
                     </p>
                     <p className="text-muted mt-4 max-w-xl text-sm leading-7">
-                      Antes de registrar el pago, aquí tienes el panorama que
-                      conviene proteger para que la captura quede clara.
+                      Antes de guardar, este es el contexto que conviene proteger para que la captura sea clara y accionable.
                     </p>
                   </div>
 
@@ -475,8 +537,9 @@ export function PaymentManager({
                   </div>
                 </div>
 
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  {[
+                <ContextMetricsGrid
+                  className="mt-4"
+                  items={[
                     {
                       label: "Saldo actual",
                       value: formatCurrency(selectedDebt.effectiveBalance),
@@ -493,7 +556,7 @@ export function PaymentManager({
                         ? formatDate(selectedDebt.nextDueDate)
                         : "Sin fecha",
                       support: "La fecha que más conviene proteger ahora.",
-                      isDate: true,
+                      valueKind: "date",
                     },
                     {
                       label: "Último pago",
@@ -503,29 +566,10 @@ export function PaymentManager({
                       support: selectedDebt.lastPaymentAt
                         ? formatDate(selectedDebt.lastPaymentAt)
                         : "Aún no hay pagos capturados",
-                      isDateSupport: Boolean(selectedDebt.lastPaymentAt),
+                      valueKind: selectedDebt.lastPaymentAmount ? "value" : "text",
                     },
-                  ].map((item) => (
-                    <div
-                      key={item.label}
-                      className="min-w-0 rounded-[1.9rem] border border-white/80 bg-white/92 p-5 shadow-[0_14px_32px_rgba(24,49,59,0.06)] sm:p-6"
-                    >
-                      <p className="text-muted text-[11px] font-semibold tracking-[0.22em] uppercase">
-                        {item.label}
-                      </p>
-                      <p
-                        className={`${item.isDate ? "date-stable" : "value-stable"} text-foreground mt-4 text-[clamp(1.35rem,3.5vw,1.95rem)] font-semibold leading-tight`}
-                      >
-                        {item.value}
-                      </p>
-                      <p
-                        className={`${item.isDateSupport ? "date-stable" : ""} text-muted mt-3 text-sm leading-6`}
-                      >
-                        {item.support}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+                  ]}
+                />
               </div>
             ) : null}
 
@@ -626,27 +670,57 @@ export function PaymentManager({
                 />
               </div>
 
-              <div className="border-border bg-secondary/45 rounded-3xl border p-4 md:col-span-2">
-                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-foreground text-sm font-semibold">
-                      Lectura rápida del desglose
-                    </p>
-                    <p className="text-muted text-sm">
-                      {pendingSplitAmount > 0
-                        ? `Faltan ${formatCurrency(pendingSplitAmount)} por asignar dentro del pago.`
-                        : pendingSplitAmount < 0
-                          ? `El desglose supera el pago por ${formatCurrency(Math.abs(pendingSplitAmount))}.`
-                          : "El desglose coincide con el pago registrado."}
-                    </p>
-                  </div>
+              <div className="rounded-[1.75rem] border border-primary/12 bg-[rgba(240,248,245,0.92)] p-4 md:col-span-2 sm:p-5">
+                <div className="flex flex-wrap items-center gap-3">
                   <Badge
-                    variant={pendingSplitAmount < 0 ? "danger" : "default"}
-                    className="value-stable max-w-full text-center"
+                    variant={
+                      pendingSplitAmount < 0
+                        ? "danger"
+                        : watchedAmount > 0
+                          ? "success"
+                          : "default"
+                    }
                   >
+                    Qué cambia con este pago
+                  </Badge>
+                  <Badge variant="default" className="value-stable max-w-full text-center">
                     {formatCurrency(watchedAmount)}
                   </Badge>
                 </div>
+                <p className="text-foreground mt-4 text-lg font-semibold leading-tight">
+                  {paymentImpactTitle}
+                </p>
+                <p className="support-copy mt-2">{paymentImpactDescription}</p>
+                <ContextMetricsGrid
+                  className="mt-4"
+                  items={[
+                    {
+                      label: "A principal",
+                      value: formatCurrency(inferredPrincipalAmount),
+                      support: "Lo que hoy empuja capital visible.",
+                    },
+                    {
+                      label: "Interés",
+                      value: formatCurrency(watchedInterest),
+                      support: "Costo financiero cubierto en esta captura.",
+                    },
+                    {
+                      label: "Cargos",
+                      value: formatCurrency(watchedLateFee + watchedExtraCharges),
+                      support: "Mora y extras absorbidos.",
+                    },
+                    {
+                      label: "Saldo luego del pago",
+                      value: formatCurrency(estimatedRemainingBalance ?? 0),
+                      support:
+                        pendingSplitAmount > 0
+                          ? `Aún faltan ${formatCurrency(pendingSplitAmount)} por asignar dentro del pago.`
+                          : pendingSplitAmount < 0
+                            ? `El desglose supera el pago por ${formatCurrency(Math.abs(pendingSplitAmount))}.`
+                            : "El desglose coincide con el pago registrado.",
+                    },
+                  ]}
+                />
               </div>
 
               <div className="space-y-2 md:col-span-2">
@@ -851,18 +925,14 @@ export function PaymentManager({
         </Card>
       </section>
 
-      <section className="border-border shadow-soft rounded-[2rem] border bg-white/90 p-6">
-        <div className="flex items-center gap-3">
-          <WalletCards className="text-primary size-5" />
-          <div>
-            <p className="text-foreground font-semibold">Consejo de captura</p>
-            <p className="text-muted text-sm">
-              Si no conoces el desglose exacto, deja principal, interés o cargos
-              vacíos y la app hará una estimación razonable.
-            </p>
-          </div>
-        </div>
-      </section>
+      <TrustInlineNote
+        title="Captura con confianza"
+        notes={[
+          "Si no conoces todo el desglose, la app estima una versión razonable.",
+          "Tú decides qué registrar y cuándo corregirlo.",
+          "No necesitas conectar cuentas bancarias.",
+        ]}
+      />
     </div>
   );
 }

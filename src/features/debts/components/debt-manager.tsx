@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Archive, Pencil, Plus, Trash2 } from "lucide-react";
+import { Archive, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
@@ -10,6 +10,13 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  ExecutiveSummaryStrip,
+  type ExecutiveSummaryItem,
+} from "@/components/shared/executive-summary-strip";
+import { ModuleSectionHeader } from "@/components/shared/module-section-header";
+import { PrimaryActionCard } from "@/components/shared/primary-action-card";
+import { TrustInlineNote } from "@/components/shared/trust-inline-note";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -240,6 +247,62 @@ export function DebtManager({
       );
     });
   }, [debts, listFilter, searchQuery]);
+  const priorityDebt = useMemo(() => {
+    if (!activeDebts.length) {
+      return null;
+    }
+
+    return [...activeDebts].sort((left, right) => {
+      const lateDelta =
+        Number(right.status === "LATE") - Number(left.status === "LATE");
+
+      if (lateDelta !== 0) {
+        return lateDelta;
+      }
+
+      const leftDueTime = left.nextDueDate ? new Date(left.nextDueDate).getTime() : Number.POSITIVE_INFINITY;
+      const rightDueTime = right.nextDueDate ? new Date(right.nextDueDate).getTime() : Number.POSITIVE_INFINITY;
+
+      if (leftDueTime !== rightDueTime) {
+        return leftDueTime - rightDueTime;
+      }
+
+      return right.monthlyInterestEstimate - left.monthlyInterestEstimate;
+    })[0] ?? null;
+  }, [activeDebts]);
+  const debtSummaryItems: ExecutiveSummaryItem[] = [
+    {
+      label: "Saldo total",
+      value: formatCurrency(summary.totalBalance),
+      support: activeDebts.length
+        ? "Lo que hoy necesitas ordenar para recuperar control."
+        : "Aquí aparecerá tu panorama apenas registres la primera deuda.",
+      badgeLabel: activeDebts.length ? "Panorama real" : "Empieza aquí",
+      badgeVariant: activeDebts.length ? ("success" as const) : ("default" as const),
+      featured: true,
+    },
+    {
+      label: "Deudas activas",
+      value: String(summary.activeDebtCount),
+      support: "Cuentas abiertas que hoy compiten por tu flujo.",
+      valueKind: "text" as const,
+    },
+    {
+      label: "Pago mínimo total",
+      value: formatCurrency(summary.totalMinimumPayment),
+      support: "Lo mínimo para sostenerte al día este mes.",
+    },
+    {
+      label: "Más presión hoy",
+      value: priorityDebt?.name ?? "Define tu prioridad",
+      support: priorityDebt
+        ? "Conviene revisarla antes de repartir el flujo del mes."
+        : "Con una deuda registrada te diremos cuál presiona más.",
+      valueKind: "text" as const,
+      badgeLabel: priorityDebt?.status === "LATE" ? "Atrasada" : undefined,
+      badgeVariant: "warning" as const,
+    },
+  ];
   const livePreview = useMemo(() => {
     const effectiveBalance = watchedCurrentBalance + watchedLateFee + watchedExtraCharges;
     const monthlyRate =
@@ -406,26 +469,66 @@ export function DebtManager({
         </section>
       ) : null}
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {[
-          { label: "Deudas activas", value: summary.activeDebtCount, suffix: "" },
-          { label: "Deuda total", value: summary.totalBalance, suffix: "currency" },
-          { label: "Pago mínimo total", value: summary.totalMinimumPayment, suffix: "currency" },
-          { label: "Interés mensual estimado", value: summary.totalMonthlyInterest, suffix: "currency" },
-        ].map((item) => (
-          <Card key={item.label} className="min-w-0 p-6">
-            <CardHeader>
-              <CardDescription>{item.label}</CardDescription>
-              <CardTitle className="value-stable mt-3 text-[clamp(1.35rem,3.8vw,2.1rem)] leading-tight">
-                {item.suffix === "currency" ? formatCurrency(item.value) : item.value}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-        ))}
-      </section>
+      <ModuleSectionHeader
+        kicker="Deudas"
+        title="Ordena tus deudas y detecta cuál necesita atención primero."
+        description="Arriba ves el panorama, luego una recomendación directa. El listado va primero para que entiendas tu realidad antes de editar."
+        action={
+          <Button className="w-full sm:w-auto" onClick={() => form.setFocus("name")}>
+            Registrar deuda
+          </Button>
+        }
+      />
 
-      <section className="grid gap-6 xl:grid-cols-[1.1fr_1fr]">
-        <Card className="min-w-0 p-6">
+      <ExecutiveSummaryStrip items={debtSummaryItems} />
+
+      <PrimaryActionCard
+        eyebrow="Lo que más te conviene hoy"
+        title={
+          priorityDebt
+            ? `Tu deuda más sensible hoy es ${priorityDebt.name}.`
+            : "Registra tu primera deuda para activar una prioridad real."
+        }
+        description={
+          priorityDebt
+            ? priorityDebt.status === "LATE"
+              ? "Ya viene atrasada. Si la atiendes primero, reduces presión y evitas que la mora siga ganando terreno."
+              : priorityDebt.nextDueDate
+                ? "Es la que más conviene proteger ahora por vencimiento, interés o presión sobre el flujo."
+                : "Hoy es la que más conviene revisar antes de repartir dinero entre varias cuentas."
+            : "Con una sola deuda ya podemos mostrarte costo mensual, riesgo y qué conviene atacar primero."
+        }
+        badgeLabel={priorityDebt?.status === "LATE" ? "Urgente" : "Siguiente mejor paso"}
+        badgeVariant={priorityDebt?.status === "LATE" ? "danger" : "default"}
+        primaryAction={{
+          label: priorityDebt ? "Registrar deuda / editar prioridad" : "Registrar deuda",
+          onClick: () => form.setFocus(priorityDebt ? "name" : "name"),
+        }}
+        secondaryAction={
+          activeDebts.length
+            ? {
+                label: "Ir a pagos",
+                onClick: () => router.push("/pagos"),
+                variant: "secondary",
+              }
+            : undefined
+        }
+        notes={
+          priorityDebt
+            ? [
+                `Saldo visible: ${formatCurrency(priorityDebt.effectiveBalance)}.`,
+                `Pago mínimo: ${formatCurrency(priorityDebt.minimumPayment)}.`,
+              ]
+            : [
+                "Empieza por saldo, pago mínimo y vencimiento.",
+                "Luego la app te ayuda con prioridad y alertas.",
+              ]
+        }
+        tone={priorityDebt?.status === "LATE" ? "warning" : "default"}
+      />
+
+      <section className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+        <Card className="order-2 min-w-0 p-6 xl:order-2">
           <CardHeader>
             <CardTitle>{selectedDebt ? "Editar deuda" : "Registrar deuda"}</CardTitle>
             <CardDescription>
@@ -712,11 +815,11 @@ export function DebtManager({
           </CardContent>
         </Card>
 
-        <Card className="min-w-0 p-6">
+        <Card className="order-1 min-w-0 p-6 xl:order-1">
           <CardHeader>
             <CardTitle>Tus deudas</CardTitle>
             <CardDescription>
-              Vista consolidada para editar, archivar o eliminar registros.
+              Primero mira cuál presiona más. Luego edita, archiva o registra la siguiente acción.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-4">
@@ -750,7 +853,7 @@ export function DebtManager({
 
             {filteredDebts.length ? (
               filteredDebts.map((debt) => (
-                <div key={debt.id} className="min-w-0 rounded-3xl border border-border bg-secondary/70 p-5">
+                <div key={debt.id} className="min-w-0 rounded-[1.9rem] border border-border bg-secondary/50 p-5 sm:p-6">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
                       <div className="flex min-w-0 flex-wrap items-center gap-3">
@@ -767,11 +870,26 @@ export function DebtManager({
                           {debtStatusLabels[debt.status as DebtFormValues["status"]] ?? debt.status}
                         </Badge>
                         <Badge variant="default">{debtTypeLabels[debt.type as DebtFormValues["type"]] ?? debt.type}</Badge>
+                        {priorityDebt?.id === debt.id ? (
+                          <Badge variant="warning">Más presión hoy</Badge>
+                        ) : null}
                       </div>
                       <p className="mt-2 break-words text-sm text-muted">{debt.creditorName}</p>
+                      {debt.notes ? (
+                        <p className="mt-3 break-words text-sm leading-6 text-muted">
+                          {debt.notes}
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => router.push(`/pagos?debtId=${debt.id}`)}
+                      >
+                        Ir a pagos
+                      </Button>
                       <Button
                         variant="secondary"
                         size="sm"
@@ -793,7 +911,7 @@ export function DebtManager({
                     </div>
                   </div>
 
-                  <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                  <div className="mt-5 grid gap-4 md:grid-cols-2">
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-[0.18em] text-muted">Saldo real</p>
                       <p className="value-stable mt-1 font-semibold text-foreground">
@@ -807,7 +925,7 @@ export function DebtManager({
                       </p>
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.18em] text-muted">Interés mensual estimado</p>
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted">Interés estimado</p>
                       <p className="value-stable mt-1 font-semibold text-foreground">
                         {formatCurrency(debt.monthlyInterestEstimate)}
                       </p>
@@ -818,21 +936,7 @@ export function DebtManager({
                         {debt.nextDueDate ? formatDate(debt.nextDueDate) : "Sin fecha"}
                       </p>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.18em] text-muted">Pagos registrados</p>
-                      <p className="mt-1 font-semibold text-foreground">{debt.paymentCount}</p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.18em] text-muted">Total pagado</p>
-                      <p className="value-stable mt-1 font-semibold text-foreground">
-                        {formatCurrency(debt.totalPaid)}
-                      </p>
-                    </div>
                   </div>
-
-                  {debt.notes ? (
-                    <p className="mt-4 break-words text-sm leading-7 text-muted">{debt.notes}</p>
-                  ) : null}
                 </div>
               ))
             ) : debts.length ? (
@@ -885,19 +989,13 @@ export function DebtManager({
         </Card>
       </section>
 
-      <section className="rounded-[2rem] border border-border bg-white/90 p-6 shadow-soft">
-        <div className="flex items-center gap-3">
-          <Plus className="size-5 text-primary" />
-          <div>
-            <p className="font-semibold text-foreground">Lectura rápida</p>
-            <p className="text-sm text-muted">
-              {activeDebts.length
-                ? `Tienes ${activeDebts.length} deudas activas y ${summary.overdueCount} en atraso.`
-                : "No hay deudas activas registradas."}
-            </p>
-          </div>
-        </div>
-      </section>
+      <TrustInlineNote
+        notes={[
+          "Tú controlas qué registras.",
+          "No conectamos cuentas bancarias.",
+          "La prioridad se calcula con tus propios datos.",
+        ]}
+      />
     </div>
   );
 }

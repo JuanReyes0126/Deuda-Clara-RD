@@ -14,6 +14,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ContextMetricsGrid } from "@/components/shared/context-metrics-grid";
+import { ModuleSectionHeader } from "@/components/shared/module-section-header";
+import { PrimaryActionCard } from "@/components/shared/primary-action-card";
+import { TrustInlineNote } from "@/components/shared/trust-inline-note";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -423,10 +427,47 @@ export function SimulatorPanel({
       );
     })[0]?.scenario.id;
   const extraPaymentValue = watchedValues.extraPayment ?? 0;
+  const simulatorActionTitle = !simulation
+    ? "Completa los datos y verás una salida estimada en segundos."
+    : simulation.savingsWithExtraPayment.interestSaved > 0
+      ? `Si subes el pago, podrías ahorrar ${formatSimulatorCurrency(
+          simulation.savingsWithExtraPayment.interestSaved,
+        )}.`
+      : simulation.scenarios.base.feasible
+        ? `Si mantienes este ritmo, sales en ${formatMonthsValue(
+            simulation.monthsToPayoff,
+          )}.`
+        : "Con este pago la deuda todavía no baja de forma sostenible.";
+  const simulatorActionDescription = !simulation
+    ? "Empieza con monto, tasa y pago actual. La app te muestra tiempo, intereses y cuánto ganas si pagas más."
+    : simulation.savingsWithExtraPayment.interestSaved > 0
+      ? `Ese ajuste te puede recortar ${formatMonthsValue(
+          simulation.savingsWithExtraPayment.monthsSaved,
+        )} y dejar menos dinero atrapado en intereses.`
+      : simulation.scenarios.base.feasible
+        ? "Ahora mismo ya tienes una lectura útil. El siguiente salto es probar un extra o una versión más agresiva."
+        : "La cuota actual no cubre lo suficiente. Toca subir el pago o cambiar la estrategia.";
 
   return (
     <div className="flex min-w-0 flex-col gap-6">
-      <section className="grid gap-6">
+      <ModuleSectionHeader
+        kicker="Simulador"
+        title="Entiende rápido cuánto tardas, cuánto pagas y qué cambiaría si subes la cuota."
+        description="Esto no es solo cálculo. Es una herramienta de decisión para ver si tu ritmo actual te conviene o si vale la pena apretar un poco más."
+        action={
+          <Button
+            className="w-full sm:w-auto"
+            variant="secondary"
+            onClick={() =>
+              debts.length ? setSelectedDebtId(debts[0]?.id ?? "") : form.setFocus("principal")
+            }
+          >
+            {debts.length ? "Cargar una deuda" : "Simular manual"}
+          </Button>
+        }
+      />
+
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)]">
         <Card className="order-1 min-w-0 p-4 sm:p-6">
           <CardHeader className="gap-3">
             <div className="flex flex-wrap items-center gap-3">
@@ -674,30 +715,40 @@ export function SimulatorPanel({
                         Lo que te tomaría terminar si mantienes este mismo ritmo.
                       </p>
                     </div>
-                    <div className="grid gap-4 2xl:grid-cols-2">
-                      <div className="rounded-[1.8rem] border border-white/80 bg-white/88 p-5 shadow-[0_12px_28px_rgba(24,49,59,0.06)] sm:p-6">
-                        <p className="text-[11px] uppercase tracking-[0.22em] text-muted">
-                          Total pagado
-                        </p>
-                        <p className="value-stable mt-4 text-[clamp(1.3rem,3vw,1.75rem)] font-semibold text-foreground">
-                          {formatSimulatorCurrency(simulation.totalPaid)}
-                        </p>
-                        <p className="text-muted mt-3 text-sm leading-6">
-                          Capital más costo financiero durante todo el período.
-                        </p>
-                      </div>
-                      <div className="rounded-[1.8rem] border border-white/80 bg-white/88 p-5 shadow-[0_12px_28px_rgba(24,49,59,0.06)] sm:p-6">
-                        <p className="text-[11px] uppercase tracking-[0.22em] text-muted">
-                          Intereses
-                        </p>
-                        <p className="value-stable mt-4 text-[clamp(1.3rem,3vw,1.75rem)] font-semibold text-foreground">
-                          {formatSimulatorCurrency(simulation.totalInterest)}
-                        </p>
-                        <p className="text-muted mt-3 text-sm leading-6">
-                          Lo que se iría solo en financiar la deuda.
-                        </p>
-                      </div>
-                    </div>
+                    <ContextMetricsGrid
+                      items={[
+                        {
+                          label: "Total pagado",
+                          value: formatSimulatorCurrency(simulation.totalPaid),
+                          support: "Capital más costo financiero durante todo el período.",
+                        },
+                        {
+                          label: "Intereses",
+                          value: formatSimulatorCurrency(simulation.totalInterest),
+                          support: "Lo que se iría solo en financiar la deuda.",
+                        },
+                        {
+                          label: "Ahorro con extra",
+                          value:
+                            simulation.savingsWithExtraPayment.interestSaved > 0
+                              ? formatSimulatorCurrency(
+                                  simulation.savingsWithExtraPayment.interestSaved,
+                                )
+                              : "Aún no visible",
+                          support:
+                            simulation.savingsWithExtraPayment.interestSaved > 0
+                              ? `Podrías recortar ${formatMonthsValue(
+                                  simulation.savingsWithExtraPayment.monthsSaved,
+                                )}.`
+                              : "Añade un pago extra para medir el impacto real.",
+                          valueKind:
+                            simulation.savingsWithExtraPayment.interestSaved > 0
+                              ? "value"
+                              : "text",
+                          span: 2,
+                        },
+                      ]}
+                    />
                   </div>
                 </div>
 
@@ -734,6 +785,77 @@ export function SimulatorPanel({
           </CardContent>
         </Card>
       </section>
+
+      <PrimaryActionCard
+        eyebrow="Lo que más te conviene hoy"
+        title={simulatorActionTitle}
+        description={simulatorActionDescription}
+        badgeLabel={
+          simulation?.savingsWithExtraPayment.interestSaved && simulation.savingsWithExtraPayment.interestSaved > 0
+            ? "Ahorro visible"
+            : simulation?.scenarios.base.feasible
+              ? "Decisión lista"
+              : "Necesita ajuste"
+        }
+        badgeVariant={
+          simulation?.savingsWithExtraPayment.interestSaved && simulation.savingsWithExtraPayment.interestSaved > 0
+            ? "success"
+            : simulation?.scenarios.base.feasible
+              ? "default"
+              : "danger"
+        }
+        primaryAction={{
+          label:
+            simulation?.savingsWithExtraPayment.interestSaved && simulation.savingsWithExtraPayment.interestSaved > 0
+              ? "Ver escenario con extra"
+              : "Probar otro pago",
+          onClick: () => {
+            setSelectedScenarioId(
+              simulation?.savingsWithExtraPayment.interestSaved &&
+                simulation.savingsWithExtraPayment.interestSaved > 0
+                ? "EXTRA"
+                : "BASE",
+            );
+            form.setFocus(
+              simulation?.savingsWithExtraPayment.interestSaved &&
+                simulation.savingsWithExtraPayment.interestSaved > 0
+                ? "extraPayment"
+                : "paymentAmount",
+            );
+          },
+        }}
+        secondaryAction={
+          !isPremiumUnlocked
+            ? {
+                label: `Ver ${highlightedPlan.label}`,
+                onClick: () => navigate(planUpgradeHref),
+                variant: "secondary",
+              }
+            : undefined
+        }
+        notes={
+          simulation
+            ? [
+                `Intereses visibles: ${formatSimulatorCurrency(simulation.totalInterest)}.`,
+                selectedScenario?.payoffDate
+                  ? `Salida cerca de ${formatDate(selectedScenario.payoffDate, "MMM yyyy")}.`
+                  : "Todavía no hay fecha clara de salida.",
+              ]
+            : [
+                "Usa monto, tasa y pago real para activar la lectura.",
+                "La comparación aparece apenas la simulación sea viable.",
+              ]
+        }
+        tone={
+          simulation?.savingsWithExtraPayment.interestSaved &&
+          simulation.savingsWithExtraPayment.interestSaved > 0
+            ? "premium"
+            : simulation?.scenarios.base.feasible
+              ? "default"
+              : "warning"
+        }
+        icon={Sparkles}
+      />
 
       {simulation ? (
         <>
@@ -969,6 +1091,15 @@ export function SimulatorPanel({
           ) : null}
         </>
       ) : null}
+
+      <TrustInlineNote
+        title="Control sin fricción"
+        notes={[
+          "La simulación corre sin recargar.",
+          "Tú decides qué datos probar y cuánto explorar.",
+          "Premium solo aparece cuando ya hay una mejora medible.",
+        ]}
+      />
     </div>
   );
 }

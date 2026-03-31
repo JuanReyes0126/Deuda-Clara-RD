@@ -13,6 +13,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ExecutiveSummaryStrip } from "@/components/shared/executive-summary-strip";
+import { ModuleSectionHeader } from "@/components/shared/module-section-header";
+import { PrimaryActionCard } from "@/components/shared/primary-action-card";
 import { readJsonPayload } from "@/lib/http/read-json-payload";
 import type { NotificationItemDto } from "@/lib/types/app";
 import { formatDate, formatRelativeDistance } from "@/lib/utils/date";
@@ -26,6 +29,68 @@ const notificationTypeLabels: Record<string, string> = {
   SECURITY: "Seguridad",
   SYSTEM: "Sistema",
 };
+
+type NotificationBucket =
+  | "ALL"
+  | "URGENT"
+  | "IMPORTANT"
+  | "OPPORTUNITY"
+  | "FOLLOW_UP";
+
+const notificationBucketMeta: Record<
+  Exclude<NotificationBucket, "ALL">,
+  { label: string; description: string; variant: "default" | "success" | "warning" | "danger" }
+> = {
+  URGENT: {
+    label: "Urgente",
+    description: "Conviene resolverlo hoy para no dejar que la presión crezca.",
+    variant: "danger",
+  },
+  IMPORTANT: {
+    label: "Importante",
+    description: "Tiene impacto directo sobre tu flujo o tu siguiente decisión.",
+    variant: "warning",
+  },
+  OPPORTUNITY: {
+    label: "Oportunidad",
+    description: "Aquí hay una mejora concreta que te conviene aprovechar.",
+    variant: "success",
+  },
+  FOLLOW_UP: {
+    label: "Seguimiento",
+    description: "Mantiene el plan alineado y evita perder contexto.",
+    variant: "default",
+  },
+};
+
+function getNotificationBucket(
+  notification: NotificationItemDto,
+): Exclude<NotificationBucket, "ALL"> {
+  if (
+    notification.type === "OVERDUE" ||
+    notification.severity === "CRITICAL"
+  ) {
+    return "URGENT";
+  }
+
+  if (
+    notification.type === "DUE_SOON" ||
+    notification.type === "MINIMUM_PAYMENT_RISK" ||
+    notification.severity === "WARNING"
+  ) {
+    return "IMPORTANT";
+  }
+
+  if (
+    notification.type === "STRATEGY_RECOMMENDATION" ||
+    notification.type === "MONTHLY_REPORT" ||
+    Boolean(notification.actionHref)
+  ) {
+    return "OPPORTUNITY";
+  }
+
+  return "FOLLOW_UP";
+}
 
 function getNotificationScore(notification: NotificationItemDto) {
   const severityScore =
@@ -92,9 +157,7 @@ export function NotificationCenter({
 }) {
   const router = useRouter();
   const [notifications, setNotifications] = useState(initialNotifications);
-  const [activeFilter, setActiveFilter] = useState<
-    "ALL" | "UNREAD" | "WARNING" | "ACTIONABLE"
-  >("ALL");
+  const [activeFilter, setActiveFilter] = useState<NotificationBucket>("ALL");
   const [isRefreshing, startTransition] = useTransition();
 
   useEffect(() => {
@@ -135,33 +198,39 @@ export function NotificationCenter({
   const shouldShowPremiumUpsell =
     !premiumInsightsEnabled && (warningCount > 0 || actionableCount > 0);
   const premiumPlanHref = "/planes?plan=NORMAL&source=notificaciones";
+  const bucketCounts = useMemo(() => {
+    const counts = {
+      URGENT: 0,
+      IMPORTANT: 0,
+      OPPORTUNITY: 0,
+      FOLLOW_UP: 0,
+    };
+
+    notifications.forEach((notification) => {
+      counts[getNotificationBucket(notification)] += 1;
+    });
+
+    return counts;
+  }, [notifications]);
   const filteredNotifications = useMemo(() => {
-    if (activeFilter === "UNREAD") {
-      return notifications.filter((notification) => !notification.readAt);
+    if (activeFilter === "ALL") {
+      return notifications;
     }
 
-    if (activeFilter === "WARNING") {
-      return notifications.filter(
-        (notification) =>
-          notification.severity === "WARNING" ||
-          notification.severity === "CRITICAL",
-      );
-    }
-
-    if (activeFilter === "ACTIONABLE") {
-      return notifications.filter((notification) =>
-        Boolean(notification.actionHref),
-      );
-    }
-
-    return notifications;
+    return notifications.filter(
+      (notification) => getNotificationBucket(notification) === activeFilter,
+    );
   }, [activeFilter, notifications]);
   const notificationGroups = useMemo(() => {
     if (!filteredNotifications.length) {
       return {
         primary: null,
-        priority: [] as NotificationItemDto[],
-        secondary: [] as NotificationItemDto[],
+        buckets: {
+          URGENT: [] as NotificationItemDto[],
+          IMPORTANT: [] as NotificationItemDto[],
+          OPPORTUNITY: [] as NotificationItemDto[],
+          FOLLOW_UP: [] as NotificationItemDto[],
+        },
       };
     }
 
@@ -169,28 +238,57 @@ export function NotificationCenter({
       (left, right) => getNotificationScore(right) - getNotificationScore(left),
     );
     const primary = sorted[0] ?? null;
-    const priority = sorted.filter(
-      (notification) =>
-        notification.id !== primary?.id &&
-        (notification.severity === "CRITICAL" ||
-          notification.severity === "WARNING" ||
-          (!notification.readAt && Boolean(notification.actionHref))),
-    );
-    const priorityIds = new Set(priority.map((notification) => notification.id));
-    const secondary = sorted.filter(
-      (notification) =>
-        notification.id !== primary?.id && !priorityIds.has(notification.id),
-    );
+    const buckets = {
+      URGENT: [] as NotificationItemDto[],
+      IMPORTANT: [] as NotificationItemDto[],
+      OPPORTUNITY: [] as NotificationItemDto[],
+      FOLLOW_UP: [] as NotificationItemDto[],
+    };
+
+    sorted.forEach((notification) => {
+      if (notification.id === primary?.id) {
+        return;
+      }
+
+      buckets[getNotificationBucket(notification)].push(notification);
+    });
 
     return {
       primary,
-      priority,
-      secondary,
+      buckets,
     };
   }, [filteredNotifications]);
   const primaryNotification = notificationGroups.primary;
-  const priorityNotifications = notificationGroups.priority;
-  const secondaryNotifications = notificationGroups.secondary;
+  const groupedNotifications = notificationGroups.buckets;
+  const notificationSummaryItems = [
+    {
+      label: "Sin leer",
+      value: String(unreadCount),
+      support: "Lo primero que conviene revisar para no perder contexto.",
+      featured: true,
+      badgeLabel: unreadCount > 0 ? "Pendientes" : "Al día",
+      badgeVariant: unreadCount > 0 ? ("warning" as const) : ("success" as const),
+      valueKind: "text" as const,
+    },
+    {
+      label: "Urgentes",
+      value: String(bucketCounts.URGENT),
+      support: "Pueden aumentar mora o presión si las dejas pasar.",
+      valueKind: "text" as const,
+    },
+    {
+      label: "Oportunidades",
+      value: String(bucketCounts.OPPORTUNITY),
+      support: "Te muestran dónde puedes ahorrar o decidir mejor.",
+      valueKind: "text" as const,
+    },
+    {
+      label: "Con acción directa",
+      value: String(actionableCount),
+      support: "Te llevan al siguiente paso útil sin rodeos.",
+      valueKind: "text" as const,
+    },
+  ];
 
   const markRead = async (notificationId: string) => {
     try {
@@ -307,15 +405,11 @@ export function NotificationCenter({
 
   return (
     <div className="flex flex-col gap-6">
-      <Card className="p-6">
-        <CardHeader className="flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <CardTitle>Centro de notificaciones</CardTitle>
-            <CardDescription>
-              Alertas por vencimiento, atraso, riesgo de mínimos,
-              recomendaciones del plan y seguimiento premium semanal.
-            </CardDescription>
-          </div>
+      <ModuleSectionHeader
+        kicker="Alertas"
+        title="Una alerta principal arriba. El resto agrupado por intención."
+        description="La idea aquí no es llenarte de avisos. Es decirte qué conviene resolver hoy, qué merece atención y dónde hay oportunidad de mejorar."
+        action={
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <Button
               variant="secondary"
@@ -334,218 +428,166 @@ export function NotificationCenter({
               Marcar todas como leídas
             </Button>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            {[
-              {
-                label: "Sin leer",
-                value: unreadCount,
-                support: "Lo que conviene revisar primero.",
-              },
-              {
-                label: "Con urgencia",
-                value: warningCount,
-                support: "Alertas de warning o críticas.",
-              },
-              {
-                label: "Con acción directa",
-                value: actionableCount,
-                support: "Te llevan al siguiente paso útil.",
-              },
-            ].map((item) => (
-              <div key={item.label} className="bg-secondary min-w-0 rounded-3xl p-4">
-                <p className="text-muted text-xs tracking-[0.16em] uppercase">
-                  {item.label}
-                </p>
-                <p className="value-stable text-foreground mt-2 text-[clamp(1.2rem,2.8vw,1.8rem)] font-semibold leading-tight">
-                  {item.value}
-                </p>
-                <p className="text-muted mt-2 text-sm">{item.support}</p>
-              </div>
-            ))}
-          </div>
+        }
+      />
 
-          {shouldShowPremiumUpsell ? (
-            <div className="border-primary/15 rounded-[1.75rem] border bg-[rgba(255,248,241,0.82)] px-5 py-4">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div className="min-w-0 max-w-2xl">
-                  <p className="text-primary text-sm font-semibold tracking-[0.16em] uppercase">
-                    Seguimiento premium disponible
-                  </p>
-                  <p className="text-foreground mt-3 break-words text-xl font-semibold">
-                    No te quedes solo leyendo alertas. Convierte estas señales
-                    en una rutina guiada.
-                  </p>
-                  <p className="text-muted mt-2 text-sm leading-7">
-                    Tienes {warningCount} alerta{warningCount === 1 ? "" : "s"}{" "}
-                    urgente
-                    {warningCount === 1 ? "" : "s"} y {actionableCount} acción
-                    {actionableCount === 1 ? "" : "es"} directa
-                    {actionableCount === 1 ? "" : "s"}. Premium las conecta con
-                    seguimiento semanal, prioridades más claras y un plan
-                    recomendado sin tener que interpretarlo todo manualmente.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    onClick={() => router.push(premiumPlanHref)}
-                  >
-                    Optimizar con Premium
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => router.push("/simulador")}
-                  >
-                    Revisar simulador
-                  </Button>
-                </div>
-              </div>
+      <ExecutiveSummaryStrip items={notificationSummaryItems} />
+
+      {primaryNotification ? (
+        <PrimaryActionCard
+          eyebrow="Alerta principal de hoy"
+          title={primaryNotification.title}
+          description={`${primaryNotification.message} ${getNotificationSupportCopy(primaryNotification)}`}
+          badgeLabel={notificationBucketMeta[getNotificationBucket(primaryNotification)].label}
+          badgeVariant={
+            primaryNotification.severity === "CRITICAL"
+              ? "danger"
+              : primaryNotification.severity === "WARNING"
+                ? "warning"
+                : "default"
+          }
+          primaryAction={{
+            label:
+              primaryNotification.actionHref && primaryNotification.actionLabel
+                ? primaryNotification.actionLabel
+                : "Actualizar alertas",
+            onClick: () => {
+              if (primaryNotification.actionHref && primaryNotification.actionLabel) {
+                if (!primaryNotification.readAt) {
+                  void markRead(primaryNotification.id);
+                }
+                router.push(primaryNotification.actionHref as never);
+                return;
+              }
+
+              refreshNotifications();
+            },
+          }}
+          secondaryAction={
+            !primaryNotification.readAt
+              ? {
+                  label: "Marcar leída",
+                  onClick: () => markRead(primaryNotification.id),
+                  variant: "secondary",
+                }
+              : undefined
+          }
+          notes={[
+            `Creada: ${formatDate(primaryNotification.createdAt)}.`,
+            primaryNotification.dueAt
+              ? `Vence ${formatRelativeDistance(primaryNotification.dueAt)}.`
+              : "Sin vencimiento directo asociado.",
+          ]}
+          tone={
+            primaryNotification.severity === "CRITICAL"
+              ? "warning"
+              : primaryNotification.actionHref
+                ? "premium"
+                : "default"
+          }
+        />
+      ) : null}
+
+      {shouldShowPremiumUpsell ? (
+        <div className="border-primary/15 rounded-[1.75rem] border bg-[rgba(255,248,241,0.82)] px-5 py-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0 max-w-2xl">
+              <p className="text-primary text-sm font-semibold tracking-[0.16em] uppercase">
+                Seguimiento premium disponible
+              </p>
+              <p className="text-foreground mt-3 break-words text-xl font-semibold">
+                No te quedes solo leyendo alertas. Úsalas para actuar mejor.
+              </p>
+              <p className="text-muted mt-2 text-sm leading-7">
+                Tienes {bucketCounts.URGENT} alerta{bucketCounts.URGENT === 1 ? "" : "s"} urgente{bucketCounts.URGENT === 1 ? "" : "s"} y {actionableCount} acción{actionableCount === 1 ? "" : "es"} directa{actionableCount === 1 ? "" : "s"}. Premium las conecta con una prioridad semanal más clara.
+              </p>
             </div>
-          ) : null}
-
-          {premiumInsightsEnabled ? (
-            <div className="rounded-[1.75rem] border border-emerald-200 bg-[linear-gradient(135deg,rgba(236,253,245,0.96),rgba(240,248,245,0.92))] px-5 py-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                <div className="min-w-0 max-w-2xl">
-                  <p className="text-sm font-semibold tracking-[0.16em] text-emerald-700 uppercase">
-                    Seguimiento premium activo
-                  </p>
-                  <p className="text-foreground mt-3 break-words text-xl font-semibold">
-                    Tus alertas ya trabajan como acompañamiento, no solo como
-                    recordatorio.
-                  </p>
-                  <p className="text-muted mt-2 text-sm leading-7">
-                    Deuda Clara RD combina tus vencimientos, tu ritmo reciente y
-                    tu progreso frente al período anterior para priorizar mejor
-                    qué hacer esta semana.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    onClick={() => router.push("/dashboard?focus=optimization")}
-                  >
-                    Ver mi plan
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          {primaryNotification ? (
-            <div className="border-primary/12 rounded-[1.75rem] border bg-[rgba(240,248,245,0.92)] px-5 py-5">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0 max-w-2xl">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Badge
-                      variant={
-                        primaryNotification.severity === "CRITICAL"
-                          ? "danger"
-                          : primaryNotification.severity === "WARNING"
-                            ? "warning"
-                            : "default"
-                      }
-                    >
-                      Alerta principal de hoy
-                    </Badge>
-                    {!primaryNotification.readAt ? (
-                      <Badge variant="success">Sin leer</Badge>
-                    ) : null}
-                  </div>
-                  <p className="text-foreground mt-4 break-words text-2xl font-semibold">
-                    {primaryNotification.title}
-                  </p>
-                  <p className="text-muted mt-3 text-sm leading-7">
-                    {primaryNotification.message}
-                  </p>
-                  <p className="text-foreground mt-3 text-sm leading-7">
-                    {getNotificationSupportCopy(primaryNotification)}
-                  </p>
-                </div>
-                <div className="flex w-full flex-col gap-3 sm:w-auto">
-                  {primaryNotification.actionHref &&
-                  primaryNotification.actionLabel ? (
-                    <Button
-                      className="w-full sm:w-auto"
-                      onClick={() => {
-                        if (!primaryNotification.readAt) {
-                          void markRead(primaryNotification.id);
-                        }
-                        router.push(primaryNotification.actionHref! as never);
-                      }}
-                    >
-                      {primaryNotification.actionLabel}
-                    </Button>
-                  ) : null}
-                  {!primaryNotification.readAt ? (
-                    <Button
-                      variant="secondary"
-                      className="w-full sm:w-auto"
-                      onClick={() => markRead(primaryNotification.id)}
-                    >
-                      Marcar leída
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="flex flex-wrap gap-2">
-            {[
-              { id: "ALL" as const, label: `Todas (${notifications.length})` },
-              { id: "UNREAD" as const, label: `Sin leer (${unreadCount})` },
-              { id: "WARNING" as const, label: `Urgentes (${warningCount})` },
-              {
-                id: "ACTIONABLE" as const,
-                label: `Accionables (${actionableCount})`,
-              },
-            ].map((filter) => (
-              <Button
-                key={filter.id}
-                type="button"
-                size="sm"
-                variant={activeFilter === filter.id ? "primary" : "secondary"}
-                onClick={() => setActiveFilter(filter.id)}
-              >
-                {filter.label}
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={() => router.push(premiumPlanHref)}>
+                Optimizar con Premium
               </Button>
-            ))}
+              <Button
+                variant="secondary"
+                onClick={() => router.push("/simulador")}
+              >
+                Revisar simulador
+              </Button>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      ) : null}
+
+      {premiumInsightsEnabled ? (
+        <div className="rounded-[1.75rem] border border-emerald-200 bg-[linear-gradient(135deg,rgba(236,253,245,0.96),rgba(240,248,245,0.92))] px-5 py-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0 max-w-2xl">
+              <p className="text-sm font-semibold tracking-[0.16em] text-emerald-700 uppercase">
+                Seguimiento premium activo
+              </p>
+              <p className="text-foreground mt-3 break-words text-xl font-semibold">
+                Tus alertas ya funcionan como acompañamiento, no como lista fría.
+              </p>
+              <p className="text-muted mt-2 text-sm leading-7">
+                Deuda Clara RD cruza vencimientos, ritmo reciente y progreso para priorizar mejor qué conviene hacer esta semana.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                onClick={() => router.push("/dashboard?focus=optimization")}
+              >
+                Ver mi plan
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap gap-2">
+        {[
+          { id: "ALL" as const, label: `Todas (${notifications.length})` },
+          { id: "URGENT" as const, label: `Urgente (${bucketCounts.URGENT})` },
+          { id: "IMPORTANT" as const, label: `Importante (${bucketCounts.IMPORTANT})` },
+          { id: "OPPORTUNITY" as const, label: `Oportunidad (${bucketCounts.OPPORTUNITY})` },
+          { id: "FOLLOW_UP" as const, label: `Seguimiento (${bucketCounts.FOLLOW_UP})` },
+        ].map((filter) => (
+          <Button
+            key={filter.id}
+            type="button"
+            size="sm"
+            variant={activeFilter === filter.id ? "primary" : "secondary"}
+            onClick={() => setActiveFilter(filter.id)}
+          >
+            {filter.label}
+          </Button>
+        ))}
+      </div>
 
       <section className="grid gap-4">
         {filteredNotifications.length ? (
           <>
-            {priorityNotifications.length ? (
-              <div className="grid gap-4">
-                <div className="flex flex-wrap items-center gap-3">
-                  <Badge variant="warning">Atiéndelo primero</Badge>
-                  <p className="text-muted text-sm">
-                    Estas alertas tienen impacto directo sobre mora,
-                    vencimientos o decisiones del plan.
-                  </p>
-                </div>
-                {priorityNotifications.map(renderNotificationCard)}
-              </div>
-            ) : null}
+            {(Object.keys(groupedNotifications) as Array<
+              Exclude<NotificationBucket, "ALL">
+            >).map((bucket) => {
+              const bucketItems = groupedNotifications[bucket];
 
-            {secondaryNotifications.length ? (
-              <div className="grid gap-4">
-                <div className="flex flex-wrap items-center gap-3">
-                  <Badge variant="default">Luego revisa esto</Badge>
-                  <p className="text-muted text-sm">
-                    Mantienen el contexto al día y ayudan a sostener el hábito
-                    semanal.
-                  </p>
-                </div>
-                {secondaryNotifications.map(renderNotificationCard)}
-              </div>
-            ) : null}
+              if (!bucketItems.length) {
+                return null;
+              }
 
-            {!priorityNotifications.length &&
-            !secondaryNotifications.length &&
+              const meta = notificationBucketMeta[bucket];
+
+              return (
+                <div key={bucket} className="grid gap-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Badge variant={meta.variant}>{meta.label}</Badge>
+                    <p className="text-muted text-sm">{meta.description}</p>
+                  </div>
+                  {bucketItems.map(renderNotificationCard)}
+                </div>
+              );
+            })}
+
+            {!Object.values(groupedNotifications).some((group) => group.length) &&
             primaryNotification ? (
               <Card className="p-6">
                 <CardContent className="border-border text-muted rounded-3xl border border-dashed p-8 text-center text-sm">
