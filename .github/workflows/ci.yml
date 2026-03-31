@@ -16,7 +16,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20.9.0
+          cache: npm
 
       - name: Install dependencies
         run: npm install
@@ -30,6 +31,6 @@ jobs:
       - name: Build
         run: npm run build
 
-      # 🔥 TESTS DESACTIVADOS (esto era lo que rompía todo)
+      # Tests E2E desactivados por ahora
       # - name: E2E Tests
       #   run: npm run test:e2e
