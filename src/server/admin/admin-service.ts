@@ -1,11 +1,52 @@
 import { AuditAction, UserStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
-import type { AdminOverviewDto } from "@/lib/types/app";
+import type { AdminOverviewDto, AdminUserStatusPublicDto } from "@/lib/types/app";
+import { assertHostPanelApiAccess } from "@/server/host/host-access";
 import { createAuditLog } from "@/server/audit/audit-service";
 import { ServiceError } from "@/server/services/service-error";
 
+function toAdminUserStatusPublic(user: {
+  id: string;
+  email: string;
+  status: "ACTIVE" | "DISABLED";
+  role: "USER" | "ADMIN";
+  firstName: string;
+  lastName: string;
+  avatarUrl: string | null;
+}): AdminUserStatusPublicDto {
+  return {
+    id: user.id,
+    email: user.email,
+    status: user.status,
+    role: user.role,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    avatarUrl: user.avatarUrl,
+  };
+}
+
+async function requireAdminOperator(expectedAdminUserId?: string) {
+  const decision = await assertHostPanelApiAccess();
+
+  if (decision.outcome === "LOGIN") {
+    throw new ServiceError("ADMIN_LOGIN_REQUIRED", 401, "No autenticado.");
+  }
+
+  if (decision.outcome !== "GRANTED") {
+    throw new ServiceError("ADMIN_ACCESS_DENIED", 404, "No encontrado.");
+  }
+
+  if (expectedAdminUserId && decision.user.id !== expectedAdminUserId) {
+    throw new ServiceError("ADMIN_CONTEXT_MISMATCH", 403, "Operación no autorizada.");
+  }
+
+  return decision.user;
+}
+
 export async function getAdminOverview(): Promise<AdminOverviewDto> {
+  await requireAdminOperator();
+
   const [
     users,
     totalUsers,
@@ -235,6 +276,8 @@ export async function updateUserStatus(
   status: UserStatus,
   meta: { ipAddress?: string | undefined; userAgent?: string | undefined },
 ) {
+  const adminUser = await requireAdminOperator(adminUserId);
+
   if (adminUserId === targetUserId) {
     throw new ServiceError(
       "ADMIN_SELF_DISABLE_BLOCKED",
@@ -250,10 +293,19 @@ export async function updateUserStatus(
     data: {
       status,
     },
+    select: {
+      id: true,
+      email: true,
+      status: true,
+      role: true,
+      firstName: true,
+      lastName: true,
+      avatarUrl: true,
+    },
   });
 
   await createAuditLog({
-    userId: adminUserId,
+    userId: adminUser.id,
     action: AuditAction.USER_STATUS_CHANGED,
     resourceType: "user",
     resourceId: targetUserId,
@@ -264,7 +316,7 @@ export async function updateUserStatus(
     },
   });
 
-  return user;
+  return toAdminUserStatusPublic(user);
 }
 
 export async function updateEmailTemplate(
@@ -279,6 +331,8 @@ export async function updateEmailTemplate(
   },
   meta: { ipAddress?: string | undefined; userAgent?: string | undefined },
 ) {
+  const adminUser = await requireAdminOperator(adminUserId);
+
   const template = await prisma.emailTemplate.update({
     where: {
       id: templateId,
@@ -287,7 +341,7 @@ export async function updateEmailTemplate(
   });
 
   await createAuditLog({
-    userId: adminUserId,
+    userId: adminUser.id,
     action: AuditAction.EMAIL_TEMPLATE_UPDATED,
     resourceType: "email-template",
     resourceId: template.id,

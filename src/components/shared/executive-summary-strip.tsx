@@ -51,7 +51,7 @@ export function ExecutiveSummaryStrip({
         className,
       )}
     >
-      <Card className="min-w-0 border-primary/12 bg-[rgba(240,248,245,0.92)] p-5 sm:p-6">
+      <Card className="min-w-0 border-primary/12 bg-[rgba(240,248,245,0.92)] p-4 sm:p-6">
         <CardHeader className="gap-3">
           <div className="flex flex-wrap items-center gap-3">
             {featured.badgeLabel ? (
@@ -73,7 +73,7 @@ export function ExecutiveSummaryStrip({
               <CardTitle
                 className={cn(
                   getValueClassName(featured.valueKind),
-                  "mt-0 text-[clamp(1.9rem,4.6vw,3rem)] leading-none",
+                  "mt-0 text-[clamp(1.75rem,7vw,3rem)] leading-none",
                 )}
               >
                 {featured.value}
@@ -93,7 +93,7 @@ export function ExecutiveSummaryStrip({
           const Icon = item.icon;
 
           return (
-            <Card key={`${item.label}-${item.value}`} className="min-w-0 p-5">
+            <Card key={`${item.label}-${item.value}`} className="min-w-0 p-4 sm:p-5">
               <CardHeader className="gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                   {Icon ? (
@@ -113,7 +113,7 @@ export function ExecutiveSummaryStrip({
                 <CardTitle
                   className={cn(
                     getValueClassName(item.valueKind),
-                    "mt-1 text-[clamp(1.3rem,3.2vw,1.8rem)] leading-tight",
+                    "mt-1 text-[clamp(1.2rem,5vw,1.8rem)] leading-tight",
                   )}
                 >
                   {item.value}

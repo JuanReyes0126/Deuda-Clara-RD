@@ -16,7 +16,13 @@ import {
 import { ExecutiveSummaryStrip } from "@/components/shared/executive-summary-strip";
 import { ModuleSectionHeader } from "@/components/shared/module-section-header";
 import { PrimaryActionCard } from "@/components/shared/primary-action-card";
+import { fetchWithCsrf } from "@/lib/http/fetch-with-csrf";
 import { readJsonPayload } from "@/lib/http/read-json-payload";
+import { resolveFeatureAccess } from "@/lib/feature-access";
+import type {
+  MembershipBillingStatus,
+  MembershipPlanId,
+} from "@/lib/membership/plans";
 import type { NotificationItemDto } from "@/lib/types/app";
 import { formatDate, formatRelativeDistance } from "@/lib/utils/date";
 
@@ -140,7 +146,7 @@ function getNotificationSupportCopy(notification: NotificationItemDto) {
 }
 
 async function requestJson(url: string, method = "POST") {
-  const response = await fetch(url, { method });
+  const response = await fetchWithCsrf(url, { method });
   const payload = await readJsonPayload<{ error?: string }>(response);
 
   if (!response.ok) {
@@ -150,12 +156,19 @@ async function requestJson(url: string, method = "POST") {
 
 export function NotificationCenter({
   initialNotifications,
-  premiumInsightsEnabled = false,
+  membershipTier,
+  billingStatus,
 }: {
   initialNotifications: NotificationItemDto[];
-  premiumInsightsEnabled?: boolean;
+  membershipTier: MembershipPlanId;
+  billingStatus: MembershipBillingStatus;
 }) {
   const router = useRouter();
+  const access = resolveFeatureAccess({
+    membershipTier,
+    membershipBillingStatus: billingStatus,
+  });
+  const premiumInsightsEnabled = access.canReceiveAdvancedAlerts;
   const [notifications, setNotifications] = useState(initialNotifications);
   const [activeFilter, setActiveFilter] = useState<NotificationBucket>("ALL");
   const [isRefreshing, startTransition] = useTransition();
@@ -196,8 +209,11 @@ export function NotificationCenter({
   const warningCount = counts.warning;
   const actionableCount = counts.actionable;
   const shouldShowPremiumUpsell =
-    !premiumInsightsEnabled && (warningCount > 0 || actionableCount > 0);
+    access.isBase && (warningCount > 0 || actionableCount > 0);
+  const shouldShowProUpsell =
+    access.isPremium && !access.canAccessProFollowup;
   const premiumPlanHref = "/planes?plan=NORMAL&source=notificaciones";
+  const proPlanHref = "/planes?plan=PRO&source=notificaciones";
   const bucketCounts = useMemo(() => {
     const counts = {
       URGENT: 0,
@@ -536,6 +552,29 @@ export function NotificationCenter({
                 onClick={() => router.push("/dashboard?focus=optimization")}
               >
                 Ver mi plan
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {shouldShowProUpsell ? (
+        <div className="rounded-[1.75rem] border border-primary/12 bg-[rgba(255,248,241,0.82)] px-5 py-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0 max-w-2xl">
+              <p className="text-primary text-sm font-semibold tracking-[0.16em] uppercase">
+                Seguimiento extendido disponible
+              </p>
+              <p className="text-foreground mt-3 break-words text-xl font-semibold">
+                Premium ya ordena tus alertas. Pro guarda más contexto y más historial.
+              </p>
+              <p className="text-muted mt-2 text-sm leading-7">
+                Ahora mismo ves las {access.notificationHistoryLimit} alertas más recientes. Pro extiende ese seguimiento para que no pierdas contexto cuando el flujo se vuelve más largo.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={() => router.push(proPlanHref)}>
+                Activar seguimiento más profundo
               </Button>
             </div>
           </div>

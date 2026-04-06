@@ -39,7 +39,7 @@ export function ContextMetricsGrid({
   return (
     <div
       className={cn(
-        "grid gap-4 sm:grid-cols-2",
+        "grid gap-3 sm:grid-cols-2 sm:gap-4",
         columnsClassName,
         className,
       )}
@@ -48,7 +48,7 @@ export function ContextMetricsGrid({
         <div
           key={`${item.label}-${item.value}`}
           className={cn(
-            "min-w-0 rounded-[1.75rem] border border-white/80 bg-white/92 p-5 shadow-[0_14px_32px_rgba(24,49,59,0.06)]",
+            "min-w-0 rounded-[1.75rem] border border-white/80 bg-white/92 p-4 shadow-[0_14px_32px_rgba(24,49,59,0.06)] sm:p-5",
             item.span === 2 ? "sm:col-span-2" : "",
             itemClassName,
           )}
@@ -66,13 +66,13 @@ export function ContextMetricsGrid({
           <p
             className={cn(
               getValueClassName(item.valueKind),
-              "text-foreground mt-4 text-[clamp(1.2rem,3.2vw,1.9rem)] font-semibold leading-tight",
+              "text-foreground mt-3 text-[clamp(1.1rem,5vw,1.9rem)] font-semibold leading-tight",
             )}
           >
             {item.value}
           </p>
           {item.support ? (
-            <p className="support-copy mt-3 text-pretty">{item.support}</p>
+            <p className="support-copy mt-2 text-pretty">{item.support}</p>
           ) : null}
         </div>
       ))}

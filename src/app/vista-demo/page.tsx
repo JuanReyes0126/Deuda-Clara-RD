@@ -17,6 +17,8 @@ import {
   reportSummary,
 } from "@/lib/demo/data";
 
+export const dynamic = "force-dynamic";
+
 export default function DemoPreviewPage() {
   return (
     <div className="min-h-screen bg-background px-4 py-8">
@@ -50,13 +52,26 @@ export default function DemoPreviewPage() {
           demoMode
         />
 
-        <DebtManager debts={demoDebts} summary={debtSummary} />
+        <DebtManager
+          debts={demoDebts}
+          summary={debtSummary}
+          membershipTier="NORMAL"
+          billingStatus="ACTIVE"
+        />
 
         <PaymentManager debts={demoDebts} payments={demoPayments} />
 
-        <ReportsPanel initialSummary={reportSummary} premiumInsightsEnabled />
+        <ReportsPanel
+          initialSummary={reportSummary}
+          membershipTier="NORMAL"
+          billingStatus="ACTIVE"
+        />
 
-        <NotificationCenter initialNotifications={demoNotifications} premiumInsightsEnabled />
+        <NotificationCenter
+          initialNotifications={demoNotifications}
+          membershipTier="NORMAL"
+          billingStatus="ACTIVE"
+        />
 
         <AdminOverview initialData={adminOverview} />
       </div>

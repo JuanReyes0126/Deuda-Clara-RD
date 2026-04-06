@@ -75,4 +75,63 @@ describe("simulateDebt", () => {
     expect(Number.isFinite(result.totalInterest)).toBe(true);
     expect(result.scenarios.base.amortizationSchedule.length).toBeGreaterThan(0);
   });
+
+  it("recorta comparacion y ahorro cuando el acceso es Base", () => {
+    const result = simulateDebt(
+      {
+        debtType: "PERSONAL_LOAN",
+        principal: 90000,
+        interestRate: 22,
+        interestRateType: "ANNUAL",
+        paymentAmount: 5000,
+        extraPayment: 1500,
+        startDate: new Date("2026-03-30T00:00:00.000Z"),
+        paymentFrequency: "MONTHLY",
+      },
+      {
+        access: {
+          canCompareScenarios: false,
+          canSeeOptimizedSavings: false,
+          canSeeRecommendedStrategy: false,
+          canUseAdvancedExtraPayments: false,
+          canUseAutoStrategy: false,
+          canSeeStepByStepPlan: false,
+        },
+      },
+    );
+
+    expect(result.scenarios.aggressive).toBeNull();
+    expect(result.savingsWithExtraPayment.interestSaved).toBe(0);
+    expect(result.recommendedScenarioId).toBeNull();
+    expect(result.proGuidance.stepByStepPlan).toEqual([]);
+  });
+
+  it("expone guía adicional cuando el acceso es Pro", () => {
+    const result = simulateDebt(
+      {
+        debtType: "PERSONAL_LOAN",
+        principal: 90000,
+        interestRate: 22,
+        interestRateType: "ANNUAL",
+        paymentAmount: 5000,
+        extraPayment: 1500,
+        startDate: new Date("2026-03-30T00:00:00.000Z"),
+        paymentFrequency: "MONTHLY",
+      },
+      {
+        access: {
+          canCompareScenarios: true,
+          canSeeOptimizedSavings: true,
+          canSeeRecommendedStrategy: true,
+          canUseAdvancedExtraPayments: true,
+          canUseAutoStrategy: true,
+          canSeeStepByStepPlan: true,
+        },
+      },
+    );
+
+    expect(result.recommendedScenarioId).not.toBeNull();
+    expect(result.recommendedStrategyLabel).not.toBeNull();
+    expect(result.proGuidance.stepByStepPlan.length).toBeGreaterThan(0);
+  });
 });

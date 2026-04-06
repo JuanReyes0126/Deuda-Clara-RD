@@ -1,3 +1,5 @@
+import { formatCurrency } from "@/lib/utils/currency";
+
 type EmailTemplateResult = {
   subject: string;
   html: string;
@@ -37,6 +39,22 @@ function formatDateLabel(value: Date | string | null | undefined) {
     day: "numeric",
     month: "long",
     year: "numeric",
+  }).format(new Date(value));
+}
+
+function formatDateLabelForTimezone(
+  value: Date | string | null | undefined,
+  timeZone: string,
+) {
+  if (!value) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat("es-DO", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone,
   }).format(new Date(value));
 }
 
@@ -170,6 +188,101 @@ export function buildPasswordChangedEmail() {
   });
 }
 
+export function buildMfaEnabledEmail(firstName?: string | null) {
+  return buildEmailLayout({
+    subject: "Verificación en dos pasos activada",
+    eyebrow: "Seguridad",
+    title: `${firstName?.trim() || "Tu cuenta"} ahora tiene verificación en dos pasos`,
+    intro:
+      "Activaste un segundo factor para proteger tu acceso. También cerramos otras sesiones activas para reducir el riesgo.",
+    bullets: [
+      "A partir de ahora necesitarás tu código temporal o un código de respaldo para entrar.",
+      "Guarda tus códigos de respaldo en un lugar seguro.",
+      "Si no reconoces este cambio, cambia tu contraseña cuanto antes.",
+    ],
+    ctaLabel: "Revisar seguridad",
+    ctaHref: `${getAppUrl()}/configuracion`,
+  });
+}
+
+export function buildMfaDisabledEmail(firstName?: string | null) {
+  return buildEmailLayout({
+    subject: "Verificación en dos pasos desactivada",
+    eyebrow: "Seguridad",
+    title: `${firstName?.trim() || "Tu cuenta"} desactivó la verificación en dos pasos`,
+    intro:
+      "La capa extra de protección ya no está activa en tu cuenta. También cerramos otras sesiones activas como medida preventiva.",
+    bullets: [
+      "Tu acceso vuelve a depender solo de tu contraseña.",
+      "Si no fuiste tú, cambia tu contraseña de inmediato.",
+      "Puedes volver a activar MFA desde Configuración.",
+    ],
+    ctaLabel: "Ir a seguridad",
+    ctaHref: `${getAppUrl()}/configuracion`,
+  });
+}
+
+export function buildRecoveryCodesRegeneratedEmail(firstName?: string | null) {
+  return buildEmailLayout({
+    subject: "Tus códigos de respaldo fueron regenerados",
+    eyebrow: "Seguridad",
+    title: `${firstName?.trim() || "Tu cuenta"} ya tiene nuevos códigos de respaldo`,
+    intro:
+      "Tus códigos anteriores dejaron de ser válidos. También cerramos otras sesiones activas por seguridad.",
+    bullets: [
+      "Guarda los nuevos códigos en un lugar privado.",
+      "Los códigos anteriores ya no funcionarán.",
+      "Si no reconoces este cambio, actualiza tu contraseña cuanto antes.",
+    ],
+    ctaLabel: "Revisar seguridad",
+    ctaHref: `${getAppUrl()}/configuracion`,
+  });
+}
+
+export function buildPasskeyRegisteredEmail(input: {
+  firstName?: string | null;
+  passkeyName?: string | null;
+}) {
+  return buildEmailLayout({
+    subject: "Nueva passkey registrada en tu cuenta",
+    eyebrow: "Seguridad",
+    title: `${input.firstName?.trim() || "Tu cuenta"} registró una nueva passkey`,
+    intro:
+      "Se agregó un nuevo método de acceso basado en passkey a tu cuenta. Este cambio permite entrar con biometría o desbloqueo seguro del dispositivo.",
+    bullets: [
+      input.passkeyName?.trim()
+        ? `Nombre registrado: ${input.passkeyName.trim()}.`
+        : "Se registró una nueva credencial passkey en tu cuenta.",
+      "Si reconoces este cambio, no necesitas hacer nada más.",
+      "Si no fuiste tú, elimina la passkey y cambia tu contraseña cuanto antes.",
+    ],
+    ctaLabel: "Revisar seguridad",
+    ctaHref: `${getAppUrl()}/configuracion`,
+  });
+}
+
+export function buildPasskeyDeletedEmail(input: {
+  firstName?: string | null;
+  passkeyName?: string | null;
+}) {
+  return buildEmailLayout({
+    subject: "Se eliminó una passkey de tu cuenta",
+    eyebrow: "Seguridad",
+    title: `${input.firstName?.trim() || "Tu cuenta"} eliminó una passkey`,
+    intro:
+      "Una de las credenciales passkey asociadas a tu cuenta fue eliminada. Este aviso te ayuda a detectar cambios no reconocidos.",
+    bullets: [
+      input.passkeyName?.trim()
+        ? `Passkey eliminada: ${input.passkeyName.trim()}.`
+        : "Se eliminó una passkey registrada en tu cuenta.",
+      "Si reconoces este cambio, no necesitas hacer nada más.",
+      "Si no fuiste tú, cambia tu contraseña y revisa tus métodos de acceso.",
+    ],
+    ctaLabel: "Ir a seguridad",
+    ctaHref: `${getAppUrl()}/configuracion`,
+  });
+}
+
 export function buildMembershipActivatedEmail(input: {
   firstName?: string | null;
   planLabel: string;
@@ -221,5 +334,65 @@ export function buildMembershipBillingAttentionEmail(input: {
         ],
     ctaLabel: "Gestionar facturación",
     ctaHref: `${getAppUrl()}/planes`,
+  });
+}
+
+export function buildDebtReminderEmail(input: {
+  firstName?: string | null;
+  debtName: string;
+  eventType: "PAYMENT_DUE" | "STATEMENT_CLOSING";
+  occursOn: Date;
+  daysBefore: number;
+  minimumPayment: number;
+  currency: "DOP" | "USD";
+  timeZone: string;
+}) {
+  const whenLabel =
+    input.daysBefore === 0
+      ? "hoy"
+      : input.daysBefore === 1
+        ? "mañana"
+        : `en ${input.daysBefore} días`;
+  const subject =
+    input.eventType === "STATEMENT_CLOSING"
+      ? input.daysBefore === 0
+        ? `Hoy corta ${input.debtName}`
+        : `${input.debtName} corta ${whenLabel}`
+      : input.daysBefore === 0
+        ? `Hoy vence tu pago de ${input.debtName}`
+        : `Tu pago de ${input.debtName} vence ${whenLabel}`;
+
+  const bullets = [
+    `Deuda: ${input.debtName}.`,
+    `Fecha: ${
+      formatDateLabelForTimezone(input.occursOn, input.timeZone) ??
+      "Próxima fecha disponible"
+    }.`,
+    `Tipo de fecha: ${
+      input.eventType === "STATEMENT_CLOSING"
+        ? "Fecha de corte"
+        : "Fecha límite de pago"
+    }.`,
+  ];
+
+  if (input.eventType === "PAYMENT_DUE" && input.minimumPayment > 0) {
+    bullets.push(
+      `Monto mínimo de referencia: ${formatCurrency(input.minimumPayment, input.currency)}.`,
+    );
+  }
+
+  return buildEmailLayout({
+    subject,
+    eyebrow: "Siempre a tiempo",
+    title: `${input.firstName?.trim() || "Tu cuenta"}, no dejes pasar esta fecha`,
+    intro:
+      input.eventType === "STATEMENT_CLOSING"
+        ? `Te avisamos ${whenLabel} porque ${input.debtName} está por llegar a su corte.`
+        : `Te avisamos ${whenLabel} para que el pago de ${input.debtName} no se te pase.`,
+    bullets,
+    ctaLabel: "Abrir mi panel",
+    ctaHref: `${getAppUrl()}/deudas`,
+    outro:
+      "Antes del corte. Antes del pago. Sin olvidos. Si ya lo resolviste, úsalo como confirmación rápida.",
   });
 }

@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { LockedCard } from "@/components/membership/locked-card";
+import { UpgradeCTA } from "@/components/membership/upgrade-cta";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,12 +34,17 @@ import { ModuleSectionHeader } from "@/components/shared/module-section-header";
 import { NarrativeInsightCard } from "@/components/shared/narrative-insight-card";
 import { PrimaryActionCard } from "@/components/shared/primary-action-card";
 import { TrustInlineNote } from "@/components/shared/trust-inline-note";
+import {
+  getCommercialUpgradeCta,
+} from "@/config/membership-commercial-copy";
+import { UPGRADE_MESSAGES } from "@/config/upgrade-messages";
 import type {
   DashboardDto,
   DashboardPlanSnapshotDto,
   MembershipConversionSnapshotDto,
 } from "@/lib/types/app";
 import { useAppNavigation } from "@/lib/navigation/use-app-navigation";
+import { trackPlanEvent } from "@/lib/telemetry/plan-events";
 import { formatCurrency } from "@/lib/utils/currency";
 import { formatDate, formatRelativeDistance } from "@/lib/utils/date";
 
@@ -304,7 +311,7 @@ function getLockedUpgradeContext({
         monthsSaved === 1 ? "mes" : "meses"
       }.`,
       description: `${conversionSnapshot.immediateAction} Premium toma esa oportunidad y la convierte en una ruta clara para los próximos 6 meses, sin tener que comparar escenarios manualmente.`,
-      primaryCtaLabel: "Activar Premium",
+      primaryCtaLabel: "Ver cómo salir antes",
       primaryHref: "/planes?plan=NORMAL&source=dashboard",
       secondaryCtaLabel: "Abrir simulador",
       secondaryHref: "/simulador",
@@ -318,7 +325,7 @@ function getLockedUpgradeContext({
       title: `Ahora mismo estás cargando ${formatCurrency(data.summary.estimatedMonthlyInterest)} al mes en intereses estimados.`,
       description:
         "El módulo premium no solo te muestra el problema: te dice qué deuda atacar primero, con qué presupuesto, y qué tanto recortas si sostienes el plan recomendado.",
-      primaryCtaLabel: "Ver Premium",
+      primaryCtaLabel: "Desbloquear mi mejor estrategia",
       primaryHref: "/planes?plan=NORMAL&source=dashboard",
       secondaryCtaLabel: "Revisar deudas",
       secondaryHref: "/deudas",
@@ -332,7 +339,7 @@ function getLockedUpgradeContext({
       "Ya tienes suficiente información para pasar de control a estrategia.",
     description:
       "Premium convierte tus deudas actuales en un orden de pago optimizado, con ahorro estimado, horizonte de salida y una guía más clara para sostener el plan.",
-    primaryCtaLabel: "Ver planes",
+    primaryCtaLabel: "Desbloquear mi mejor estrategia",
     primaryHref: "/planes?plan=NORMAL&source=dashboard",
     secondaryCtaLabel: "Abrir simulador",
     secondaryHref: "/simulador",
@@ -670,6 +677,8 @@ export function DashboardOverview({
   const needsBillingAttention =
     data.membership.billingStatus === "PAST_DUE" ||
     data.membership.cancelAtPeriodEnd;
+  const isProUnlocked =
+    data.membership.tier === "PRO" && data.membership.billingStatus === "ACTIVE";
   const quickActions = [
     !hasDebts
       ? {
@@ -695,8 +704,8 @@ export function DashboardOverview({
       ? {
           title: "Desbloquea el plan recomendado",
           description:
-            "Premium te guía por 6 meses para salir más rápido y mostrar ahorro potencial.",
-          actionLabel: "Ver planes",
+            "Premium te guía por 6 meses para dejar de perder dinero y mostrar cuánto tiempo podrías recortar.",
+          actionLabel: getCommercialUpgradeCta("Premium"),
           href: upgradePlanHref,
           icon: Crown,
         }
@@ -1038,7 +1047,7 @@ export function DashboardOverview({
       value: formatCurrency(data.summary.estimatedMonthlyInterest),
       support:
         data.summary.estimatedMonthlyInterest > 0
-          ? "Esto es lo que te está costando sostener la estructura actual."
+          ? `Estás pagando ${formatCurrency(data.summary.estimatedMonthlyInterest)} en intereses.`
           : "Cuando registres deuda activa, aquí verás el costo financiero del mes.",
       icon: AlertTriangle,
       badgeLabel:
@@ -1097,26 +1106,113 @@ export function DashboardOverview({
         };
 
   return (
-    <div className="flex flex-col gap-6">
-      <section className="border-border shadow-soft rounded-[2rem] border bg-white/90 p-5 sm:p-8">
-        <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5 sm:gap-6">
+      <section className="border-border shadow-soft rounded-[2rem] border bg-white/90 p-4 sm:p-8">
+        <div className="flex flex-col gap-5 sm:gap-6">
+          {!isPremiumUnlocked ? (
+            <Card className="border-amber-200 bg-[linear-gradient(135deg,rgba(255,248,241,0.98),rgba(255,255,255,0.94))] p-4 shadow-[0_22px_50px_rgba(240,138,93,0.1)] sm:p-5">
+              <CardHeader className="gap-3 px-0 pt-0">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Badge variant="warning">Atención</Badge>
+                  <Badge variant="default">Esto no es tu mejor escenario</Badge>
+                </div>
+                <CardTitle className="text-balance text-[clamp(1.45rem,6vw,2.2rem)]">
+                  Este no es tu mejor escenario
+                </CardTitle>
+                <CardDescription className="max-w-3xl text-base leading-7">
+                  Estás perdiendo dinero ahora mismo. {UPGRADE_MESSAGES.PARTIAL_VIEW}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4 px-0 pb-0">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-[1.4rem] border border-white/80 bg-white/90 px-4 py-4 text-sm leading-6 text-foreground">
+                    <span className="font-semibold">
+                      Estás pagando {formatCurrency(data.summary.estimatedMonthlyInterest)} en intereses
+                    </span>{" "}
+                    y ese dinero no está bajando capital tan rápido como podría.
+                  </div>
+                  <div className="rounded-[1.4rem] border border-white/80 bg-white/90 px-4 py-4 text-sm leading-6 text-foreground">
+                    {data.analysisScope.partialAnalysis
+                      ? "Hay deudas fuera del análisis Base. Estás tomando decisiones sin ver toda tu realidad."
+                      : "Tu panorama ya muestra el problema, pero todavía no te enseña la mejor salida."}
+                  </div>
+                  <div className="rounded-[1.4rem] border border-white/80 bg-white/90 px-4 py-4 text-sm leading-6 text-foreground">
+                    Premium compara tu escenario actual contra una ruta mejorada para que veas cuánto tiempo y dinero estás perdiendo hoy.
+                  </div>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                  <Button
+                    className="w-full sm:w-auto"
+                    onClick={() => {
+                      trackPlanEvent("upgrade_click", {
+                        source: "dashboard_warning_banner",
+                        targetPlan: "NORMAL",
+                      });
+                      navigateTo(upgradePlanHref);
+                    }}
+                  >
+                    {getCommercialUpgradeCta("Premium")}
+                  </Button>
+                  <Button className="w-full sm:w-auto" variant="secondary" onClick={() => navigateTo("/simulador")}>
+                    Abrir simulador
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
           <ModuleSectionHeader
             kicker="Dashboard"
             title="Tu tablero ya no solo informa: te dice qué conviene hacer ahora."
             description="Primero ves tu panorama real. Luego una sola recomendación clara para mover el plan sin abrir demasiados frentes."
             action={
               <Button
-                onClick={revealOptimization}
+                onClick={() => {
+                  if (!isPremiumUnlocked) {
+                    trackPlanEvent("upgrade_click", {
+                      source: "dashboard_header",
+                      targetPlan: "NORMAL",
+                    });
+                  }
+                  revealOptimization();
+                }}
                 size="lg"
                 variant={isPremiumUnlocked ? "secondary" : "primary"}
                 className="w-full sm:w-auto"
               >
-                {isPremiumUnlocked ? "Ver mi plan" : "Activar Premium"}
+                {isPremiumUnlocked ? "Ver mi plan" : getCommercialUpgradeCta("Premium")}
               </Button>
             }
           />
 
           <ExecutiveSummaryStrip items={dashboardSummaryItems} />
+
+          {!isPremiumUnlocked && data.analysisScope.partialAnalysis ? (
+            <LockedCard
+              title={UPGRADE_MESSAGES.PARTIAL_VIEW}
+              description={`${UPGRADE_MESSAGES.HIDDEN_DEBTS} ${UPGRADE_MESSAGES.INTEREST_LOSS}`}
+              requiredPlan="Premium"
+              reason={`Tienes ${data.analysisScope.hiddenDebtCount} deuda${data.analysisScope.hiddenDebtCount === 1 ? "" : "s"} fuera del análisis Base. Hoy estás viendo ${data.analysisScope.analyzedDebtCount} de ${data.analysisScope.activeDebtCount} deuda${data.analysisScope.activeDebtCount === 1 ? "" : "s"} activa${data.analysisScope.activeDebtCount === 1 ? "" : "s"}.`}
+            >
+              <UpgradeCTA
+                title="Estás viendo solo una parte de tu situación financiera"
+                description="Premium toma todas tus deudas activas, compara escenarios y te muestra cuánto dinero y tiempo estás perdiendo por no ver el panorama completo."
+                requiredPlan="Premium"
+                ctaText={getCommercialUpgradeCta("Premium")}
+                onClick={() => {
+                  trackPlanEvent("feature_blocked", {
+                    source: "dashboard_partial_analysis",
+                    hiddenDebtCount: data.analysisScope.hiddenDebtCount,
+                  });
+                  trackPlanEvent("upgrade_click", {
+                    source: "dashboard_partial_analysis",
+                    targetPlan: "NORMAL",
+                  });
+                  navigateTo(upgradePlanHref);
+                }}
+              />
+            </LockedCard>
+          ) : null}
 
           <PrimaryActionCard
             eyebrow="Tu siguiente mejor paso"
@@ -1142,7 +1238,51 @@ export function DashboardOverview({
             ]}
           />
 
-          <div className="grid gap-5 2xl:grid-cols-[1.05fr_0.95fr]">
+          <Card className="border-border/80 bg-white/92 p-4 sm:p-5">
+            <CardHeader className="gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="grid size-11 place-items-center rounded-2xl bg-primary/10 text-primary">
+                    <CalendarClock className="size-5" />
+                  </span>
+                  <div>
+                    <CardTitle>{data.upcomingTimeline.headline}</CardTitle>
+                    <CardDescription>{data.upcomingTimeline.support}</CardDescription>
+                  </div>
+                </div>
+                <Badge variant="success">Siempre a tiempo</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-2">
+              {data.upcomingTimeline.items.length ? (
+                <div className="grid gap-3 lg:grid-cols-3">
+                  {data.upcomingTimeline.items.map((item) => (
+                    <div
+                      key={`${item.debtId}-${item.eventType}-${item.occursOn}`}
+                      className="rounded-[1.5rem] border border-border bg-secondary/45 p-4"
+                    >
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/80">
+                        {item.eventLabel}
+                      </p>
+                      <p className="mt-2 text-base font-semibold text-foreground">
+                        {item.debtName}
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-muted">{item.summary}</p>
+                      <p className="date-stable mt-3 text-sm font-medium text-foreground">
+                        {formatDate(item.occursOn)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-[1.5rem] border border-dashed border-border bg-secondary/30 p-4 text-sm leading-7 text-muted">
+                  {data.upcomingTimeline.emptyState}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 sm:gap-5 2xl:grid-cols-[1.05fr_0.95fr]">
             <NarrativeInsightCard
               kicker="Así va tu plan"
               title={momentumSummary.title}
@@ -1206,7 +1346,7 @@ export function DashboardOverview({
               }
             />
 
-            <div className="min-w-0 rounded-[2rem] bg-[linear-gradient(160deg,rgba(12,88,74,0.98),rgba(33,132,113,0.92))] p-6 text-white shadow-[0_24px_60px_rgba(15,88,74,0.24)]">
+            <div className="min-w-0 rounded-[2rem] bg-[linear-gradient(160deg,rgba(12,88,74,0.98),rgba(33,132,113,0.92))] p-5 text-white shadow-[0_24px_60px_rgba(15,88,74,0.24)] sm:p-6">
               <p className="text-sm font-medium text-white/78">
                 {isPremiumUnlocked
                   ? "Fecha estimada de salida"
@@ -1249,7 +1389,7 @@ export function DashboardOverview({
 
           <div className="grid gap-5 2xl:grid-cols-[1.02fr_0.98fr]">
             {showPremiumWelcome && isPremiumUnlocked ? (
-              <div className="rounded-[1.75rem] border border-emerald-200 bg-[linear-gradient(135deg,rgba(236,253,245,0.95),rgba(255,248,241,0.92))] p-5 xl:col-span-2">
+              <div className="rounded-[1.75rem] border border-emerald-200 bg-[linear-gradient(135deg,rgba(236,253,245,0.95),rgba(255,248,241,0.92))] p-4 sm:p-5 xl:col-span-2">
                 <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_320px] 2xl:items-start">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-3">
@@ -1375,7 +1515,7 @@ export function DashboardOverview({
               </div>
             ) : null}
 
-            <div className="border-border/80 bg-secondary/50 rounded-[1.75rem] border p-6">
+            <div className="border-border/80 bg-secondary/50 rounded-[1.75rem] border p-4 sm:p-6">
               <div className="flex items-center gap-3">
                 <Badge
                   variant={
@@ -1413,8 +1553,9 @@ export function DashboardOverview({
                   ? "Aquí entras directo al simulador o revisas la estructura activa sin pasar por varias pantallas."
                   : "Aquí solo te mostramos el siguiente paso natural, no una lista larga de decisiones."}
               </div>
-              <div className="mt-4 flex flex-wrap gap-3">
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <Button
+                  className="w-full sm:w-auto"
                   variant={
                     needsBillingAttention || !isPremiumUnlocked
                       ? "primary"
@@ -1437,14 +1578,14 @@ export function DashboardOverview({
                       : "Ir al simulador"}
                 </Button>
                 {hasDebts ? (
-                  <Button variant="ghost" onClick={() => navigateTo("/deudas")}>
+                  <Button className="w-full sm:w-auto" variant="ghost" onClick={() => navigateTo("/deudas")}>
                     Revisar deudas
                   </Button>
                 ) : null}
               </div>
             </div>
 
-            <div className="border-primary/10 rounded-[1.75rem] border bg-[rgba(255,248,241,0.72)] p-6">
+            <div className="border-primary/10 rounded-[1.75rem] border bg-[rgba(255,248,241,0.72)] p-4 sm:p-6">
               <p className="section-kicker">
                 Luego puedes revisar
               </p>
@@ -1632,7 +1773,7 @@ export function DashboardOverview({
                       Plan recomendado bloqueado
                     </p>
                     <p className="text-muted text-sm">
-                      Disponible en los planes Premium y Pro.
+                      Estás viendo solo una parte de la decisión.
                     </p>
                   </div>
                 </div>
@@ -1698,25 +1839,25 @@ export function DashboardOverview({
                 </div>
               </div>
 
-              <div className="border-primary/10 rounded-[1.75rem] border bg-[rgba(255,248,241,0.95)] p-5 shadow-[0_18px_42px_rgba(240,138,93,0.1)] 2xl:col-span-2">
+              <div className="border-primary/10 rounded-[1.75rem] border bg-[rgba(255,248,241,0.95)] p-4 shadow-[0_18px_42px_rgba(240,138,93,0.1)] sm:p-5 2xl:col-span-2">
                 <p className="section-kicker">
                   Planes premium
                 </p>
                 <p className="text-foreground mt-3 text-2xl font-semibold">
-                  Premium US$5/mes y Pro US$10/mes
+                  Premium US$5/mes · US$49/año · ahorras US$11. Pro US$10/mes · US$99/año · ahorras US$21.
                 </p>
                 <p className="support-copy mt-3">
-                  Premium está diseñado para quien quiere salir más rápido, con
-                  una guía de 6 meses. Pro extiende la experiencia a 12 meses
-                  con mejores consejos y un flujo más completo.
+                  Premium está diseñado para quien quiere dejar de perder dinero más rápido. Pro extiende esa lógica con más seguimiento, más contexto y un flujo más completo.
                 </p>
-                <div className="mt-5 flex flex-wrap gap-3">
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                   <Button
+                    className="w-full sm:w-auto"
                     onClick={() => navigateTo(lockedUpgradeContext.primaryHref)}
                   >
                     {lockedUpgradeContext.primaryCtaLabel}
                   </Button>
                   <Button
+                    className="w-full sm:w-auto"
                     variant="secondary"
                     onClick={() =>
                       navigateTo(lockedUpgradeContext.secondaryHref)
@@ -1732,7 +1873,7 @@ export function DashboardOverview({
       </section>
 
       <section className="grid gap-5 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-        <Card className="min-w-0 p-6 sm:p-7">
+        <Card className="min-w-0 p-4 sm:p-7">
           <CardHeader className="gap-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -1806,7 +1947,7 @@ export function DashboardOverview({
 
       {isPremiumUnlocked && hasDebts ? (
         <section className="grid gap-5 2xl:grid-cols-[1.08fr_0.92fr]">
-          <Card className="p-6">
+          <Card className="p-4 sm:p-6">
             <CardHeader>
               <CardTitle>Seguimiento premium de la semana</CardTitle>
               <CardDescription>
@@ -1815,7 +1956,7 @@ export function DashboardOverview({
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-4">
-              <div className="border-primary/12 rounded-[1.75rem] border bg-[rgba(240,248,245,0.92)] p-5">
+              <div className="border-primary/12 rounded-[1.75rem] border bg-[rgba(240,248,245,0.92)] p-4 sm:p-5">
                 <div className="flex flex-wrap items-center gap-3">
                   <Badge variant="success">Plan premium activo</Badge>
                   <Badge variant="warning">Próxima revisión en 7 días</Badge>
@@ -1831,7 +1972,7 @@ export function DashboardOverview({
                   principal.
                 </p>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <div className="rounded-3xl bg-white/85 p-5 md:col-span-2">
+                  <div className="rounded-3xl bg-white/85 p-4 sm:p-5 md:col-span-2">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Presupuesto sugerido
                     </p>
@@ -1841,7 +1982,7 @@ export function DashboardOverview({
                       )}
                     </p>
                   </div>
-                  <div className="rounded-3xl bg-white/85 p-5">
+                  <div className="rounded-3xl bg-white/85 p-4 sm:p-5">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Vencimientos cercanos
                     </p>
@@ -1849,7 +1990,7 @@ export function DashboardOverview({
                       {data.dueSoonDebts.length}
                     </p>
                   </div>
-                  <div className="rounded-3xl bg-white/85 p-5">
+                  <div className="rounded-3xl bg-white/85 p-4 sm:p-5">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Alertas activas
                     </p>
@@ -1858,7 +1999,7 @@ export function DashboardOverview({
                     </p>
                   </div>
                 </div>
-                <div className="mt-5 flex flex-wrap gap-3">
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                   <Button onClick={revealOptimization}>
                     Revisar plan de esta semana
                   </Button>
@@ -1873,49 +2014,120 @@ export function DashboardOverview({
             </CardContent>
           </Card>
 
-          <Card className="p-6">
+          <Card className="p-4 sm:p-6">
             <CardHeader>
-              <CardTitle>Para no salirte del plan</CardTitle>
+              <CardTitle>
+                {isProUnlocked
+                  ? "Seguimiento Pro de esta semana"
+                  : "Lo que Pro añade encima"}
+              </CardTitle>
               <CardDescription>
-                Tres recordatorios sencillos para sostener la tracción premium.
+                {isProUnlocked
+                  ? "Más contexto para sostener tu ritmo durante más tiempo."
+                  : "Premium ya te da la prioridad. Pro le añade más contexto y seguimiento."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 pt-4">
-              <div className="border-border bg-secondary/70 rounded-3xl border p-5">
-                <p className="text-foreground font-semibold">
-                  1. No redistribuyas el excedente
-                </p>
-                <p className="text-muted mt-2 text-sm leading-7">
-                  Si aparece dinero extra esta semana, envíalo a la deuda
-                  prioritaria en vez de repartirlo.
-                </p>
-              </div>
-              <div className="border-border bg-secondary/70 rounded-3xl border p-5">
-                <p className="text-foreground font-semibold">
-                  2. Revisa tus próximos vencimientos
-                </p>
-                <p className="text-muted mt-2 text-sm leading-7">
-                  {data.dueSoonDebts.length
-                    ? `Tienes ${data.dueSoonDebts.length} deuda${data.dueSoonDebts.length === 1 ? "" : "s"} por revisar pronto para no perder control.`
-                    : "No hay vencimientos inmediatos, así que puedes concentrarte en acelerar la prioridad actual."}
-                </p>
-              </div>
-              <div className="border-border bg-secondary/70 rounded-3xl border p-5">
-                <p className="text-foreground font-semibold">
-                  3. Vuelve al dashboard cada semana
-                </p>
-                <p className="text-muted mt-2 text-sm leading-7">
-                  El plan premium funciona mejor cuando revisas avance, alertas
-                  y prioridad una vez por semana.
-                </p>
-              </div>
+              {isProUnlocked ? (
+                <>
+                  <div className="border-border bg-secondary/70 rounded-3xl border p-4 sm:p-5">
+                    <p className="text-foreground font-semibold">
+                      1. Mantén la revisión semanal viva
+                    </p>
+                    <p className="text-muted mt-2 text-sm leading-7">
+                      {data.habitSignals.reviewPrompt ??
+                        "Tu seguimiento ya tiene suficiente contexto para revisar avance, alertas y prioridad una vez por semana."}
+                    </p>
+                  </div>
+                  <div className="border-border bg-secondary/70 rounded-3xl border p-4 sm:p-5">
+                    <p className="text-foreground font-semibold">
+                      2. Lee el progreso con más historial
+                    </p>
+                    <p className="text-muted mt-2 text-sm leading-7">
+                      Tienes {data.balanceHistory.length} puntos de saldo y{" "}
+                      {data.recentPayments.length} pagos recientes visibles para
+                      juzgar si el ritmo está mejorando o se está estancando.
+                    </p>
+                  </div>
+                  <div className="border-border bg-secondary/70 rounded-3xl border p-4 sm:p-5">
+                    <p className="text-foreground font-semibold">
+                      3. Convierte alertas en seguimiento
+                    </p>
+                    <p className="text-muted mt-2 text-sm leading-7">
+                      Hoy tienes {data.riskAlerts.length} alerta
+                      {data.riskAlerts.length === 1 ? "" : "s"} y{" "}
+                      {data.dueSoonDebts.length} fecha
+                      {data.dueSoonDebts.length === 1 ? "" : "s"} cercana
+                      {data.dueSoonDebts.length === 1 ? "" : "s"} para sostener
+                      el plan con más contexto operativo.
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                    <Button onClick={() => navigateTo("/reportes")}>
+                      Abrir reportes
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => navigateTo("/notificaciones")}
+                    >
+                      Revisar alertas
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="border-border bg-secondary/70 rounded-3xl border p-4 sm:p-5">
+                    <p className="text-foreground font-semibold">
+                      1. Más historia para leer tu ritmo
+                    </p>
+                    <p className="text-muted mt-2 text-sm leading-7">
+                      Pro amplía la profundidad de reportes e historial para que
+                      no veas solo el momento actual, sino también si tu avance
+                      se está sosteniendo.
+                    </p>
+                  </div>
+                  <div className="border-border bg-secondary/70 rounded-3xl border p-4 sm:p-5">
+                    <p className="text-foreground font-semibold">
+                      2. Exportes y seguimiento más operativo
+                    </p>
+                    <p className="text-muted mt-2 text-sm leading-7">
+                      Premium resuelve la prioridad. Pro añade exportes CSV/PDF,
+                      más contexto y una lectura más larga del plan.
+                    </p>
+                  </div>
+                  <div className="border-primary/15 rounded-3xl border bg-[rgba(255,248,241,0.88)] p-4 sm:p-5">
+                    <div className="flex items-center gap-3">
+                      <Badge variant="warning">Control total en Pro</Badge>
+                      <Badge variant="default">Seguimiento 12 meses</Badge>
+                    </div>
+                    <p className="text-foreground mt-3 font-semibold">
+                      Si ya estás usando Premium, Pro es la capa para sostenerlo
+                      mejor.
+                    </p>
+                    <p className="text-muted mt-2 text-sm leading-7">
+                      Hoy ya tienes {data.riskAlerts.length} alerta
+                      {data.riskAlerts.length === 1 ? "" : "s"} y{" "}
+                      {data.dueSoonDebts.length} fecha
+                      {data.dueSoonDebts.length === 1 ? "" : "s"} sensible
+                      {data.dueSoonDebts.length === 1 ? "" : "s"}. Pro guarda
+                      más contexto para que el seguimiento no dependa de memoria
+                      corta.
+                    </p>
+                    <div className="mt-4">
+                      <Button onClick={() => navigateTo("/planes?plan=PRO&source=dashboard")}>
+                        Ver Pro
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </section>
       ) : null}
 
-      <section className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
-        <Card className="p-6">
+      <section className="grid gap-5 sm:gap-6 xl:grid-cols-[1.35fr_1fr]">
+        <Card className="p-4 sm:p-6">
           <CardHeader>
             <CardTitle>Evolución del saldo</CardTitle>
             <CardDescription>
@@ -1944,7 +2156,7 @@ export function DashboardOverview({
           </CardContent>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-4 sm:p-6">
           <CardHeader>
             <CardTitle>Resumen por tipo</CardTitle>
             <CardDescription>
@@ -1975,10 +2187,10 @@ export function DashboardOverview({
 
       <section
         ref={optimizationRef}
-        className="grid gap-6 2xl:grid-cols-[1.14fr_0.86fr]"
+        className="grid gap-5 sm:gap-6 2xl:grid-cols-[1.14fr_0.86fr]"
       >
         <Card
-          className={`p-6 transition ${showOptimization ? "border-primary/25 ring-primary/10 ring-2" : ""}`}
+          className={`p-4 transition sm:p-6 ${showOptimization ? "border-primary/25 ring-primary/10 ring-2" : ""}`}
         >
           <CardHeader>
             <CardTitle>Plan inteligente recomendado</CardTitle>
@@ -1986,7 +2198,7 @@ export function DashboardOverview({
           </CardHeader>
           <CardContent className="space-y-4 pt-4">
             {isPremiumUnlocked && showOptimization && optimizedPlan ? (
-              <div className="border-primary/10 rounded-[1.75rem] border bg-[rgba(240,248,245,0.92)] p-5">
+              <div className="border-primary/10 rounded-[1.75rem] border bg-[rgba(240,248,245,0.92)] p-4 sm:p-5">
                 <p className="text-primary text-sm font-semibold tracking-[0.18em] uppercase">
                   Resultado inmediato
                 </p>
@@ -1999,7 +2211,7 @@ export function DashboardOverview({
                   {data.planComparison?.immediateAction}
                 </p>
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-3xl bg-white/90 p-5">
+                  <div className="rounded-3xl bg-white/90 p-4 sm:p-5">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Ruta elegida
                     </p>
@@ -2007,7 +2219,7 @@ export function DashboardOverview({
                       {optimizedPlan.strategyLabel}
                     </p>
                   </div>
-                  <div className="rounded-3xl bg-white/90 p-5">
+                  <div className="rounded-3xl bg-white/90 p-4 sm:p-5">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Intereses evitables
                     </p>
@@ -2017,7 +2229,7 @@ export function DashboardOverview({
                       )}
                     </p>
                   </div>
-                  <div className="rounded-3xl bg-white/90 p-5 md:col-span-2">
+                  <div className="rounded-3xl bg-white/90 p-4 sm:p-5 md:col-span-2">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Pago mensual sugerido
                     </p>
@@ -2058,13 +2270,15 @@ export function DashboardOverview({
                     ))}
                   </div>
                 ) : null}
-                <div className="mt-4 flex flex-wrap gap-3">
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                   <Button
+                    className="w-full sm:w-auto"
                     onClick={() => navigateTo(lockedUpgradeContext.primaryHref)}
                   >
                     {lockedUpgradeContext.primaryCtaLabel}
                   </Button>
                   <Button
+                    className="w-full sm:w-auto"
                     variant="secondary"
                     onClick={() =>
                       navigateTo(lockedUpgradeContext.secondaryHref)
@@ -2077,7 +2291,7 @@ export function DashboardOverview({
             )}
 
             {priorityOne ? (
-              <div className="rounded-[1.85rem] border border-primary/20 bg-[linear-gradient(145deg,rgba(240,248,245,0.96),rgba(255,248,241,0.92))] p-5 shadow-[0_22px_48px_rgba(15,88,74,0.1)] transition-all duration-200 ease-out hover:-translate-y-[1px] hover:shadow-[0_24px_46px_rgba(15,88,74,0.12)]">
+              <div className="rounded-[1.85rem] border border-primary/20 bg-[linear-gradient(145deg,rgba(240,248,245,0.96),rgba(255,248,241,0.92))] p-4 shadow-[0_22px_48px_rgba(15,88,74,0.1)] transition-all duration-200 ease-out hover:-translate-y-[1px] hover:shadow-[0_24px_46px_rgba(15,88,74,0.12)] sm:p-5">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="max-w-4xl">
                     <div className="flex flex-wrap items-center gap-3">
@@ -2146,7 +2360,7 @@ export function DashboardOverview({
               remainingRecommendedOrder.map((item) => (
                 <div
                   key={item.id}
-                  className={`rounded-[1.75rem] border p-5 transition-all duration-200 ease-out ${
+                  className={`rounded-[1.75rem] border p-4 transition-all duration-200 ease-out sm:p-5 ${
                     item.priorityRank === 1
                       ? "border-primary/20 bg-[rgba(240,248,245,0.92)] shadow-[0_18px_42px_rgba(15,88,74,0.08)] hover:shadow-[0_22px_44px_rgba(15,88,74,0.11)]"
                       : "border-border bg-secondary/70 hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)]"
@@ -2204,8 +2418,8 @@ export function DashboardOverview({
           </CardContent>
         </Card>
 
-        <div className="grid gap-6">
-          <Card className="p-6">
+        <div className="grid gap-5 sm:gap-6">
+          <Card className="p-4 sm:p-6">
             <CardHeader>
               <CardTitle>Deuda más urgente</CardTitle>
               <CardDescription>
@@ -2250,7 +2464,7 @@ export function DashboardOverview({
             </CardContent>
           </Card>
 
-          <Card className="p-6">
+          <Card className="p-4 sm:p-6">
             <CardHeader>
               <CardTitle>Alertas de riesgo</CardTitle>
               <CardDescription>
@@ -2262,7 +2476,7 @@ export function DashboardOverview({
                 data.riskAlerts.map((alert) => (
                 <div
                   key={alert.title}
-                  className="border-border bg-secondary/70 rounded-3xl border p-5 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997]"
+                  className="border-border bg-secondary/70 rounded-3xl border p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:p-5"
                 >
                     <p className="text-foreground font-semibold">
                       {alert.title}
@@ -2282,8 +2496,8 @@ export function DashboardOverview({
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-2">
-        <Card className="p-6">
+      <section className="grid gap-5 sm:gap-6 xl:grid-cols-2">
+        <Card className="p-4 sm:p-6">
           <CardHeader>
             <CardTitle>Próximos vencimientos</CardTitle>
             <CardDescription>
@@ -2323,7 +2537,7 @@ export function DashboardOverview({
           </CardContent>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-4 sm:p-6">
           <CardHeader>
             <CardTitle>Pagos recientes</CardTitle>
             <CardDescription>

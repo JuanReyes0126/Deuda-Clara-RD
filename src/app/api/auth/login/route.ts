@@ -7,14 +7,14 @@ import { readRequestBody } from "@/lib/http/read-request-body";
 import { buildRedirectUrl } from "@/lib/http/request-origin";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { getRequestMeta } from "@/lib/security/request-meta";
-import { assertRateLimit } from "@/lib/security/rate-limit";
+import { assertRateLimit, buildRateLimitKey } from "@/lib/security/rate-limit";
 import { loginSchema } from "@/lib/validations/auth";
 import { authenticateUser } from "@/server/auth/auth-service";
 import { isDatabaseReachable, markDatabaseUnavailable } from "@/server/services/database-availability";
 import { isInfrastructureUnavailableError } from "@/server/services/infrastructure-error";
 import { generateOpaqueToken } from "@/server/auth/tokens";
 import { isServiceError } from "@/server/services/service-error";
-import { logServerError } from "@/server/observability/logger";
+import { logSecurityEvent, logServerError } from "@/server/observability/logger";
 
 function redirectWithError(request: NextRequest, message: string) {
   const url = buildRedirectUrl(request, "/login");
@@ -33,9 +33,9 @@ export async function POST(request: NextRequest) {
   );
 
   try {
-    assertSameOrigin(request);
-
     const body = await readRequestBody(request);
+    assertSameOrigin(request, { fallbackCsrfToken: body.csrfToken });
+    const requestMeta = getRequestMeta(request);
     const parsed = loginSchema.safeParse(body);
 
     if (!parsed.success) {
@@ -54,12 +54,17 @@ export async function POST(request: NextRequest) {
     parsedInput = parsed.data;
 
     const rateLimit = await assertRateLimit({
-      key: `login:${parsed.data.email}`,
+      key: buildRateLimitKey(request, "login", parsed.data.email),
       limit: 10,
       windowMs: 10 * 60 * 1000,
     });
 
     if (!rateLimit.success) {
+      logSecurityEvent("rate_limit_login", {
+        email: parsed.data.email,
+        ipAddress: requestMeta.ipAddress,
+      });
+
       if (wantsRedirect) {
         return redirectWithError(
           request,
@@ -99,7 +104,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const user = await authenticateUser(parsed.data, getRequestMeta(request));
+    const user = await authenticateUser(parsed.data, requestMeta);
     const rawToken = generateOpaqueToken();
     await createUserSession(user.id, rawToken);
 
@@ -116,11 +121,18 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     if (isServiceError(error)) {
+      const payload = {
+        error: error.message,
+        ...(error.code === "MFA_REQUIRED" || error.code === "MFA_INVALID"
+          ? { mfaRequired: true }
+          : {}),
+      };
+
       if (wantsRedirect) {
         return redirectWithError(request, error.message);
       }
 
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return NextResponse.json(payload, { status: error.status });
     }
 
     if (isInfrastructureUnavailableError(error)) {

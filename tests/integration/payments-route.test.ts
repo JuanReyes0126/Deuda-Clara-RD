@@ -1,8 +1,8 @@
-import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Prisma } from "@prisma/client";
 
 import { POST } from "@/app/api/payments/route";
+import { buildJsonRequest } from "./request-helpers";
 
 vi.mock("@/lib/auth/session", () => ({
   getCurrentSession: vi.fn(),
@@ -25,17 +25,9 @@ describe("api/payments", () => {
     } as never);
 
     const response = await POST(
-      new NextRequest("http://localhost/api/payments", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          origin: "http://localhost",
-          host: "localhost",
-        },
-        body: JSON.stringify({
+      buildJsonRequest("http://localhost/api/payments", {
           debtId: "",
           amount: -1,
-        }),
       }),
     );
 
@@ -54,19 +46,11 @@ describe("api/payments", () => {
     } as never);
 
     const response = await POST(
-      new NextRequest("http://localhost/api/payments", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          origin: "http://localhost",
-          host: "localhost",
-        },
-        body: JSON.stringify({
+      buildJsonRequest("http://localhost/api/payments", {
           debtId: "debt-1",
           amount: 5000,
           paidAt: "2026-03-20",
           source: "MANUAL",
-        }),
       }),
     );
 
@@ -86,19 +70,11 @@ describe("api/payments", () => {
     );
 
     const response = await POST(
-      new NextRequest("http://localhost/api/payments", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          origin: "http://localhost",
-          host: "localhost",
-        },
-        body: JSON.stringify({
+      buildJsonRequest("http://localhost/api/payments", {
           debtId: "debt-1",
           amount: 5000,
           paidAt: "2026-03-20",
           source: "MANUAL",
-        }),
       }),
     );
     const body = (await response.json()) as { error: string };

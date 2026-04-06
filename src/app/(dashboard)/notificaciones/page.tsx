@@ -1,36 +1,31 @@
 import { NotificationCenter } from "@/features/notifications/components/notification-center";
-import { requireUser } from "@/lib/auth/session";
 import { demoNotifications } from "@/lib/demo/data";
 import { isDemoSessionUser } from "@/lib/demo/session";
-import { hasMembershipAccess } from "@/lib/membership/plans";
 import { listUserNotifications } from "@/server/notifications/notification-service";
-import { getUserSettingsBundle } from "@/server/settings/settings-service";
+import { getRequestMembershipContext, getRequestSessionUser } from "@/server/request/request-user-context";
 
 export default async function NotificationsPage() {
-  const user = await requireUser();
+  const user = await getRequestSessionUser();
 
   if (isDemoSessionUser(user)) {
     return (
       <NotificationCenter
         initialNotifications={demoNotifications}
-        premiumInsightsEnabled
+        membershipTier="NORMAL"
+        billingStatus="ACTIVE"
       />
     );
   }
 
-  const [notifications, settingsBundle] = await Promise.all([
+  const [notifications, membership] = await Promise.all([
     listUserNotifications(user.id),
-    getUserSettingsBundle(user.id),
+    getRequestMembershipContext(),
   ]);
-  const premiumInsightsEnabled = hasMembershipAccess(
-    settingsBundle.settings?.membershipTier,
-    settingsBundle.settings?.membershipBillingStatus ?? "FREE",
-  );
-
   return (
     <NotificationCenter
       initialNotifications={notifications}
-      premiumInsightsEnabled={premiumInsightsEnabled}
+      membershipTier={membership.membershipTier}
+      billingStatus={membership.membershipBillingStatus}
     />
   );
 }

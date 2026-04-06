@@ -1,5 +1,13 @@
 # Guía de despliegue
 
+Este documento es una vista general de despliegue.
+
+Para ejecución real usa:
+
+- [STAGING_SETUP.md](./STAGING_SETUP.md)
+- [STAGING_GO_LIVE_RUNBOOK.md](./STAGING_GO_LIVE_RUNBOOK.md)
+- [GO_NO_GO_CHECKLIST.md](./GO_NO_GO_CHECKLIST.md)
+
 ## Recomendación
 
 La opción recomendada para este proyecto es **Vercel + Neon**.
@@ -17,64 +25,22 @@ Alternativas:
 - Render: válido, pero el cold start y costos pueden ser menos atractivos para este perfil.
 - AWS: más control y más complejidad operativa; recomendable solo si ya existe equipo DevOps dedicado.
 
-## Variables de entorno mínimas
+## Variables de entorno
 
-- `APP_URL`
-- `AUTH_SECRET`
-- `DATABASE_URL`
-- `DIRECT_DATABASE_URL`
-- `CRON_SECRET`
-- `RESEND_API_KEY`
-- `RESEND_FROM_EMAIL`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-- `STRIPE_PREMIUM_PRICE_ID`
-- `STRIPE_PRO_PRICE_ID`
+No mantengas aquí una lista paralela.
+
+Usa:
+
+- [ENVIRONMENT_MATRIX.md](./ENVIRONMENT_MATRIX.md)
+- [VERCEL_ENV_TEMPLATES.md](./VERCEL_ENV_TEMPLATES.md)
 
 ## Despliegue en Vercel
 
-1. Crea una base PostgreSQL en Neon.
-2. Configura `DATABASE_URL` y `DIRECT_DATABASE_URL`.
-   - `DATABASE_URL`: conexión pooled para runtime
-   - `DIRECT_DATABASE_URL`: conexión directa / no pooled para Prisma
-3. Si Vercel + Neon te inyectan `DATABASE_URL_UNPOOLED`, mapea manualmente:
+Para no duplicar flujo:
 
-```bash
-DIRECT_DATABASE_URL = DATABASE_URL_UNPOOLED
-```
-
-4. Configura también:
-   - `APP_URL` con la URL pública real
-   - `AUTH_SECRET`
-   - `DATA_ENCRYPTION_KEY`
-   - `CRON_SECRET`
-   - `DEMO_MODE_ENABLED=false`
-5. Configura las variables de entorno del proyecto en Vercel.
-6. Ejecuta migraciones:
-
-```bash
-npx prisma migrate deploy
-```
-
-7. Carga seed inicial si quieres entorno demo:
-
-```bash
-npm run db:seed
-```
-
-8. Despliega el proyecto.
-
-9. Configura Stripe:
-
-- crea los productos `Premium` y `Pro`
-- carga los `Price IDs` en variables de entorno
-- crea el webhook hacia `/api/stripe/webhook`
-- habilita el Billing Portal
-
-Referencia completa:
-
-- [Stripe setup](./STRIPE_SETUP.md)
-- [Staging real con Vercel + Neon](./STAGING_SETUP.md)
+- setup base: [STAGING_SETUP.md](./STAGING_SETUP.md)
+- ejecución completa: [STAGING_GO_LIVE_RUNBOOK.md](./STAGING_GO_LIVE_RUNBOOK.md)
+- billing: [STRIPE_SETUP.md](./STRIPE_SETUP.md)
 
 ## Job de recordatorios
 
@@ -86,11 +52,9 @@ Con header:
 
 - `x-cron-secret: <CRON_SECRET>`
 
-## Checklist post-despliegue
+## Post-despliegue
 
-- Verificar login y recuperación de contraseña.
-- Verificar que PostgreSQL responde desde la app.
-- Ejecutar seed solo en entornos donde aplique.
-- Probar exportación CSV/PDF.
-- Confirmar envío de emails de recordatorio.
-- Revisar logs de auditoría y errores.
+La validación post-despliegue vive en:
+
+- [STAGING_GO_LIVE_RUNBOOK.md](./STAGING_GO_LIVE_RUNBOOK.md)
+- [GO_NO_GO_CHECKLIST.md](./GO_NO_GO_CHECKLIST.md)

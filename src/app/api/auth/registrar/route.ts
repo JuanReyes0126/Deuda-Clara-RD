@@ -7,14 +7,14 @@ import { readRequestBody } from "@/lib/http/read-request-body";
 import { buildRedirectUrl } from "@/lib/http/request-origin";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { getRequestMeta } from "@/lib/security/request-meta";
-import { assertRateLimit } from "@/lib/security/rate-limit";
+import { assertRateLimit, buildRateLimitKey } from "@/lib/security/rate-limit";
 import { registerSchema } from "@/lib/validations/auth";
 import { registerUser } from "@/server/auth/auth-service";
 import { isDatabaseReachable, markDatabaseUnavailable } from "@/server/services/database-availability";
 import { isInfrastructureUnavailableError } from "@/server/services/infrastructure-error";
 import { generateOpaqueToken } from "@/server/auth/tokens";
 import { isServiceError } from "@/server/services/service-error";
-import { logServerError } from "@/server/observability/logger";
+import { logSecurityEvent, logServerError } from "@/server/observability/logger";
 
 function redirectWithError(request: NextRequest, message: string) {
   const url = buildRedirectUrl(request, "/registro");
@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
         email: string;
         password: string;
         confirmPassword: string;
+        acceptLegal: boolean;
       }
     | null = null;
   const wantsRedirect = !(request.headers.get("content-type") ?? "").includes(
@@ -41,15 +42,20 @@ export async function POST(request: NextRequest) {
   );
 
   try {
-    assertSameOrigin(request);
+    const requestBody = await readRequestBody(request);
+    assertSameOrigin(request, { fallbackCsrfToken: requestBody.csrfToken });
+    const requestMeta = getRequestMeta(request);
 
     const rateLimit = await assertRateLimit({
-      key: `register:${request.headers.get("x-forwarded-for") ?? "local"}`,
+      key: buildRateLimitKey(request, "register"),
       limit: 5,
       windowMs: 10 * 60 * 1000,
     });
 
     if (!rateLimit.success) {
+      logSecurityEvent("rate_limit_register", {
+        ipAddress: requestMeta.ipAddress,
+      });
       if (wantsRedirect) {
         return redirectWithError(
           request,
@@ -63,7 +69,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const parsed = registerSchema.safeParse(await readRequestBody(request));
+    const parsed = registerSchema.safeParse(requestBody);
 
     if (!parsed.success) {
       if (wantsRedirect) {
@@ -95,7 +101,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const user = await registerUser(parsed.data, getRequestMeta(request));
+    const user = await registerUser(parsed.data, requestMeta);
     const rawToken = generateOpaqueToken();
     await createUserSession(user.id, rawToken);
 

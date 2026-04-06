@@ -34,14 +34,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     const { userId } = await context.params;
-    const user = await updateUserStatus(
+    const publicUser = await updateUserStatus(
       decision.user.id,
       userId,
       parsed.data.status,
       getRequestMeta(request),
     );
 
-    return NextResponse.json({ ok: true, user });
+    return NextResponse.json({ ok: true, user: publicUser });
   } catch (error) {
     return handleApiError(error, "No se pudo actualizar el usuario.");
   }

@@ -32,6 +32,7 @@ export const debtSchema = z
     statementDay: optionalIntegerDayInputSchema,
     dueDay: optionalIntegerDayInputSchema,
     nextDueDate: optionalDateInputSchema,
+    notificationsEnabled: z.boolean().default(true),
     lateFeeAmount: moneyInputSchema.default(0),
     extraChargesAmount: moneyInputSchema.default(0),
     notes: optionalLongTextSchema(),

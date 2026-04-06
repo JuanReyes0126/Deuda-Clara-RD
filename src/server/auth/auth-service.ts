@@ -1,10 +1,18 @@
 import { AuditAction, CurrencyCode, StrategyMethod } from "@prisma/client";
 
+import {
+  CURRENT_PRIVACY_VERSION,
+  CURRENT_TERMS_VERSION,
+} from "@/config/legal";
 import { prisma } from "@/lib/db/prisma";
+import { revokeOtherSessions, rotateCurrentSession } from "@/lib/auth/session";
+import { decryptSensitiveText } from "@/lib/security/encryption";
+import { verifyRecoveryCode, verifyTotpCode } from "@/lib/security/totp";
 import type {
   ChangePasswordInput,
   ForgotPasswordInput,
   LoginInput,
+  ReauthenticateInput,
   RegisterInput,
   ResetPasswordInput,
 } from "@/lib/validations/auth";
@@ -16,7 +24,10 @@ import {
   buildWelcomeEmail,
 } from "@/server/mail/email-templates";
 import { sendTransactionalEmail } from "@/server/mail/mail-service";
-import { logServerError } from "@/server/observability/logger";
+import {
+  logSecurityEvent,
+  logServerError,
+} from "@/server/observability/logger";
 
 import { ServiceError } from "../services/service-error";
 import { hashPassword, verifyPassword } from "./password";
@@ -26,6 +37,23 @@ type RequestMeta = {
   ipAddress?: string | undefined;
   userAgent?: string | undefined;
 };
+
+const loginUserSelect = {
+  id: true,
+  email: true,
+  passwordHash: true,
+  firstName: true,
+  lastName: true,
+  status: true,
+  onboardingCompleted: true,
+  settings: {
+    select: {
+      mfaTotpEnabled: true,
+      mfaTotpSecretEncrypted: true,
+      mfaRecoveryCodesHashes: true,
+    },
+  },
+} as const;
 
 function normalizeAuthEmail(email: string) {
   return email.trim().toLowerCase();
@@ -69,37 +97,80 @@ export async function registerUser(input: RegisterInput, meta: RequestMeta) {
   }
 
   const passwordHash = await hashPassword(input.password);
+  const acceptedAt = new Date();
 
-  const user = await prisma.user.create({
-    data: {
-      email: normalizedEmail,
-      passwordHash,
-      firstName: input.firstName,
-      lastName: input.lastName,
-      settings: {
-        create: {
-          defaultCurrency: CurrencyCode.DOP,
-          preferredStrategy: StrategyMethod.AVALANCHE,
-          membershipTier: "FREE",
-          notifyDueSoon: true,
-          notifyOverdue: true,
-          notifyMinimumRisk: true,
-          notifyMonthlyReport: true,
-          emailRemindersEnabled: false,
-          upcomingDueDays: 3,
+  const user = await prisma.$transaction(async (tx) => {
+    const createdUser = await tx.user.create({
+      data: {
+        email: normalizedEmail,
+        passwordHash,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        termsAcceptedAt: acceptedAt,
+        termsVersion: CURRENT_TERMS_VERSION,
+        privacyVersion: CURRENT_PRIVACY_VERSION,
+        settings: {
+          create: {
+            defaultCurrency: CurrencyCode.DOP,
+            preferredStrategy: StrategyMethod.AVALANCHE,
+            membershipTier: "FREE",
+            notifyDueSoon: true,
+            notifyOverdue: true,
+            notifyMinimumRisk: true,
+            notifyMonthlyReport: true,
+            emailRemindersEnabled: false,
+            preferredReminderDays: [5, 2, 0],
+            preferredReminderHour: 8,
+            upcomingDueDays: 3,
+          },
         },
       },
-    },
+    });
+
+    await tx.userConsent.create({
+      data: {
+        userId: createdUser.id,
+        termsVersion: CURRENT_TERMS_VERSION,
+        privacyVersion: CURRENT_PRIVACY_VERSION,
+        acceptedAt,
+        ipAddress: meta.ipAddress ?? null,
+        userAgent: meta.userAgent ?? null,
+      },
+    });
+
+    await createAuditLog(
+      {
+        userId: createdUser.id,
+        action: AuditAction.USER_REGISTERED,
+        resourceType: "user",
+        resourceId: createdUser.id,
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        metadata: {
+          legalAccepted: true,
+          termsVersion: CURRENT_TERMS_VERSION,
+          privacyVersion: CURRENT_PRIVACY_VERSION,
+          termsAcceptedAt: acceptedAt.toISOString(),
+        },
+      },
+      tx,
+    );
+
+    return createdUser;
   });
 
-  await createAuditLog({
-    userId: user.id,
-    action: AuditAction.USER_REGISTERED,
-    resourceType: "user",
-    resourceId: user.id,
-    ipAddress: meta.ipAddress,
-    userAgent: meta.userAgent,
-  });
+  logSecurityEvent(
+    "user_registered_with_legal_acceptance",
+    {
+      userId: user.id,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      termsVersion: CURRENT_TERMS_VERSION,
+      privacyVersion: CURRENT_PRIVACY_VERSION,
+      acceptedAt: acceptedAt.toISOString(),
+    },
+    "info",
+  );
 
   const welcomeEmail = buildWelcomeEmail(user.firstName);
   await deliverAuthEmailSafely({
@@ -122,6 +193,7 @@ export async function authenticateUser(input: LoginInput, meta: RequestMeta) {
         mode: "insensitive",
       },
     },
+    select: loginUserSelect,
   });
 
   if (!user) {
@@ -157,6 +229,77 @@ export async function authenticateUser(input: LoginInput, meta: RequestMeta) {
     throw new ServiceError("INVALID_CREDENTIALS", 401, "Correo o contraseña inválidos.");
   }
 
+  if (user.settings?.mfaTotpEnabled) {
+    const hasTotpCode = Boolean(input.totpCode?.trim());
+    const hasRecoveryCode = Boolean(input.recoveryCode?.trim());
+
+    if (!hasTotpCode && !hasRecoveryCode) {
+      throw new ServiceError(
+        "MFA_REQUIRED",
+        401,
+        "Ingresa tu código de verificación o un código de respaldo.",
+      );
+    }
+
+    let mfaVerified = false;
+
+    if (hasTotpCode) {
+      const totpSecret = decryptSensitiveText(user.settings.mfaTotpSecretEncrypted);
+
+      if (!totpSecret) {
+        throw new ServiceError(
+          "MFA_CONFIGURATION_INVALID",
+          500,
+          "No pudimos validar tu segundo factor ahora mismo.",
+        );
+      }
+
+      if (verifyTotpCode(totpSecret, input.totpCode ?? "")) {
+        mfaVerified = true;
+      }
+    }
+
+    if (!mfaVerified && hasRecoveryCode) {
+      const recoveryResult = verifyRecoveryCode(
+        input.recoveryCode ?? "",
+        user.settings.mfaRecoveryCodesHashes,
+      );
+
+      if (recoveryResult.matched) {
+        await prisma.userSettings.update({
+          where: { userId: user.id },
+          data: {
+            mfaRecoveryCodesHashes: recoveryResult.remainingHashes,
+          },
+        });
+
+        mfaVerified = true;
+      }
+    }
+
+    if (!mfaVerified) {
+      await createAuditLog({
+        userId: user.id,
+        action: AuditAction.LOGIN_FAILURE,
+        resourceType: "auth",
+        resourceId: user.id,
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        metadata: {
+          reason: hasRecoveryCode ? "invalid_recovery_code" : "invalid_totp",
+        },
+      });
+
+      throw new ServiceError(
+        "MFA_INVALID",
+        401,
+        hasRecoveryCode
+          ? "El código de respaldo no es válido."
+          : "El código de verificación no es válido.",
+      );
+    }
+  }
+
   await prisma.user.update({
     where: { id: user.id },
     data: { lastLoginAt: new Date() },
@@ -172,6 +315,107 @@ export async function authenticateUser(input: LoginInput, meta: RequestMeta) {
   });
 
   return user;
+}
+
+export async function reauthenticateUser(
+  userId: string,
+  input: ReauthenticateInput,
+  meta: RequestMeta,
+) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: loginUserSelect,
+  });
+
+  if (!user) {
+    throw new ServiceError("USER_NOT_FOUND", 404, "No se encontró la cuenta.");
+  }
+
+  if (user.status !== "ACTIVE") {
+    throw new ServiceError("ACCOUNT_DISABLED", 403, "Tu cuenta está desactivada.");
+  }
+
+  const passwordMatches = await verifyPassword(
+    input.currentPassword,
+    user.passwordHash,
+  );
+
+  if (!passwordMatches) {
+    throw new ServiceError(
+      "CURRENT_PASSWORD_INVALID",
+      400,
+      "La contraseña actual no es correcta.",
+    );
+  }
+
+  if (user.settings?.mfaTotpEnabled) {
+    const hasTotpCode = Boolean(input.totpCode?.trim());
+    const hasRecoveryCode = Boolean(input.recoveryCode?.trim());
+
+    if (!hasTotpCode && !hasRecoveryCode) {
+      throw new ServiceError(
+        "MFA_REQUIRED",
+        401,
+        "Ingresa tu código de verificación o un código de respaldo.",
+      );
+    }
+
+    let mfaVerified = false;
+
+    if (hasTotpCode) {
+      const totpSecret = decryptSensitiveText(user.settings.mfaTotpSecretEncrypted);
+
+      if (!totpSecret) {
+        throw new ServiceError(
+          "MFA_CONFIGURATION_INVALID",
+          500,
+          "No pudimos validar tu segundo factor ahora mismo.",
+        );
+      }
+
+      if (verifyTotpCode(totpSecret, input.totpCode ?? "")) {
+        mfaVerified = true;
+      }
+    }
+
+    if (!mfaVerified && hasRecoveryCode) {
+      const recoveryResult = verifyRecoveryCode(
+        input.recoveryCode ?? "",
+        user.settings.mfaRecoveryCodesHashes,
+      );
+
+      if (recoveryResult.matched) {
+        await prisma.userSettings.update({
+          where: { userId: user.id },
+          data: {
+            mfaRecoveryCodesHashes: recoveryResult.remainingHashes,
+          },
+        });
+
+        mfaVerified = true;
+      }
+    }
+
+    if (!mfaVerified) {
+      throw new ServiceError(
+        "MFA_INVALID",
+        401,
+        hasRecoveryCode
+          ? "El código de respaldo no es válido."
+          : "El código de verificación no es válido.",
+      );
+    }
+  }
+
+  await createAuditLog({
+    userId,
+    action: AuditAction.LOGIN_SUCCESS,
+    resourceType: "auth",
+    resourceId: userId,
+    ipAddress: meta.ipAddress,
+    userAgent: meta.userAgent,
+    metadata: { securityEvent: "reauth_confirmed" },
+  });
 }
 
 export async function requestPasswordReset(
@@ -303,6 +547,9 @@ export async function changePassword(
     where: { id: userId },
     data: { passwordHash },
   });
+
+  await revokeOtherSessions(userId);
+  await rotateCurrentSession(userId);
 
   await createAuditLog({
     userId,

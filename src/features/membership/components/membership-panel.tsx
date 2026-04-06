@@ -13,14 +13,27 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ModuleSectionHeader } from "@/components/shared/module-section-header";
 import { PrimaryActionCard } from "@/components/shared/primary-action-card";
 import { TrustInlineNote } from "@/components/shared/trust-inline-note";
 import {
+  MEMBERSHIP_COMMERCIAL_COPY,
+  getCommercialUpgradeCta,
+} from "@/config/membership-commercial-copy";
+import { getPlanFeatureBullets } from "@/lib/feature-access";
+import {
+  formatMembershipAnnualPriceUsd,
+  formatMembershipAnnualSavingsUsd,
+  formatMembershipCommercialSummary,
+  formatMembershipMonthlyPriceUsd,
   membershipPlanCatalog,
   type MembershipBillingStatus,
   type MembershipPlanId,
 } from "@/lib/membership/plans";
+import { trackPlanEvent } from "@/lib/telemetry/plan-events";
+import { fetchWithCsrf } from "@/lib/http/fetch-with-csrf";
 import { readJsonPayload } from "@/lib/http/read-json-payload";
 import type { MembershipConversionSnapshotDto } from "@/lib/types/app";
 import { formatCurrency } from "@/lib/utils/currency";
@@ -39,19 +52,27 @@ async function requestJson(
   method: "PATCH" | "POST",
   body?: unknown,
 ) {
-  const response = await fetch(url, {
+  const response = await fetchWithCsrf(url, {
     method,
     headers: {
       "Content-Type": "application/json",
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-  const payload = await readJsonPayload<{ error?: string; url?: string }>(
+  const payload = await readJsonPayload<{
+    error?: string;
+    url?: string;
+    reauthRequired?: boolean;
+  }>(
     response,
   );
 
   if (!response.ok) {
-    throw new Error(payload.error ?? "No se pudo guardar.");
+    const error = new Error(payload.error ?? "No se pudo guardar.") as Error & {
+      reauthRequired?: boolean;
+    };
+    error.reauthRequired = Boolean(payload.reauthRequired);
+    throw error;
   }
 
   return payload;
@@ -85,7 +106,6 @@ function getPlanActionLabel({
   isCurrent,
   isPremium,
   planId,
-  planLabel,
 }: {
   billingConfigured: boolean;
   canManageBilling: boolean;
@@ -93,14 +113,13 @@ function getPlanActionLabel({
   isCurrent: boolean;
   isPremium: boolean;
   planId: MembershipPlanId;
-  planLabel: string;
 }) {
   if (isCurrent) {
     if (billingConfigured && canManageBilling && planId !== "FREE") {
-      return "Gestionar suscripción";
+      return "Gestionar facturación";
     }
 
-    return "Plan activo";
+    return "Tu plan actual";
   }
 
   if (billingConfigured && canManageBilling && currentTier !== "FREE") {
@@ -108,14 +127,16 @@ function getPlanActionLabel({
       return "Volver a Base";
     }
 
-    return "Cambiar en Stripe";
+    return getCommercialUpgradeCta(planId === "PRO" ? "Pro" : "Premium");
   }
 
   if (isPremium) {
-    return "Activar Premium";
+    return getCommercialUpgradeCta("Premium");
   }
 
-  return `Elegir ${planLabel}`;
+  return planId === "PRO"
+    ? getCommercialUpgradeCta("Pro")
+    : getCommercialUpgradeCta("Premium");
 }
 
 function getHighlightedActionLabel(
@@ -124,33 +145,33 @@ function getHighlightedActionLabel(
 ) {
   if (planId === "NORMAL") {
     if (sourceContext === "simulador") {
-      return "Activar Premium y fijar ruta";
+      return "Desbloquear comparación completa";
     }
 
     if (sourceContext === "reportes") {
-      return "Activar Premium y corregir prioridad";
+      return "Desbloquear lectura completa";
     }
 
     if (sourceContext === "notificaciones") {
-      return "Activar Premium y ordenar alertas";
+      return "Desbloquear alertas completas";
     }
 
     if (sourceContext === "dashboard") {
-      return "Activar Premium y ver prioridad";
+      return "Desbloquear plan completo";
     }
 
-    return "Activar Premium ahora";
+    return getCommercialUpgradeCta("Premium");
   }
 
   if (sourceContext === "reportes") {
-    return "Activar Pro y sostener seguimiento";
+    return "Subir a Pro y sostener seguimiento";
   }
 
   if (sourceContext === "notificaciones") {
-    return "Activar Pro y mantener acompañamiento";
+    return "Subir a Pro y mantener acompañamiento";
   }
 
-  return "Activar Pro ahora";
+  return getCommercialUpgradeCta("Pro");
 }
 
 function getConversionDeltaCopy(
@@ -238,7 +259,7 @@ function getCommercialNarrative({
     return {
       title: `Hay ${formatCurrency(conversionSnapshot.interestSavings)} que podrías dejar de regalar en intereses.`,
       description:
-        "Si tu meta es salir más rápido, Premium vale cuando te ayuda a mover dinero desde intereses hacia capital real. La diferencia no está en ver más datos, sino en decidir mejor qué pagar primero.",
+        "Si tu meta es salir más rápido, Premium vale cuando te ayuda a dejar de perder dinero en intereses y a mover más flujo hacia capital real.",
       bullets: [
         `Interés mensual estimado hoy: ${formatCurrency(conversionSnapshot.estimatedMonthlyInterest)}.`,
         `Presupuesto actual registrado: ${formatCurrency(conversionSnapshot.currentMonthlyBudget)}.`,
@@ -256,7 +277,7 @@ function getCommercialNarrative({
       "Base sirve para ordenar. Pro sirve para extender el acompañamiento. Pero Premium sigue siendo la opción más directa para pasar de control básico a decisiones más claras y ejecutables.",
     bullets: [
       "Desbloquea el orden recomendado según tus deudas reales.",
-      "Muestra ahorro potencial y reducción de tiempo antes de que te comprometas más.",
+      "Te deja ver cuánto dinero y tiempo sigues perdiendo si no ajustas.",
       "Te deja entrar al módulo premium sin la fricción de un plan demasiado largo.",
     ],
   };
@@ -277,6 +298,12 @@ function getCheckoutNarrative({
     "Tu cuenta y tus datos siguen siendo tuyos",
   ];
 
+  if (highlightedPlan && highlightedPlan.id !== "FREE") {
+    trustItems.unshift(
+      `${highlightedPlan.label}: ${formatMembershipCommercialSummary(highlightedPlan)}`,
+    );
+  }
+
   if (conversionSnapshot.hasDebts && conversionSnapshot.urgentDebtName) {
     trustItems.push(
       `La prioridad detectada hoy es ${conversionSnapshot.urgentDebtName}`,
@@ -294,7 +321,7 @@ function getCheckoutNarrative({
       title:
         "La idea es que dejes de comparar escenarios y pases a ejecutar uno.",
       description:
-        "El simulador ya te dejó ver que sí hay margen para mejorar. El checkout solo desbloquea la capa que decide qué escenario ejecutar primero con tus deudas reales.",
+        "El simulador ya te dejó ver que estás dejando dinero sobre la mesa. El checkout solo desbloquea la capa que te dice qué escenario ejecutar primero para empezar a pagar menos ahora.",
       trustItems,
     };
   }
@@ -304,7 +331,7 @@ function getCheckoutNarrative({
       title:
         "La idea es convertir el reporte en una decisión que cambie el próximo mes.",
       description:
-        "Ya viste qué porcentaje se fue en capital y qué parte se sigue diluyendo. El pago del plan vale si te ayuda a corregir esa mezcla desde ahora.",
+        "Ya viste cuánto se sigue yendo en costo financiero. El pago del plan vale si te ayuda a dejar de perder dinero desde el próximo mes.",
       trustItems,
     };
   }
@@ -314,7 +341,7 @@ function getCheckoutNarrative({
       title:
         "La idea es que las alertas te lleven a un hábito, no a más ruido.",
       description:
-        "Si ya tienes alertas y vencimientos compitiendo por atención, el plan premium te devuelve una secuencia más clara para actuar semana a semana.",
+        "Si ya tienes alertas y vencimientos compitiendo por atención, el plan premium te devuelve una secuencia más clara para actuar antes de seguir perdiendo dinero por desorden.",
       trustItems,
     };
   }
@@ -322,7 +349,7 @@ function getCheckoutNarrative({
   return {
     title: `La idea es simple: que ${highlightedPlan?.label ?? "Premium"} se pague solo con mejores decisiones.`,
     description:
-      "Si tu estructura actual ya genera intereses, atrasos o semanas de indecisión, una mejor prioridad de pago puede devolver varias veces el costo mensual del plan.",
+      "Si tu estructura actual ya genera intereses, atrasos o semanas de indecisión, una mejor prioridad de pago puede devolverte varias veces el costo mensual del plan.",
     trustItems,
   };
 }
@@ -332,23 +359,23 @@ function getActivationSteps(sourceContext: MembershipSourceContext) {
     {
       title: "1. Pasas por Stripe",
       description:
-        "El pago se procesa en un checkout seguro. No guardamos datos sensibles de tarjeta en la app.",
+        `${MEMBERSHIP_COMMERCIAL_COPY.reinforcement.checkout} No guardamos datos sensibles de tarjeta en la app.`,
     },
     {
       title: "2. Se desbloquea tu plan",
       description:
         sourceContext === "simulador"
-          ? "Vuelves con una ruta recomendada para dejar de comparar escenarios manualmente."
+          ? "Vuelves viendo cuánto dinero y tiempo estabas perdiendo, y con una ruta para corregirlo."
           : sourceContext === "reportes"
-            ? "Vuelves con una prioridad más clara para corregir lo que el reporte te mostró."
+            ? "Vuelves con una prioridad más clara para corregir lo que hoy te está costando dinero."
             : sourceContext === "notificaciones"
-              ? "Vuelves con seguimiento más guiado para que tus alertas se conviertan en rutina."
-              : "Vuelves a tu panel y ya puedes abrir el plan recomendado, el ahorro estimado y la guía premium.",
+              ? "Vuelves con seguimiento más guiado para que tus alertas se conviertan en acción antes de perder más dinero."
+              : "Vuelves a tu panel y ya puedes abrir el plan recomendado, ver la pérdida visible y corregirla con una guía premium.",
     },
     {
       title: "3. Lo gestionas cuando quieras",
       description:
-        "Si más adelante quieres cambiar o cancelar, lo haces desde facturación sin perder tu cuenta.",
+        `${MEMBERSHIP_COMMERCIAL_COPY.reinforcement.riskFree} Puedes cambiar o cancelar desde facturación sin perder tu cuenta.`,
     },
   ];
 }
@@ -457,6 +484,16 @@ export function MembershipPanel({
   const [checkoutOutcome, setCheckoutOutcome] = useState<
     "success" | "cancelled" | null
   >(null);
+  const [showReauthCard, setShowReauthCard] = useState(false);
+  const [isReauthSubmitting, setIsReauthSubmitting] = useState(false);
+  const [reauthValues, setReauthValues] = useState({
+    currentPassword: "",
+    totpCode: "",
+    recoveryCode: "",
+  });
+  const [pendingSensitiveAction, setPendingSensitiveAction] = useState<
+    (() => Promise<void>) | null
+  >(null);
   const highlightedPlan = highlightPlanId
     ? membershipPlanCatalog[highlightPlanId]
     : null;
@@ -467,28 +504,28 @@ export function MembershipPanel({
           title:
             "Ya comparaste escenarios. Ahora puedes convertir eso en una decisión clara.",
           description:
-            "Premium toma esos datos y te entrega una ruta recomendada sin tener que seguir comparando manualmente escenario por escenario.",
+            "Premium toma esos datos y te entrega la ruta para dejar de perder dinero sin seguir comparando manualmente escenario por escenario.",
         }
       : sourceContext === "dashboard"
         ? {
             eyebrow: "Vienes desde tu panel",
-            title: "El siguiente salto es desbloquear el plan recomendado.",
+            title: "El siguiente salto es dejar de perder dinero con una mejor prioridad.",
             description:
-              "Desde aquí puedes activar la capa premium para ver la comparación entre tu plan actual y el optimizado con ahorro y tiempo recortado.",
+              "Desde aquí puedes abrir la capa premium para ver la comparación entre tu plan actual y el optimizado, con tiempo perdido e intereses visibles.",
           }
         : sourceContext === "reportes"
           ? {
               eyebrow: "Vienes desde reportes",
               title:
-                "Ya viste el dinero salir. Ahora toca decidir mejor qué hacer con él.",
+                "Ya viste el dinero salir. Ahora toca dejar de perder más.",
               description:
-                "Premium convierte el reporte en una lectura accionable: te muestra si realmente mejoraste frente al período anterior y qué deuda conviene priorizar después.",
+                "Premium convierte el reporte en una lectura accionable: te muestra si realmente estás corrigiendo la pérdida y qué deuda conviene priorizar después.",
             }
           : sourceContext === "notificaciones"
             ? {
                 eyebrow: "Vienes desde notificaciones",
                 title:
-                  "No solo recibas alertas. Convierte esas señales en una rutina clara.",
+                  "No solo recibas alertas. Úsalas para dejar de pagar de más.",
                 description:
                   "Premium usa tus alertas, tu progreso y tu prioridad real para empujarte con seguimiento semanal y acciones más concretas.",
               }
@@ -546,9 +583,56 @@ export function MembershipPanel({
     });
   };
 
+  const handleSensitiveActionError = (
+    error: unknown,
+    retryAction: () => Promise<void>,
+  ) => {
+    if (
+      error instanceof Error &&
+      "reauthRequired" in error &&
+      (error as Error & { reauthRequired?: boolean }).reauthRequired
+    ) {
+      setPendingSensitiveAction(() => retryAction);
+      setShowReauthCard(true);
+      toast.message("Confirma tu identidad para continuar.");
+      return true;
+    }
+
+    return false;
+  };
+
+  const runPendingSensitiveAction = async (action: () => Promise<void>) => {
+    try {
+      await action();
+    } catch (error) {
+      if (handleSensitiveActionError(error, action)) {
+        return;
+      }
+
+      throw error;
+    }
+  };
+
+  const confirmRecentAuth = async () => {
+    await requestJson("/api/auth/reautenticar", "POST", reauthValues);
+    setShowReauthCard(false);
+    setReauthValues({
+      currentPassword: "",
+      totpCode: "",
+      recoveryCode: "",
+    });
+    toast.success("Identidad confirmada.");
+
+    if (pendingSensitiveAction) {
+      const action = pendingSensitiveAction;
+      setPendingSensitiveAction(null);
+      await runPendingSensitiveAction(action);
+    }
+  };
+
   return (
-    <div className="flex flex-col gap-6">
-      <section className="border-border shadow-soft rounded-[2rem] border bg-white/90 p-6 sm:p-8">
+    <div className="flex flex-col gap-5 sm:gap-6">
+      <section className="border-border shadow-soft rounded-[2rem] border bg-white/90 p-4 sm:p-8">
         <ModuleSectionHeader
           kicker="Planes"
           title="Elige la capa de ayuda que mejor encaja con tu momento."
@@ -559,7 +643,7 @@ export function MembershipPanel({
             </Button>
           }
         />
-        <div className="border-primary/12 text-foreground mt-5 inline-flex max-w-5xl rounded-3xl border bg-[rgba(240,248,245,0.86)] px-5 py-4 text-sm leading-7">
+        <div className="border-primary/12 text-foreground mt-5 inline-flex max-w-5xl rounded-3xl border bg-[rgba(240,248,245,0.86)] px-4 py-4 text-sm leading-7 sm:px-5">
           <span>
             <span className="text-primary font-semibold">Premium</span> es la
             opción pensada para salir más rápido: una ruta guiada de{" "}
@@ -597,6 +681,101 @@ export function MembershipPanel({
             Aquí seguimos permitiendo el cambio manual para pruebas locales.
           </div>
         ) : null}
+        {showReauthCard ? (
+          <div className="mt-4 rounded-[1.75rem] border border-primary/15 bg-[rgba(240,248,245,0.82)] p-4 sm:p-5">
+            <p className="section-kicker">Confirma tu identidad</p>
+            <p className="text-foreground mt-3 text-xl font-semibold">
+              Antes de abrir facturación, verifica que sigues siendo tú.
+            </p>
+            <p className="support-copy mt-2">
+              Usa tu contraseña actual y, si tienes MFA activo, tu código temporal o uno de respaldo.
+            </p>
+            <div className="mt-4 grid gap-4 lg:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="reauthCurrentPassword">Contraseña actual</Label>
+                <Input
+                  id="reauthCurrentPassword"
+                  type="password"
+                  autoComplete="current-password"
+                  value={reauthValues.currentPassword}
+                  onChange={(event) =>
+                    setReauthValues((current) => ({
+                      ...current,
+                      currentPassword: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reauthTotpCode">Código de verificación</Label>
+                <Input
+                  id="reauthTotpCode"
+                  type="text"
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={reauthValues.totpCode}
+                  onChange={(event) =>
+                    setReauthValues((current) => ({
+                      ...current,
+                      totpCode: event.target.value.replace(/\D/g, "").slice(0, 6),
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reauthRecoveryCode">Código de respaldo</Label>
+                <Input
+                  id="reauthRecoveryCode"
+                  type="text"
+                  autoCapitalize="characters"
+                  maxLength={20}
+                  placeholder="ABCDE-12345"
+                  value={reauthValues.recoveryCode}
+                  onChange={(event) =>
+                    setReauthValues((current) => ({
+                      ...current,
+                      recoveryCode: event.target.value.toUpperCase(),
+                    }))
+                  }
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+              <Button
+                type="button"
+                onClick={async () => {
+                  try {
+                    setIsReauthSubmitting(true);
+                    await confirmRecentAuth();
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error
+                        ? error.message
+                        : "No se pudo confirmar tu identidad.",
+                    );
+                  } finally {
+                    setIsReauthSubmitting(false);
+                  }
+                }}
+                disabled={isReauthSubmitting}
+              >
+                {isReauthSubmitting ? "Confirmando..." : "Confirmar identidad"}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setShowReauthCard(false);
+                  setPendingSensitiveAction(null);
+                }}
+                disabled={isReauthSubmitting}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        ) : null}
         {contextualMessage && highlightedPlan ? (
           <div className="border-primary/15 mt-4 rounded-[1.75rem] border bg-[rgba(255,248,241,0.82)] px-5 py-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -616,7 +795,7 @@ export function MembershipPanel({
                   Plan sugerido {highlightedPlan.label}
                 </Badge>
                 <Badge variant="success">
-                  US${highlightedPlan.monthlyPriceUsd}/mes
+                  {formatMembershipMonthlyPriceUsd(highlightedPlan)}
                 </Badge>
               </div>
             </div>
@@ -628,18 +807,21 @@ export function MembershipPanel({
             eyebrow="Recomendación principal"
             title={
               highlightedPlan.id === "NORMAL"
-                ? "Premium es el punto natural si quieres dejar de improvisar."
+                ? "Premium es la forma más directa de dejar de pagar de más."
                 : `Pro tiene más sentido si ya quieres acompañamiento más largo.`
             }
             description={
               highlightedPlan.id === "NORMAL"
-                ? "Te dice qué pagar primero, te ayuda a salir más rápido y convierte el ahorro visible en una ruta concreta."
-                : "Mantiene la lógica premium, pero la extiende con más contexto y seguimiento durante 12 meses."
+                ? "Te dice qué pagar primero, te ayuda a pagar menos intereses y convierte la pérdida visible en una ruta concreta."
+                : "Mantiene la lógica premium, pero la extiende con más contexto, seguimiento y una capa superior de control."
             }
             badgeLabel={`Plan sugerido ${highlightedPlan.label}`}
             badgeVariant="warning"
             primaryAction={{
-              label: `Elegir ${highlightedPlan.label}`,
+              label:
+                highlightedPlan.id === "NORMAL"
+                  ? getCommercialUpgradeCta("Premium")
+                  : getCommercialUpgradeCta("Pro"),
               onClick: scrollToPlans,
             }}
             secondaryAction={{
@@ -664,7 +846,7 @@ export function MembershipPanel({
           />
         ) : null}
         {checkoutOutcome === "success" ? (
-          <div className="mt-4 rounded-[1.9rem] border border-emerald-200 bg-[linear-gradient(135deg,rgba(236,253,245,0.96),rgba(240,248,245,0.92))] p-5">
+          <div className="mt-4 rounded-[1.9rem] border border-emerald-200 bg-[linear-gradient(135deg,rgba(236,253,245,0.96),rgba(240,248,245,0.92))] p-4 sm:p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div className="min-w-0 max-w-4xl">
                 <p className="text-sm font-semibold tracking-[0.16em] text-emerald-700 uppercase">
@@ -672,8 +854,8 @@ export function MembershipPanel({
                 </p>
                 <p className="text-foreground mt-3 break-words text-2xl font-semibold">
                   {billingStatus === "ACTIVE"
-                    ? "Tu plan premium ya está activo."
-                    : "Estamos actualizando tu plan premium."}
+                ? "Tu plan premium ya está activo."
+                : "Estamos actualizando tu plan premium."}
                 </p>
                 <p className="text-muted mt-2 text-sm leading-7">
                   {billingStatus === "ACTIVE"
@@ -729,7 +911,7 @@ export function MembershipPanel({
           </div>
         ) : null}
         {conversionSnapshot.hasDebts ? (
-          <div className="border-primary/12 mt-4 rounded-[1.9rem] border bg-[rgba(240,248,245,0.92)] p-5">
+          <div className="border-primary/12 mt-4 rounded-[1.9rem] border bg-[rgba(240,248,245,0.92)] p-4 sm:p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div className="min-w-0 max-w-4xl">
                 <p className="section-kicker">
@@ -804,7 +986,7 @@ export function MembershipPanel({
       </section>
 
       <section className="grid gap-5 2xl:grid-cols-[1.12fr_0.88fr]">
-        <div className="border-primary/12 shadow-soft rounded-[2rem] border bg-[rgba(240,248,245,0.92)] p-6">
+        <div className="border-primary/12 shadow-soft rounded-[2rem] border bg-[rgba(240,248,245,0.92)] p-4 sm:p-6">
           <div className="flex flex-wrap items-center gap-3">
             <Badge variant={fitStory.badgeVariant}>{fitStory.badgeLabel}</Badge>
             <Badge variant="default">Plan sugerido {suggestedPlan.label}</Badge>
@@ -847,7 +1029,7 @@ export function MembershipPanel({
           </div>
         </div>
 
-        <div className="border-primary/15 rounded-[2rem] border bg-[rgba(255,248,241,0.92)] p-6 shadow-[0_18px_42px_rgba(240,138,93,0.08)]">
+        <div className="border-primary/15 rounded-[2rem] border bg-[rgba(255,248,241,0.92)] p-4 shadow-[0_18px_42px_rgba(240,138,93,0.08)] sm:p-6">
           <p className="section-kicker">
             Cómo elegir sin complicarte
           </p>
@@ -876,9 +1058,9 @@ export function MembershipPanel({
 
       <section
         ref={planComparisonRef}
-        className="grid gap-6 2xl:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)]"
+        className="grid gap-5 sm:gap-6 2xl:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)]"
       >
-        <div className="border-border shadow-soft rounded-[2rem] border bg-white/90 p-6">
+        <div className="border-border shadow-soft rounded-[2rem] border bg-white/90 p-4 sm:p-6">
           <p className="section-kicker">
             Qué cambia entre planes
           </p>
@@ -906,7 +1088,7 @@ export function MembershipPanel({
                   } ${isHighlighted ? "ring-primary/10 shadow-[0_18px_42px_rgba(15,88,74,0.08)] ring-2" : ""}`}
                 >
                   <div className="grid gap-0 2xl:grid-cols-[minmax(0,1fr)_340px]">
-                    <div className="p-6 sm:p-7">
+                    <div className="p-4 sm:p-7">
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge variant={isCurrent ? "success" : "default"}>
                           {isCurrent ? "Actual" : "Disponible"}
@@ -942,16 +1124,22 @@ export function MembershipPanel({
                       </div>
                     </div>
 
-                    <div className="border-border/70 bg-white/72 p-6 sm:p-7 2xl:border-l">
+                    <div className="border-border/70 bg-white/72 p-4 sm:p-7 2xl:border-l">
                       <div className="rounded-[1.7rem] border border-white/80 bg-white/95 px-5 py-5">
                         <p className="text-muted text-[11px] font-semibold uppercase tracking-[0.22em]">
                           Precio
                         </p>
                         <p className="value-stable text-foreground mt-3 text-[clamp(1.9rem,4vw,2.7rem)] font-semibold leading-none">
-                          {plan.monthlyPriceUsd === 0
-                            ? "Gratis"
-                            : `US$${plan.monthlyPriceUsd}/mes`}
+                          {formatMembershipMonthlyPriceUsd(plan)}
                         </p>
+                        {formatMembershipAnnualPriceUsd(plan) ? (
+                          <p className="mt-2 text-sm font-medium text-primary">
+                            {formatMembershipAnnualPriceUsd(plan)}
+                            {formatMembershipAnnualSavingsUsd(plan)
+                              ? ` · ${formatMembershipAnnualSavingsUsd(plan)}`
+                              : ""}
+                          </p>
+                        ) : null}
                       </div>
 
                       <div className="mt-4 rounded-[1.55rem] border border-white/70 bg-white/92 px-4 py-4 text-sm leading-7 text-foreground">
@@ -973,7 +1161,7 @@ export function MembershipPanel({
           </div>
         </div>
 
-        <div className="border-primary/15 rounded-[2rem] border bg-[rgba(255,248,241,0.92)] p-6 shadow-[0_18px_42px_rgba(240,138,93,0.08)]">
+        <div className="border-primary/15 rounded-[2rem] border bg-[rgba(255,248,241,0.92)] p-4 shadow-[0_18px_42px_rgba(240,138,93,0.08)] sm:p-6">
           <p className="section-kicker">
             Recomendación comercial
           </p>
@@ -997,7 +1185,7 @@ export function MembershipPanel({
       </section>
 
       <section className="grid gap-5 2xl:grid-cols-[minmax(0,1.14fr)_minmax(0,0.86fr)]">
-        <div className="border-border shadow-soft rounded-[2rem] border bg-white/90 p-6">
+        <div className="border-border shadow-soft rounded-[2rem] border bg-white/90 p-4 sm:p-6">
           <p className="section-kicker">
             Qué pasa después de activar
           </p>
@@ -1005,7 +1193,7 @@ export function MembershipPanel({
             {activationSteps.map((step) => (
               <div
                 key={step.title}
-                className="border-border bg-secondary/35 rounded-[1.5rem] border p-6"
+                className="border-border bg-secondary/35 rounded-[1.5rem] border p-4 sm:p-6"
               >
                 <p className="text-foreground text-lg font-semibold leading-tight">
                   {step.title}
@@ -1018,7 +1206,7 @@ export function MembershipPanel({
           </div>
         </div>
 
-        <div className="border-primary/15 rounded-[2rem] border bg-[rgba(255,248,241,0.92)] p-6 shadow-[0_18px_42px_rgba(240,138,93,0.08)]">
+        <div className="border-primary/15 rounded-[2rem] border bg-[rgba(255,248,241,0.92)] p-4 shadow-[0_18px_42px_rgba(240,138,93,0.08)] sm:p-6">
           <p className="section-kicker">
             Antes de pagar
           </p>
@@ -1050,7 +1238,7 @@ export function MembershipPanel({
         ]}
       />
 
-      <section className="grid gap-6 2xl:grid-cols-2">
+      <section className="grid gap-5 sm:gap-6 2xl:grid-cols-2">
         {orderedPlans.map((planId) => {
           const plan = membershipPlanCatalog[planId];
           const isCurrent = currentTier === plan.id;
@@ -1079,28 +1267,32 @@ export function MembershipPanel({
                       isCurrent,
                       isPremium,
                       planId: plan.id,
-                      planLabel: plan.label,
                     });
           const planCardClassName = isCurrent
             ? "border-primary/25 ring-2 ring-primary/10 shadow-[0_24px_48px_rgba(15,88,74,0.1)]"
             : isHighlighted
               ? "border-primary/25 ring-2 ring-primary/10 shadow-[0_22px_44px_rgba(15,88,74,0.09)]"
               : isPremium
-                ? "border-primary/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(240,248,245,0.95)_100%)] shadow-[0_22px_44px_rgba(15,88,74,0.09)]"
-                : "";
+                ? "border-primary/25 bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(240,248,245,0.97)_100%)] shadow-[0_28px_60px_rgba(15,88,74,0.12)] ring-2 ring-primary/10 lg:-translate-y-1"
+                : isPro
+                  ? "border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(244,247,250,0.96)_100%)] shadow-[0_18px_40px_rgba(23,56,74,0.08)]"
+                  : "";
 
           return (
             <Card
               key={plan.id}
-              className={`p-6 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:shadow-[0_24px_44px_rgba(23,56,74,0.1)] ${planCardClassName}`}
+              className={`p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:shadow-[0_24px_44px_rgba(23,56,74,0.1)] sm:p-6 ${planCardClassName}`}
             >
               <CardHeader className="gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <CardTitle>{plan.label}</CardTitle>
+                    <CardTitle className="text-[clamp(1.35rem,5vw,1.75rem)] leading-tight">{plan.label}</CardTitle>
                     <CardDescription className="mt-2 leading-7">
                       {plan.description}
                     </CardDescription>
+                    <p className="mt-3 text-sm font-semibold text-primary">
+                      {plan.headline}
+                    </p>
                   </div>
                   <Badge variant={isCurrent ? "success" : "default"}>
                     {isCurrent ? "Actual" : "Disponible"}
@@ -1111,28 +1303,34 @@ export function MembershipPanel({
                     <Badge variant="warning">Recomendado ahora</Badge>
                   ) : null}
                   {isPremium ? (
-                    <Badge variant="warning">Más rápido</Badge>
+                    <Badge variant="warning">Recomendado para la mayoría</Badge>
                   ) : null}
                   {isPro ? (
-                    <Badge variant="default">Más seguimiento</Badge>
+                    <Badge variant="default">Más control y automatización</Badge>
                   ) : null}
                 </div>
               </CardHeader>
               <CardContent className="pt-4">
-                <div className="rounded-[1.6rem] border border-border/80 bg-white/80 px-5 py-5 transition-all duration-200 ease-out">
+                <div className="rounded-[1.6rem] border border-border/80 bg-white/80 px-4 py-4 transition-all duration-200 ease-out sm:px-5 sm:py-5">
                   <p className="text-muted text-xs font-semibold uppercase tracking-[0.16em]">
                     Precio
                   </p>
-                  <p className="text-foreground mt-3 text-4xl font-semibold">
-                    {plan.monthlyPriceUsd === 0
-                      ? "Gratis"
-                      : `US$${plan.monthlyPriceUsd}/mes`}
+                  <p className="text-foreground mt-3 text-[clamp(2rem,8vw,2.25rem)] font-semibold leading-none">
+                    {formatMembershipMonthlyPriceUsd(plan)}
                   </p>
                   <p className="text-muted mt-3 text-sm leading-7">
                     {plan.durationMonths > 0
                       ? `${plan.guidanceLabel} con recomendaciones premium`
                       : "Ideal para gestión básica y uso inicial"}
                   </p>
+                  {formatMembershipAnnualPriceUsd(plan) ? (
+                    <p className="mt-2 text-sm font-medium text-primary">
+                      {formatMembershipAnnualPriceUsd(plan)}
+                      {formatMembershipAnnualSavingsUsd(plan)
+                        ? ` · ${formatMembershipAnnualSavingsUsd(plan)}`
+                        : ""}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="border-border/70 text-foreground mt-4 rounded-3xl border bg-white/80 px-4 py-3 text-sm leading-7 transition-all duration-200 ease-out">
                   <span className="font-semibold">Resultado esperado:</span>{" "}
@@ -1142,7 +1340,7 @@ export function MembershipPanel({
                   <span className="font-semibold">Mejor para:</span>{" "}
                   {plan.bestFor}
                 </div>
-                {plan.monthlyPriceUsd > 0 ? (
+                {plan.id !== "FREE" ? (
                   <div className="border-primary/12 text-foreground mt-3 rounded-3xl border bg-[rgba(240,248,245,0.9)] px-4 py-3 text-sm leading-7 transition-all duration-200 ease-out">
                     {getPlanValueSignal({
                       planId: plan.id,
@@ -1151,11 +1349,11 @@ export function MembershipPanel({
                   </div>
                 ) : null}
 
-                <div className="mt-5 space-y-3">
-                  {plan.features.map((feature) => (
+                <div className="mt-5 space-y-2.5">
+                  {getPlanFeatureBullets(plan.id).map((feature) => (
                     <div
                       key={feature}
-                      className="border-border bg-secondary/55 text-muted rounded-2xl border px-4 py-3 text-sm transition-all duration-200 ease-out hover:border-primary/14 hover:bg-white/86 hover:text-foreground"
+                      className="border-border bg-secondary/55 text-muted rounded-2xl border px-4 py-3 text-sm leading-6 transition-all duration-200 ease-out hover:border-primary/14 hover:bg-white/86 hover:text-foreground"
                     >
                       {feature}
                     </div>
@@ -1164,7 +1362,7 @@ export function MembershipPanel({
 
                 <div className="mt-6">
                   <Button
-                    className="w-full"
+                    className="min-h-12 w-full text-base"
                     variant={isCurrent ? "secondary" : "primary"}
                     disabled={shouldDisableButton || activePlanId !== null}
                     onClick={async () => {
@@ -1172,57 +1370,66 @@ export function MembershipPanel({
                         return;
                       }
 
+                      trackPlanEvent("upgrade_click", {
+                        source: sourceContext ?? "planes",
+                        targetPlan: plan.id,
+                        currentTier,
+                      });
                       setActivePlanId(plan.id);
 
                       try {
-                        if (billingConfigured) {
-                          if (
-                            canManageBilling &&
-                            (currentTier !== "FREE" || isCurrent)
-                          ) {
+                        const action = async () => {
+                          if (billingConfigured) {
+                            if (
+                              canManageBilling &&
+                              (currentTier !== "FREE" || isCurrent)
+                            ) {
+                              const payload = await requestJson(
+                                "/api/billing/portal",
+                                "POST",
+                              );
+
+                              if (!payload.url) {
+                                throw new Error("No se pudo abrir el portal.");
+                              }
+
+                              window.location.assign(payload.url);
+                              return;
+                            }
+
+                            if (plan.id === "FREE") {
+                              throw new Error(
+                                "Ese cambio se gestiona desde facturación.",
+                              );
+                            }
+
                             const payload = await requestJson(
-                              "/api/billing/portal",
+                              "/api/billing/checkout",
                               "POST",
+                              {
+                                membershipTier: plan.id,
+                                sourceContext: sourceContext ?? "planes",
+                              },
                             );
 
                             if (!payload.url) {
-                              throw new Error("No se pudo abrir el portal.");
+                              throw new Error("No se pudo abrir el checkout.");
                             }
 
                             window.location.assign(payload.url);
                             return;
                           }
 
-                          if (plan.id === "FREE") {
-                            throw new Error(
-                              "Ese cambio se gestiona desde facturación.",
-                            );
-                          }
-
-                          const payload = await requestJson(
-                            "/api/billing/checkout",
-                            "POST",
-                            {
-                              membershipTier: plan.id,
-                              sourceContext: sourceContext ?? "planes",
-                            },
+                          await requestJson("/api/settings/membership", "PATCH", {
+                            membershipTier: plan.id,
+                          });
+                          toast.success(
+                            `Tu cuenta ahora usa el plan ${plan.label}.`,
                           );
+                          router.refresh();
+                        };
 
-                          if (!payload.url) {
-                            throw new Error("No se pudo abrir el checkout.");
-                          }
-
-                          window.location.assign(payload.url);
-                          return;
-                        }
-
-                        await requestJson("/api/settings/membership", "PATCH", {
-                          membershipTier: plan.id,
-                        });
-                        toast.success(
-                          `Tu cuenta ahora usa el plan ${plan.label}.`,
-                        );
-                        router.refresh();
+                        await runPendingSensitiveAction(action);
                       } catch (error) {
                         toast.error(
                           error instanceof Error
@@ -1236,15 +1443,15 @@ export function MembershipPanel({
                   >
                     {actionLabel}
                   </Button>
-                  {plan.monthlyPriceUsd > 0 ? (
+                  {plan.id !== "FREE" ? (
                     <p className="text-muted mt-3 text-center text-xs leading-6">
                       {sourceContext === "simulador"
-                        ? "Después del checkout vuelves con una ruta recomendada basada en tu simulación."
+                    ? "Después del checkout vuelves con una ruta recomendada basada en tu simulación y en lo que hoy estás perdiendo."
                         : sourceContext === "reportes"
-                          ? "Después del checkout vuelves con una prioridad más clara para corregir tu flujo."
+                          ? "Después del checkout vuelves con una prioridad más clara para corregir tu flujo y dejar de perder dinero."
                           : sourceContext === "notificaciones"
                             ? "Después del checkout vuelves con alertas más guiadas y seguimiento premium."
-                            : "Checkout seguro con Stripe. Puedes gestionar tu suscripción después desde facturación."}
+                            : `${MEMBERSHIP_COMMERCIAL_COPY.reinforcement.checkout} ${MEMBERSHIP_COMMERCIAL_COPY.reinforcement.riskFree}`}
                     </p>
                   ) : null}
                 </div>

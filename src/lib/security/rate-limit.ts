@@ -1,7 +1,10 @@
+import type { NextRequest } from "next/server";
+
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
 import { getServerEnv } from "@/lib/env/server";
+import { getRequestMeta } from "@/lib/security/request-meta";
 
 type RateLimitInput = {
   key: string;
@@ -83,4 +86,22 @@ export async function assertRateLimit(input: RateLimitInput) {
     remaining: Math.max(0, input.limit - entry.count),
     resetAt: entry.resetAt,
   };
+}
+
+function normalizeKeyPart(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9@._-]+/g, "-").slice(0, 120);
+}
+
+export function buildRateLimitKey(
+  request: NextRequest,
+  namespace: string,
+  ...parts: Array<string | undefined | null>
+) {
+  const { ipAddress } = getRequestMeta(request);
+
+  return [namespace, ipAddress ?? "unknown", ...parts.filter(Boolean).map((part) => normalizeKeyPart(part!))].join(":");
+}
+
+export function getRetryAfterSeconds(resetAt: number) {
+  return Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import { Archive, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -9,6 +8,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { UpgradeCTA } from "@/components/membership/upgrade-cta";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ExecutiveSummaryStrip,
@@ -17,14 +17,28 @@ import {
 import { ModuleSectionHeader } from "@/components/shared/module-section-header";
 import { PrimaryActionCard } from "@/components/shared/primary-action-card";
 import { TrustInlineNote } from "@/components/shared/trust-inline-note";
+import {
+  UPGRADE_MESSAGES,
+  getDebtLimitUpgradeNotes,
+} from "@/config/upgrade-messages";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { fetchWithCsrf } from "@/lib/http/fetch-with-csrf";
 import { readJsonPayload } from "@/lib/http/read-json-payload";
+import { resolveFeatureAccess } from "@/lib/feature-access";
+import type {
+  MembershipBillingStatus,
+  MembershipPlanId,
+} from "@/lib/membership/plans";
+import {
+  sanitizeMultilineText,
+  sanitizeText,
+} from "@/lib/security/sanitize";
 import type { DebtItemDto, DebtSummaryDto } from "@/lib/types/app";
+import { trackPlanEvent } from "@/lib/telemetry/plan-events";
 import { formatCurrency } from "@/lib/utils/currency";
 import { formatDate } from "@/lib/utils/date";
-import { debtSchema } from "@/lib/validations/debts";
 
 const debtTypeLabels: Record<DebtFormValues["type"], string> = {
   CREDIT_CARD: "Tarjeta de crédito",
@@ -99,6 +113,7 @@ type DebtFormValues = {
   statementDay: number | undefined;
   dueDay: number | undefined;
   nextDueDate: string | undefined;
+  notificationsEnabled: boolean;
   lateFeeAmount: number;
   extraChargesAmount: number;
   notes: string | undefined;
@@ -118,6 +133,169 @@ function requiredNumberValue(value: string) {
   return value === "" ? 0 : Number(value);
 }
 
+function optionalDateValue(value: string) {
+  return value ? value : undefined;
+}
+
+function optionalNotesValue(value: string) {
+  const sanitized = sanitizeMultilineText(value);
+  return sanitized.length ? sanitized : undefined;
+}
+
+function buildRequiredTextValidation(maxLength: number) {
+  return {
+    validate: {
+      required: (value: string) =>
+        sanitizeText(value).length >= 1 || "Este campo es obligatorio.",
+      maxLength: (value: string) =>
+        sanitizeText(value).length <= maxLength || "El texto es demasiado largo.",
+    },
+    setValueAs: (value: string) => sanitizeText(value),
+  } as const;
+}
+
+function buildMoneyValidation(
+  fieldName: "currentBalance" | "creditLimit" | "minimumPayment" | "lateFeeAmount" | "extraChargesAmount",
+  { optional = false } = {},
+) {
+  return {
+    validate: {
+      amount: (value: number | undefined, formValues: DebtFormValues) => {
+        if (value === undefined) {
+          return optional || "Debes introducir un monto válido.";
+        }
+
+        if (!Number.isFinite(value)) {
+          return "Debes introducir un monto válido.";
+        }
+
+        if (value < 0) {
+          return "El monto no puede ser negativo.";
+        }
+
+        if (value > 999_999_999) {
+          return "El monto es demasiado alto.";
+        }
+
+        if (
+          fieldName === "minimumPayment" &&
+          value >
+            formValues.currentBalance +
+              formValues.lateFeeAmount +
+              formValues.extraChargesAmount
+        ) {
+          return "El pago mínimo no puede superar la deuda total actual.";
+        }
+
+        if (
+          fieldName === "creditLimit" &&
+          value !== undefined &&
+          formValues.type !== "CREDIT_CARD"
+        ) {
+          return "El límite de crédito solo aplica a tarjetas.";
+        }
+
+        if (
+          fieldName === "currentBalance" &&
+          formValues.creditLimit !== undefined &&
+          formValues.creditLimit > 0 &&
+          value > formValues.creditLimit * 1.5
+        ) {
+          return "El saldo parece inconsistente con el límite de crédito.";
+        }
+
+        return true;
+      },
+    },
+    setValueAs: optional ? optionalNumberValue : requiredNumberValue,
+  } as const;
+}
+
+const nameValidation = buildRequiredTextValidation(120);
+const creditorNameValidation = buildRequiredTextValidation(120);
+const currentBalanceValidation = buildMoneyValidation("currentBalance");
+const creditLimitValidation = buildMoneyValidation("creditLimit", { optional: true });
+const minimumPaymentValidation = buildMoneyValidation("minimumPayment");
+const lateFeeAmountValidation = buildMoneyValidation("lateFeeAmount");
+const extraChargesAmountValidation = buildMoneyValidation("extraChargesAmount");
+
+const interestRateValidation = {
+  validate: {
+    amount: (value: number) => {
+      if (!Number.isFinite(value)) {
+        return "Debes introducir una tasa válida.";
+      }
+
+      if (value < 0) {
+        return "La tasa no puede ser negativa.";
+      }
+
+      return value <= 999 || "La tasa es demasiado alta.";
+    },
+  },
+  setValueAs: requiredNumberValue,
+} as const;
+
+function buildDayValidation({
+  requiresCreditCard = false,
+} = {}) {
+  return {
+    validate: {
+      day: (value: number | undefined, formValues: DebtFormValues) => {
+        if (value === undefined) {
+          return true;
+        }
+
+        if (!Number.isInteger(value)) {
+          return "Debes introducir un valor entero válido.";
+        }
+
+        if (value < 1) {
+          return "Debe ser mayor que cero.";
+        }
+
+        if (value > 31) {
+          return "Debe estar entre 1 y 31.";
+        }
+
+        if (requiresCreditCard && formValues.type !== "CREDIT_CARD") {
+          return "La fecha de corte solo aplica a tarjetas.";
+        }
+
+        return true;
+      },
+    },
+    setValueAs: optionalNumberValue,
+  } as const;
+}
+
+const statementDayValidation = buildDayValidation({ requiresCreditCard: true });
+const dueDayValidation = buildDayValidation();
+
+const estimatedEndAtValidation = {
+  validate: (value: string | undefined, formValues: DebtFormValues) => {
+    if (!value || !formValues.startedAt) {
+      return true;
+    }
+
+    return (
+      new Date(value) >= new Date(formValues.startedAt) ||
+      "La fecha estimada de término no puede ser anterior al inicio."
+    );
+  },
+  setValueAs: optionalDateValue,
+} as const;
+
+const optionalDateValidation = {
+  setValueAs: optionalDateValue,
+} as const;
+
+const notesValidation = {
+  validate: (value: string | undefined) =>
+    (value?.length ?? 0) <= 4000 || "El texto es demasiado largo.",
+  setValueAs: optionalNotesValue,
+} as const;
+
 function emptyDebtValues(): DebtFormValues {
   return {
     name: "",
@@ -133,6 +311,7 @@ function emptyDebtValues(): DebtFormValues {
     statementDay: undefined,
     dueDay: undefined,
     nextDueDate: undefined,
+    notificationsEnabled: true,
     lateFeeAmount: 0,
     extraChargesAmount: 0,
     notes: undefined,
@@ -156,6 +335,7 @@ function debtToFormValues(debt: DebtItemDto): DebtFormValues {
     statementDay: debt.statementDay ?? undefined,
     dueDay: debt.dueDay ?? undefined,
     nextDueDate: toDateInput(debt.nextDueDate),
+    notificationsEnabled: debt.notificationsEnabled,
     lateFeeAmount: debt.lateFeeAmount,
     extraChargesAmount: debt.extraChargesAmount,
     notes: debt.notes ?? undefined,
@@ -165,7 +345,7 @@ function debtToFormValues(debt: DebtItemDto): DebtFormValues {
 }
 
 async function requestJson(url: string, init?: RequestInit) {
-  const response = await fetch(url, {
+  const response = await fetchWithCsrf(url, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -185,12 +365,21 @@ export function DebtManager({
   debts,
   summary,
   entryFlow = null,
+  membershipTier,
+  billingStatus,
 }: {
   debts: DebtItemDto[];
   summary: DebtSummaryDto;
   entryFlow?: "onboarding" | null;
+  membershipTier: MembershipPlanId;
+  billingStatus: MembershipBillingStatus;
 }) {
   const router = useRouter();
+  const access = resolveFeatureAccess({
+    membershipTier,
+    membershipBillingStatus: billingStatus,
+  });
+  const upgradeHref = `/planes?plan=${access.upgradeTargetTier}&source=deudas`;
   const [selectedDebt, setSelectedDebt] = useState<DebtItemDto | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -200,7 +389,6 @@ export function DebtManager({
     [debts],
   );
   const form = useForm<DebtFormValues>({
-    resolver: zodResolver(debtSchema) as never,
     defaultValues: emptyDebtValues(),
   });
   const isOnboardingFlow = entryFlow === "onboarding";
@@ -270,6 +458,10 @@ export function DebtManager({
       return right.monthlyInterestEstimate - left.monthlyInterestEstimate;
     })[0] ?? null;
   }, [activeDebts]);
+  const debtLimitReached =
+    activeDebts.length >= access.maxActiveDebts && !selectedDebt;
+  const hiddenDebtCount = Math.max(0, activeDebts.length - access.maxActiveDebts);
+  const debtLimitNotes = getDebtLimitUpgradeNotes();
   const debtSummaryItems: ExecutiveSummaryItem[] = [
     {
       label: "Saldo total",
@@ -284,7 +476,9 @@ export function DebtManager({
     {
       label: "Deudas activas",
       value: String(summary.activeDebtCount),
-      support: "Cuentas abiertas que hoy compiten por tu flujo.",
+      support: access.isBase
+        ? `Cuentas abiertas que hoy compiten por tu flujo. Base llega hasta ${access.maxActiveDebts}.`
+        : `Cuentas abiertas que hoy compiten por tu flujo. Tu plan permite hasta ${access.maxActiveDebts}.`,
       valueKind: "text" as const,
     },
     {
@@ -474,11 +668,49 @@ export function DebtManager({
         title="Ordena tus deudas y detecta cuál necesita atención primero."
         description="Arriba ves el panorama, luego una recomendación directa. El listado va primero para que entiendas tu realidad antes de editar."
         action={
-          <Button className="w-full sm:w-auto" onClick={() => form.setFocus("name")}>
-            Registrar deuda
-          </Button>
+          debtLimitReached ? (
+            <Button className="w-full sm:w-auto" onClick={() => router.push(upgradeHref as never)}>
+              Desbloquear más deudas
+            </Button>
+          ) : (
+            <Button className="w-full sm:w-auto" onClick={() => form.setFocus("name")}>
+              Registrar deuda
+            </Button>
+          )
         }
       />
+
+      {access.isBase ? (
+        <div className="rounded-[1.6rem] border border-dashed border-primary/18 bg-[rgba(255,248,241,0.82)] px-5 py-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0 max-w-3xl">
+              <p className="text-primary text-sm font-semibold tracking-[0.16em] uppercase">
+                Base con límite útil
+              </p>
+              <p className="text-foreground mt-3 text-lg font-semibold">
+                Puedes organizar hasta {access.maxActiveDebts} deudas activas antes de pasar a Premium.
+              </p>
+              <p className="text-muted mt-2 text-sm leading-7">
+                Base te ayuda a entender el problema. Premium te deja ver el panorama completo y optimizarlo sin tomar decisiones a ciegas.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  trackPlanEvent("upgrade_click", {
+                    source: "deudas_top_banner",
+                    targetPlan: access.upgradeTargetTier,
+                  });
+                  router.push(upgradeHref as never);
+                }}
+              >
+                Desbloquear esto con Premium
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <ExecutiveSummaryStrip items={debtSummaryItems} />
 
@@ -581,6 +813,64 @@ export function DebtManager({
               </div>
             </div>
 
+            {debtLimitReached ? (
+              <div className="mb-6">
+                <UpgradeCTA
+                  title={UPGRADE_MESSAGES.DEBT_LIMIT_BASE}
+                  description={`${UPGRADE_MESSAGES.DEBT_LIMIT_CONTEXT} ${UPGRADE_MESSAGES.DEBT_LIMIT_DECISION}`}
+                  requiredPlan="Premium"
+                  ctaText="Desbloquear más deudas"
+                  onClick={() => {
+                    trackPlanEvent("debt_limit_hit", {
+                      source: "debt_form_limit",
+                      activeDebtCount: activeDebts.length,
+                      maxDebts: access.maxActiveDebts,
+                    });
+                    trackPlanEvent("upgrade_click", {
+                      source: "debt_form_limit",
+                      targetPlan: access.upgradeTargetTier,
+                    });
+                    router.push(upgradeHref as never);
+                  }}
+                />
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  {debtLimitNotes.map((note) => (
+                    <div
+                      key={note}
+                      className="rounded-3xl border border-white/70 bg-white/85 px-4 py-4 text-sm font-medium text-foreground"
+                    >
+                      {note}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {access.isBase && hiddenDebtCount > 0 ? (
+              <div className="mb-6 rounded-[1.6rem] border border-primary/14 bg-[rgba(255,248,241,0.7)] p-5">
+                <p className="text-lg font-semibold text-foreground">
+                  Hay {hiddenDebtCount} deuda{hiddenDebtCount === 1 ? "" : "s"} fuera del análisis Base.
+                </p>
+                <p className="mt-2 text-sm leading-7 text-muted">
+                  {UPGRADE_MESSAGES.HIDDEN_DEBTS} {UPGRADE_MESSAGES.DEBT_LIMIT_DECISION}
+                </p>
+                <div className="mt-4">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      trackPlanEvent("feature_blocked", {
+                        source: "debt_hidden_warning",
+                        hiddenDebtCount,
+                      });
+                      router.push(upgradeHref as never);
+                    }}
+                  >
+                    Ver panorama completo
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
             <div className="mb-6 grid gap-4 md:grid-cols-3">
               <div className="min-w-0 rounded-3xl border border-border bg-secondary/60 p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted">Deuda real estimada</p>
@@ -622,12 +912,20 @@ export function DebtManager({
             <form className="grid gap-4 md:grid-cols-2" onSubmit={submit}>
               <div className="space-y-2">
                 <Label htmlFor="name">Nombre</Label>
-                <Input id="name" placeholder="Ej. Tarjeta principal" {...form.register("name")} />
+                <Input
+                  id="name"
+                  placeholder="Ej. Tarjeta principal"
+                  {...form.register("name", nameValidation)}
+                />
                 <p className="text-sm text-rose-600">{form.formState.errors.name?.message}</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="creditorName">Institución / acreedor</Label>
-                <Input id="creditorName" placeholder="Ej. Banco Popular" {...form.register("creditorName")} />
+                <Input
+                  id="creditorName"
+                  placeholder="Ej. Banco Popular"
+                  {...form.register("creditorName", creditorNameValidation)}
+                />
                 <p className="text-sm text-rose-600">{form.formState.errors.creditorName?.message}</p>
               </div>
 
@@ -668,7 +966,7 @@ export function DebtManager({
                   type="number"
                   step="0.01"
                   inputMode="decimal"
-                  {...form.register("currentBalance", { setValueAs: requiredNumberValue })}
+                  {...form.register("currentBalance", currentBalanceValidation)}
                 />
                 <p className="text-xs text-muted">
                   Usa el saldo pendiente actual, no el monto original.
@@ -684,7 +982,7 @@ export function DebtManager({
                   inputMode="decimal"
                   disabled={!isCreditCard}
                   placeholder={isCreditCard ? "Solo si aplica" : "Solo aplica a tarjetas"}
-                  {...form.register("creditLimit", { setValueAs: optionalNumberValue })}
+                  {...form.register("creditLimit", creditLimitValidation)}
                 />
                 <p className="text-sm text-rose-600">{form.formState.errors.creditLimit?.message}</p>
               </div>
@@ -696,7 +994,7 @@ export function DebtManager({
                   type="number"
                   step="0.01"
                   inputMode="decimal"
-                  {...form.register("interestRate", { setValueAs: requiredNumberValue })}
+                  {...form.register("interestRate", interestRateValidation)}
                 />
                 <p className="text-xs text-muted">
                   Introduce la tasa tal como aparece en el contrato o estado.
@@ -722,7 +1020,7 @@ export function DebtManager({
                   type="number"
                   step="0.01"
                   inputMode="decimal"
-                  {...form.register("minimumPayment", { setValueAs: requiredNumberValue })}
+                  {...form.register("minimumPayment", minimumPaymentValidation)}
                 />
                 <p className="text-xs text-muted">
                   Esto ayuda a detectar cuándo una deuda se estanca solo pagando el mínimo.
@@ -748,29 +1046,60 @@ export function DebtManager({
                   type="number"
                   disabled={!isCreditCard}
                   placeholder={isCreditCard ? "1 a 31" : "Solo aplica a tarjetas"}
-                  {...form.register("statementDay", { setValueAs: optionalNumberValue })}
+                  {...form.register("statementDay", statementDayValidation)}
                 />
                 <p className="text-sm text-rose-600">{form.formState.errors.statementDay?.message}</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="dueDay">Día de vencimiento</Label>
+                <Label htmlFor="dueDay">
+                  {isCreditCard ? "Fecha límite de pago" : "Día de pago mensual"}
+                </Label>
                 <Input
                   id="dueDay"
                   type="number"
                   placeholder="1 a 31"
-                  {...form.register("dueDay", { setValueAs: optionalNumberValue })}
+                  {...form.register("dueDay", dueDayValidation)}
                 />
                 <p className="text-sm text-rose-600">{form.formState.errors.dueDay?.message}</p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="nextDueDate">Próximo vencimiento</Label>
-                <Input id="nextDueDate" type="date" {...form.register("nextDueDate")} />
+                <Label htmlFor="nextDueDate">
+                  {isCreditCard ? "Próxima fecha de pago" : "Próximo vencimiento"}
+                </Label>
+                <Input
+                  id="nextDueDate"
+                  type="date"
+                  {...form.register("nextDueDate", optionalDateValidation)}
+                />
+                <p className="text-xs text-muted">
+                  Si todavía no manejas el día mensual exacto, usa esta fecha como próxima referencia.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="startedAt">Fecha de inicio</Label>
-                <Input id="startedAt" type="date" {...form.register("startedAt")} />
+                <Input
+                  id="startedAt"
+                  type="date"
+                  {...form.register("startedAt", optionalDateValidation)}
+                />
               </div>
+
+              <label className="flex items-start gap-3 rounded-2xl border border-border bg-secondary/60 p-4 md:col-span-2">
+                <input
+                  type="checkbox"
+                  className="mt-1 size-4"
+                  {...form.register("notificationsEnabled")}
+                />
+                <span className="space-y-1">
+                  <span className="block text-sm font-semibold text-foreground">
+                    Activar recordatorios para esta deuda
+                  </span>
+                  <span className="block text-sm text-muted">
+                    Te avisaremos antes del corte y antes del pago si tus correos están activos en Configuración.
+                  </span>
+                </span>
+              </label>
 
               <div className="space-y-2">
                 <Label htmlFor="lateFeeAmount">Mora</Label>
@@ -779,7 +1108,7 @@ export function DebtManager({
                   type="number"
                   step="0.01"
                   inputMode="decimal"
-                  {...form.register("lateFeeAmount", { setValueAs: requiredNumberValue })}
+                  {...form.register("lateFeeAmount", lateFeeAmountValidation)}
                 />
               </div>
               <div className="space-y-2">
@@ -789,22 +1118,26 @@ export function DebtManager({
                   type="number"
                   step="0.01"
                   inputMode="decimal"
-                  {...form.register("extraChargesAmount", { setValueAs: requiredNumberValue })}
+                  {...form.register("extraChargesAmount", extraChargesAmountValidation)}
                 />
               </div>
 
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="estimatedEndAt">Fecha estimada de término</Label>
-                <Input id="estimatedEndAt" type="date" {...form.register("estimatedEndAt")} />
+                <Input
+                  id="estimatedEndAt"
+                  type="date"
+                  {...form.register("estimatedEndAt", estimatedEndAtValidation)}
+                />
               </div>
 
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="notes">Notas</Label>
-                <Textarea id="notes" {...form.register("notes")} />
+                <Textarea id="notes" {...form.register("notes", notesValidation)} />
               </div>
 
               <div className="flex flex-wrap gap-3 md:col-span-2">
-                <Button type="submit" disabled={isSubmitting}>
+                <Button type="submit" disabled={isSubmitting || debtLimitReached}>
                   {selectedDebt ? "Guardar cambios" : "Crear deuda"}
                 </Button>
                 <Button type="button" variant="secondary" onClick={resetForm}>

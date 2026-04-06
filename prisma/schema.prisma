@@ -81,10 +81,29 @@ enum NotificationChannel {
   EMAIL
 }
 
+enum NotificationEventChannel {
+  EMAIL
+  PUSH
+  IN_APP
+}
+
 enum NotificationSeverity {
   INFO
   WARNING
   CRITICAL
+}
+
+enum NotificationEventType {
+  PAYMENT_DUE
+  STATEMENT_CLOSING
+  WEEKLY_SUMMARY
+}
+
+enum NotificationEventStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
 }
 
 enum PaymentSource {
@@ -137,6 +156,9 @@ model User {
   onboardingCompleted Boolean              @default(false)
   lastLoginAt         DateTime?
   avatarUrl           String?
+  termsAcceptedAt     DateTime?
+  termsVersion        String?
+  privacyVersion      String?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   accounts            Account[]
@@ -148,6 +170,9 @@ model User {
   auditLogs           AuditLog[]
   passwordResetTokens PasswordResetToken[]
   balanceSnapshots    BalanceSnapshot[]
+  passkeyCredentials  PasskeyCredential[]
+  consents            UserConsent[]
+  notificationEvents  NotificationEvent[]
 
   @@index([role, status])
   @@index([createdAt])
@@ -219,18 +244,38 @@ model UserSettings {
   stripePriceId         String?
   hybridRateWeight      Int            @default(70)
   hybridBalanceWeight   Int            @default(30)
+  monthlyIncome         Decimal?       @db.Decimal(14, 2)
   monthlyDebtBudget     Decimal?       @db.Decimal(14, 2)
   notifyDueSoon         Boolean        @default(true)
   notifyOverdue         Boolean        @default(true)
   notifyMinimumRisk     Boolean        @default(true)
   notifyMonthlyReport   Boolean        @default(true)
   emailRemindersEnabled Boolean        @default(false)
+  preferredReminderDays Int[]          @default([5, 2, 0])
+  preferredReminderHour Int            @default(8)
+  mfaTotpEnabled        Boolean        @default(false)
+  mfaTotpSecretEncrypted String?       @db.Text
+  mfaRecoveryCodesHashes String[]      @default([])
   upcomingDueDays       Int            @default(3)
   language              String         @default("es")
   timezone              String         @default("America/Santo_Domingo")
   createdAt             DateTime       @default(now())
   updatedAt             DateTime       @updatedAt
   user                  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserConsent {
+  id             String   @id @default(cuid())
+  userId         String
+  termsVersion   String
+  privacyVersion String
+  acceptedAt     DateTime
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, acceptedAt])
 }
 
 model Debt {
@@ -249,6 +294,7 @@ model Debt {
   statementDay          Int?
   dueDay                Int?
   nextDueDate           DateTime?
+  notificationsEnabled  Boolean          @default(true)
   lateFeeAmount         Decimal          @default(0) @db.Decimal(14, 2)
   extraChargesAmount    Decimal          @default(0) @db.Decimal(14, 2)
   notes                 String?          @db.Text
@@ -261,6 +307,7 @@ model Debt {
   user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   payments              Payment[]
   notifications         Notification[]
+  notificationEvents    NotificationEvent[]
   auditLogs             AuditLog[]
 
   @@index([userId, status])
@@ -314,6 +361,27 @@ model Notification {
   @@index([debtId])
 }
 
+model NotificationEvent {
+  id           String                  @id @default(cuid())
+  userId       String
+  debtId       String?
+  channel      NotificationEventChannel
+  eventType    NotificationEventType
+  scheduledFor DateTime
+  sentAt       DateTime?
+  status       NotificationEventStatus @default(PENDING)
+  subject      String?
+  payload      Json?
+  dedupeKey    String                  @unique
+  createdAt    DateTime                @default(now())
+  debt         Debt?                   @relation(fields: [debtId], references: [id], onDelete: SetNull)
+  user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, scheduledFor])
+  @@index([status, scheduledFor])
+  @@index([debtId, scheduledFor])
+}
+
 model AuditLog {
   id           String      @id @default(cuid())
   userId       String?
@@ -358,4 +426,22 @@ model BalanceSnapshot {
   user                         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, capturedAt])
+}
+
+model PasskeyCredential {
+  id         String   @id @default(cuid())
+  userId     String
+  credentialId String @unique @db.Text
+  publicKey  String   @db.Text
+  counter    Int      @default(0)
+  deviceType String
+  backedUp   Boolean  @default(false)
+  transports String[] @default([])
+  name       String?
+  lastUsedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }

@@ -1,13 +1,13 @@
-import {
-  CurrencyCode,
-  MembershipBillingStatus,
-  MembershipTier,
-  PrismaClient,
-  StrategyMethod,
-  UserRole,
-  UserStatus,
-} from "@prisma/client";
-import { hash } from "@node-rs/argon2";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { loadProjectEnv } from "./load-env.mjs";
+
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+Object.assign(process.env, loadProjectEnv(projectRoot));
+
+const [{ CurrencyCode, MembershipBillingStatus, MembershipTier, PrismaClient, StrategyMethod, UserRole, UserStatus }, { hash }] =
+  await Promise.all([import("@prisma/client"), import("@node-rs/argon2")]);
 
 const prisma = new PrismaClient();
 
@@ -77,6 +77,8 @@ async function main() {
       notifyMinimumRisk: true,
       notifyMonthlyReport: true,
       emailRemindersEnabled: true,
+      preferredReminderDays: [5, 2, 0],
+      preferredReminderHour: 8,
       upcomingDueDays: 3,
     },
     create: {
@@ -91,6 +93,8 @@ async function main() {
       notifyMinimumRisk: true,
       notifyMonthlyReport: true,
       emailRemindersEnabled: true,
+      preferredReminderDays: [5, 2, 0],
+      preferredReminderHour: 8,
       upcomingDueDays: 3,
     },
   });

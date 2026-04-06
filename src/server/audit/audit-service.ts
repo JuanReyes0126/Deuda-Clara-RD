@@ -14,8 +14,15 @@ type CreateAuditLogInput = {
   metadata?: Prisma.InputJsonValue | undefined;
 };
 
-export async function createAuditLog(input: CreateAuditLogInput) {
-  await prisma.auditLog.create({
+type AuditLogClient =
+  | Pick<typeof prisma, "auditLog">
+  | Pick<Prisma.TransactionClient, "auditLog">;
+
+export async function createAuditLog(
+  input: CreateAuditLogInput,
+  client: AuditLogClient = prisma,
+) {
+  await client.auditLog.create({
     data: {
       action: input.action,
       resourceType: input.resourceType,

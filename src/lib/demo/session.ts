@@ -1,5 +1,11 @@
-import type { User, UserSettings } from "@prisma/client";
 import { cookies } from "next/headers";
+
+import type {
+  CurrentSessionDto,
+  ServerUserContextDto,
+  ServerUserSettingsContextDto,
+  SessionUserContextDto,
+} from "@/lib/auth/session-context";
 
 export const DEMO_SESSION_COOKIE_NAME = "dc_demo_session";
 export const DEMO_PROFILE_COOKIE_NAME = "dc_demo_profile";
@@ -12,8 +18,6 @@ type DemoProfile = {
   lastName: string;
   email: string;
 };
-
-type DemoSessionUser = User & { settings: UserSettings | null };
 
 const DEMO_SESSION_DAYS = 7;
 
@@ -55,52 +59,55 @@ function decodeDemoProfile(value: string | undefined) {
   }
 }
 
-function buildDemoUser(profile: DemoProfile): DemoSessionUser {
-  const now = new Date();
+function buildDemoSettings(now: Date): ServerUserSettingsContextDto {
+  return {
+    defaultCurrency: "DOP",
+    preferredStrategy: "AVALANCHE",
+    membershipTier: "NORMAL",
+    membershipBillingStatus: "ACTIVE",
+    membershipCurrentPeriodEnd: new Date(
+      now.getTime() + 1000 * 60 * 60 * 24 * 30,
+    ).toISOString(),
+    membershipCancelAtPeriodEnd: false,
+    hybridRateWeight: 70,
+    hybridBalanceWeight: 30,
+    monthlyIncome: null,
+    monthlyDebtBudget: null,
+    notifyDueSoon: true,
+    notifyOverdue: true,
+    notifyMinimumRisk: true,
+    notifyMonthlyReport: true,
+    emailRemindersEnabled: true,
+    preferredReminderDays: [5, 2, 0],
+    preferredReminderHour: 8,
+    mfaTotpEnabled: false,
+    mfaRecoveryCodesRemaining: 0,
+    upcomingDueDays: 3,
+    language: "es",
+    timezone: "America/Santo_Domingo",
+  };
+}
 
+function buildDemoSessionUser(profile: DemoProfile): SessionUserContextDto {
   return {
     id: DEMO_USER_ID,
     email: profile.email,
-    passwordHash: "demo-mode",
     firstName: profile.firstName,
     lastName: profile.lastName,
+    avatarUrl: null,
     role: "USER",
     status: "ACTIVE",
-    locale: "es-DO",
     timezone: "America/Santo_Domingo",
-    emailVerifiedAt: now,
     onboardingCompleted: true,
-    lastLoginAt: now,
-    avatarUrl: null,
-    createdAt: now,
-    updatedAt: now,
-    settings: {
-      id: "demo-user-settings",
-      userId: DEMO_USER_ID,
-      defaultCurrency: "DOP",
-      preferredStrategy: "AVALANCHE",
-      membershipTier: "NORMAL",
-      membershipBillingStatus: "ACTIVE",
-      membershipActivatedAt: now,
-      membershipCurrentPeriodEnd: new Date(now.getTime() + 1000 * 60 * 60 * 24 * 30),
-      membershipCancelAtPeriodEnd: false,
-      stripeCustomerId: null,
-      stripeSubscriptionId: null,
-      stripePriceId: null,
-      hybridRateWeight: 70,
-      hybridBalanceWeight: 30,
-      monthlyDebtBudget: null,
-      notifyDueSoon: true,
-      notifyOverdue: true,
-      notifyMinimumRisk: true,
-      notifyMonthlyReport: true,
-      emailRemindersEnabled: true,
-      upcomingDueDays: 3,
-      language: "es",
-      timezone: "America/Santo_Domingo",
-      createdAt: now,
-      updatedAt: now,
-    },
+  };
+}
+
+function buildDemoServerUser(profile: DemoProfile): ServerUserContextDto {
+  const now = new Date();
+
+  return {
+    ...buildDemoSessionUser(profile),
+    settings: buildDemoSettings(now),
   };
 }
 
@@ -182,6 +189,28 @@ export async function getDemoSession() {
     userId: DEMO_USER_ID,
     sessionToken: "demo-session-token",
     expires: buildDemoExpiration(),
-    user: buildDemoUser(profile),
-  };
+    user: buildDemoSessionUser(profile),
+  } satisfies CurrentSessionDto & { sessionToken: string };
+}
+
+export async function getDemoServerUser() {
+  if (!isDemoModeEnabled()) {
+    return null;
+  }
+
+  const store = await cookies();
+  const enabled = store.get(DEMO_SESSION_COOKIE_NAME)?.value === "1";
+
+  if (!enabled) {
+    return null;
+  }
+
+  const profile =
+    decodeDemoProfile(store.get(DEMO_PROFILE_COOKIE_NAME)?.value) ?? {
+      firstName: "Cuenta",
+      lastName: "demo",
+      email: DEMO_LOGIN_EMAIL,
+    };
+
+  return buildDemoServerUser(profile);
 }

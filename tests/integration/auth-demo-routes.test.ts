@@ -1,8 +1,8 @@
-import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { POST as loginPost } from "@/app/api/auth/login/route";
 import { POST as registerPost } from "@/app/api/auth/registrar/route";
+import { buildJsonRequest } from "./request-helpers";
 
 vi.mock("@/lib/auth/session", () => ({
   createUserSession: vi.fn(),
@@ -10,6 +10,7 @@ vi.mock("@/lib/auth/session", () => ({
 
 vi.mock("@/lib/security/rate-limit", () => ({
   assertRateLimit: vi.fn(),
+  buildRateLimitKey: vi.fn(() => "auth-rate-limit-key"),
 }));
 
 vi.mock("@/server/auth/auth-service", () => ({
@@ -58,17 +59,9 @@ describe("api/auth demo fallback", () => {
     });
 
     const response = await loginPost(
-      new NextRequest("http://localhost/api/auth/login", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          origin: "http://localhost",
-          host: "localhost",
-        },
-        body: JSON.stringify({
+      buildJsonRequest("http://localhost/api/auth/login", {
           email: "demo@deudaclarard.com",
           password: "DeudaClara123!",
-        }),
       }),
     );
     const body = (await response.json()) as {
@@ -101,20 +94,13 @@ describe("api/auth demo fallback", () => {
     });
 
     const response = await registerPost(
-      new NextRequest("http://localhost/api/auth/registrar", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          origin: "http://localhost",
-          host: "localhost",
-        },
-        body: JSON.stringify({
-          firstName: "Ana",
-          lastName: "Perez",
-          email: "ana@correo.com",
-          password: "DeudaClara123!",
-          confirmPassword: "DeudaClara123!",
-        }),
+      buildJsonRequest("http://localhost/api/auth/registrar", {
+        firstName: "Ana",
+        lastName: "Perez",
+        email: "ana@correo.com",
+        password: "DeudaClara123!",
+        confirmPassword: "DeudaClara123!",
+        acceptLegal: true,
       }),
     );
     const body = (await response.json()) as {

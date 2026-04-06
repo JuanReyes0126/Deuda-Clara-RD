@@ -82,6 +82,7 @@ Detalles más extensos:
 - [Configuración de Stripe](./docs/STRIPE_SETUP.md)
 - [Checklist beta real](./docs/BETA_CHECKLIST.md)
 - [Guía de beta cerrada](./docs/CLOSED_BETA.md)
+- [Demo snapshot 1.1](./docs/DEMO_SNAPSHOT_1_1.md)
 
 ## Requisitos
 
@@ -100,6 +101,9 @@ Variables principales:
 - `DATABASE_URL`
 - `DIRECT_DATABASE_URL`
 - `DATA_ENCRYPTION_KEY`
+- `PASSKEY_RP_ID`
+- `PASSKEY_RP_NAME`
+- `PASSKEY_ALLOWED_ORIGINS`
 - `SKIP_RATE_LIMIT_IN_DEV`
 - `RESEND_API_KEY`
 - `RESEND_FROM_EMAIL`
@@ -115,6 +119,7 @@ Variables principales:
 - `HOST_PANEL_ENABLED`
 - `HOST_ALLOWED_EMAILS`
 - `HOST_SECONDARY_PASSWORD`
+- `HOST_SECONDARY_TOTP_SECRET`
 
 ## Instalación local
 
@@ -213,6 +218,11 @@ Detalles completos:
 - Admin: `admin@deudaclarard.com`
 - Contraseña: `DeudaClara123!`
 
+## Snapshot actual
+
+- Demo actual: [`Snapshot 1.1`](./docs/DEMO_SNAPSHOT_1_1.md)
+- Corte funcional con seguridad, legal, onboarding y dashboard ya integrados
+
 ## Prueba real de registro y acceso
 
 1. Verifica el entorno:
@@ -243,6 +253,7 @@ Nota local:
 - En desarrollo, `SKIP_RATE_LIMIT_IN_DEV=true` evita que el rate limit te bloquee mientras pruebas registro/login muchas veces.
 - Si quieres probar el rate limit real, cambia esa variable a `false`.
 - Si `DEMO_MODE_ENABLED=true`, login y registro pueden abrir una sesión demo de revisión cuando PostgreSQL no responda.
+- En staging/producción real, deja `DEMO_MODE_ENABLED=false`.
 
 ## Panel interno oculto
 
@@ -252,15 +263,17 @@ Nota local:
 - Capas de acceso:
   - sesión activa
   - rol `ADMIN`
+  - MFA obligatorio en la cuenta admin
   - allowlist por `HOST_ALLOWED_EMAILS`
   - feature flag por `HOST_PANEL_ENABLED`
-  - clave secundaria opcional por `HOST_SECONDARY_PASSWORD`
+  - segundo factor interno por `HOST_SECONDARY_TOTP_SECRET` o, solo como legado, `HOST_SECONDARY_PASSWORD`
 
 Recomendación local para probarlo:
 
 ```bash
 HOST_PANEL_ENABLED=true
 HOST_ALLOWED_EMAILS=admin@deudaclarard.com
+HOST_SECONDARY_TOTP_SECRET=BASE32SECRETO...
 HOST_SECONDARY_PASSWORD=una-clave-larga-opcional
 ```
 
@@ -273,6 +286,7 @@ Antes de invitar usuarios, verifica este mínimo:
 - `GET /api/health`
 - PostgreSQL accesible desde `DATABASE_URL`
 - `APP_URL`, `AUTH_SECRET` y `DATA_ENCRYPTION_KEY` configurados
+- `PASSKEY_RP_ID` y `PASSKEY_ALLOWED_ORIGINS` configurados si vas a habilitar WebAuthn/passkeys
 - Resend listo si vas a probar recuperación por email
 - Stripe en modo test si vas a probar Premium y Pro
 - `CRON_SECRET` configurado si vas a disparar recordatorios
@@ -422,17 +436,21 @@ Justificación:
 
 ## Riesgos pendientes
 
-- Sin MFA todavía
-- CSRF endurecido con `Origin`, pero sin token dedicado
-- Cifrado por campo aplicado a notas sensibles, pero no a todos los metadatos potencialmente sensibles
-- Sin monitoreo avanzado tipo SIEM/Sentry integrado
+- WAF/CDN y reglas anti-bot todavía dependen del proveedor de despliegue, no del código de la app
+- Falta un pentest externo de staging/producción
+- `style-src` sigue más permisivo que `script-src` por dependencias de estilos inline
+- El cifrado por campo está enfocado en datos sensibles clave, no en todo el modelo
 
 Ver mitigaciones en [SECURITY.md](./SECURITY.md).
+Checklist operativo final en [docs/PRODUCTION_SECURITY_CHECKLIST.md](./docs/PRODUCTION_SECURITY_CHECKLIST.md).
+Matriz exacta de variables en [docs/ENVIRONMENT_MATRIX.md](./docs/ENVIRONMENT_MATRIX.md).
+Runbook de staging y salida en [docs/STAGING_GO_LIVE_RUNBOOK.md](./docs/STAGING_GO_LIVE_RUNBOOK.md).
+Plantillas listas para Vercel en [docs/VERCEL_ENV_TEMPLATES.md](./docs/VERCEL_ENV_TEMPLATES.md).
 
 ## Roadmap
 
 - conexión bancaria/importación de estados
-- MFA o passkeys
+- monitoreo y alertas operativas avanzadas
 - reglas avanzadas de refinanciamiento
 - analytics de comportamiento
 - multi-moneda ampliada
@@ -449,3 +467,12 @@ Notas honestas:
 - Para ejecutar la app completa necesitas PostgreSQL levantado.
 - Los tests e2e requieren navegador y base disponible.
 - En este entorno local de trabajo, `build` pasó aunque sin una base activa aparecieron logs de conexión durante generación dinámica.
+
+## 🚀 Go-Live
+
+Antes de cualquier despliegue a producción, ejecutar obligatoriamente:
+
+- [STAGING_GO_LIVE_RUNBOOK.md](./docs/STAGING_GO_LIVE_RUNBOOK.md)
+- [GO_NO_GO_CHECKLIST.md](./docs/GO_NO_GO_CHECKLIST.md)
+
+No se debe realizar deploy a producción sin completar ambos documentos.

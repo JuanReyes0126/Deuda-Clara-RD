@@ -30,7 +30,10 @@ function decodeDebts(value: string | undefined) {
       return null;
     }
 
-    return parsed as DebtItemDto[];
+    return (parsed as DebtItemDto[]).map((debt) => ({
+      ...debt,
+      notificationsEnabled: debt.notificationsEnabled ?? true,
+    }));
   } catch {
     return null;
   }
@@ -126,6 +129,7 @@ function buildDebtDto(input: DebtInput, existing?: DebtItemDto): DebtItemDto {
     statementDay: input.statementDay ?? null,
     dueDay: input.dueDay ?? null,
     nextDueDate: input.nextDueDate?.toISOString() ?? null,
+    notificationsEnabled: input.notificationsEnabled,
     lateFeeAmount: toMoneyNumber(lateFeeAmount),
     extraChargesAmount: toMoneyNumber(extraChargesAmount),
     utilizationPct,

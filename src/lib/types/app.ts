@@ -15,6 +15,7 @@ export type DebtItemDto = {
   statementDay: number | null;
   dueDay: number | null;
   nextDueDate: string | null;
+  notificationsEnabled: boolean;
   lateFeeAmount: number;
   extraChargesAmount: number;
   utilizationPct: number | null;
@@ -62,6 +63,83 @@ export type NotificationItemDto = {
   readAt: string | null;
   sentAt: string | null;
   createdAt: string;
+};
+
+export type UserPublicDto = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl: string | null;
+};
+
+export type AppShellUserDto = UserPublicDto & {
+  membershipTier: "FREE" | "NORMAL" | "PRO";
+};
+
+export type UserSettingsPublicDto = {
+  defaultCurrency: "DOP" | "USD";
+  preferredStrategy: "SNOWBALL" | "AVALANCHE" | "HYBRID";
+  hybridRateWeight: number;
+  hybridBalanceWeight: number;
+  monthlyIncome: number | null;
+  monthlyDebtBudget: number | null;
+  notifyDueSoon: boolean;
+  notifyOverdue: boolean;
+  notifyMinimumRisk: boolean;
+  notifyMonthlyReport: boolean;
+  emailRemindersEnabled: boolean;
+  preferredReminderDays: number[];
+  preferredReminderHour: number;
+  mfaTotpEnabled: boolean;
+  mfaRecoveryCodesRemaining: number;
+  upcomingDueDays: number;
+  timezone: string;
+  language: string;
+};
+
+export type MembershipSettingsPublicDto = {
+  membershipTier: "FREE" | "NORMAL" | "PRO";
+  membershipBillingStatus:
+    | "FREE"
+    | "PENDING"
+    | "ACTIVE"
+    | "PAST_DUE"
+    | "CANCELED"
+    | "INACTIVE";
+  membershipCurrentPeriodEnd: string | null;
+  membershipCancelAtPeriodEnd: boolean;
+};
+
+export type PasskeyPublicDto = {
+  id: string;
+  name: string | null;
+  deviceType: "singleDevice" | "multiDevice";
+  backedUp: boolean;
+  transports: string[];
+  createdAt: string;
+  lastUsedAt: string | null;
+};
+
+export type UserSettingsViewModelDto = UserPublicDto & {
+  timezone: string;
+  passkeys: PasskeyPublicDto[];
+  settings:
+    | (UserSettingsPublicDto &
+        MembershipSettingsPublicDto & {
+          canManageBilling: boolean;
+        })
+    | null;
+};
+
+export type AdminUserStatusPublicDto = {
+  id: string;
+  email: string;
+  status: "ACTIVE" | "DISABLED";
+  role: "USER" | "ADMIN";
+  firstName: string;
+  lastName: string;
+  avatarUrl: string | null;
 };
 
 export type DebtSummaryDto = {
@@ -151,7 +229,33 @@ export type DashboardPlanComparisonDto = {
 export type DashboardDto = {
   summary: DashboardSummaryDto;
   membership: MembershipInfoDto;
+  analysisScope: {
+    activeDebtCount: number;
+    analyzedDebtCount: number;
+    hiddenDebtCount: number;
+    partialAnalysis: boolean;
+  };
   planComparison: DashboardPlanComparisonDto | null;
+  habitSignals: {
+    weeklyStreak: number;
+    reviewPrompt: string | null;
+    momentumMessage: string;
+    microFeedback: string;
+  };
+  upcomingTimeline: {
+    headline: string;
+    support: string;
+    items: Array<{
+      debtId: string;
+      debtName: string;
+      eventType: "PAYMENT_DUE" | "STATEMENT_CLOSING";
+      eventLabel: string;
+      occursOn: string;
+      daysUntil: number;
+      summary: string;
+    }>;
+    emptyState: string | null;
+  };
   debtBreakdown: Array<{ label: string; value: number }>;
   balanceHistory: Array<{ label: string; totalBalance: number }>;
   recentPayments: PaymentItemDto[];
@@ -168,6 +272,17 @@ export type DashboardDto = {
   }>;
   strategyExplanation: string;
   riskAlerts: Array<{ title: string; description: string }>;
+};
+
+export type OnboardingPreviewDto = {
+  estimatedDebtFreeDate: string | null;
+  potentialSavings: number;
+  recommendedStrategy: "SNOWBALL" | "AVALANCHE" | "HYBRID";
+  recommendedStrategyLabel: string;
+  priorityDebtName: string | null;
+  immediateAction: string;
+  monthsToDebtFree: number | null;
+  monthsSaved: number | null;
 };
 
 export type ReportSummaryDto = {

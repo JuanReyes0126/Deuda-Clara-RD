@@ -4,9 +4,17 @@ const ENCRYPTION_PREFIX = "enc:v1";
 const ENCRYPTION_ALGORITHM = "aes-256-gcm";
 
 function getEncryptionSecret() {
-  const secret = process.env.DATA_ENCRYPTION_KEY ?? process.env.AUTH_SECRET;
+  const secret =
+    process.env.DATA_ENCRYPTION_KEY ??
+    (process.env.NODE_ENV === "production" ? undefined : process.env.AUTH_SECRET);
 
   if (!secret || secret.length < 24) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "DATA_ENCRYPTION_KEY must be configured with at least 24 characters in production.",
+      );
+    }
+
     return null;
   }
 

@@ -1,14 +1,14 @@
 import { PaymentManager } from "@/features/payments/components/payment-manager";
-import { requireUser } from "@/lib/auth/session";
 import { listUserDebts } from "@/server/debts/debt-service";
 import { listUserPayments } from "@/server/payments/payment-service";
+import { getRequestSessionUser } from "@/server/request/request-user-context";
 
 export default async function PaymentsPage({
   searchParams,
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const user = await requireUser();
+  const user = await getRequestSessionUser();
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const entryFlow =
     resolvedSearchParams.from === "onboarding" ? "onboarding" : null;

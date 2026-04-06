@@ -2,33 +2,52 @@ import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
 import { getServerEnv } from "@/lib/env/server";
-import { logServerError } from "@/server/observability/logger";
+import { logSecurityEvent, logServerError } from "@/server/observability/logger";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+type HealthEnvironmentStatus =
+  | {
+      ok: true;
+      appUrl: string | null;
+      authSecretReady: boolean;
+      encryptionReady: boolean;
+      emailReady: boolean;
+      billingReady: boolean;
+      billingMode: "test" | "live" | "not-configured";
+      webhookReady: boolean;
+      cronReady: boolean;
+      hostPanelEnabled: boolean;
+      hostAllowlistReady: boolean;
+      hostSecondaryEnabled: boolean;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
+
+function canViewDetailedHealth(secretFromRequest: string | null, env: ReturnType<typeof getServerEnv>) {
+  if (env.NODE_ENV !== "production") {
+    return true;
+  }
+
+  if (!env.HEALTHCHECK_SECRET) {
+    return false;
+  }
+
+  return secretFromRequest === env.HEALTHCHECK_SECRET;
+}
+
+export async function GET(request: Request) {
   let envStatus:
-    | {
-        ok: true;
-        appUrl: string | null;
-        authSecretReady: boolean;
-        encryptionReady: boolean;
-        emailReady: boolean;
-        billingReady: boolean;
-        billingMode: "test" | "live" | "not-configured";
-        webhookReady: boolean;
-        cronReady: boolean;
-        hostPanelEnabled: boolean;
-        hostAllowlistReady: boolean;
-        hostSecondaryEnabled: boolean;
-      }
-    | {
-        ok: false;
-        message: string;
-      };
+    | HealthEnvironmentStatus
+    | undefined;
+  let env:
+    | ReturnType<typeof getServerEnv>
+    | undefined;
 
   try {
-    const env = getServerEnv();
+    env = getServerEnv();
     envStatus = {
       ok: true,
       appUrl: env.APP_URL ?? null,
@@ -85,31 +104,44 @@ export async function GET() {
     ? envStatus.authSecretReady && envStatus.encryptionReady && databaseStatus.ok
     : false;
 
+  const detailedAccess = env ? canViewDetailedHealth(request.headers.get("x-health-secret"), env) : false;
+
+  if (env?.NODE_ENV === "production" && !detailedAccess) {
+    logSecurityEvent("healthcheck_detail_denied", {
+      route: "/api/health",
+      ipAddress: request.headers.get("x-forwarded-for") ?? request.headers.get("x-real-ip") ?? undefined,
+    }, "info");
+  }
+
   const payload = {
     ok: envStatus.ok && databaseStatus.ok && authReady,
     app: {
       status: "up",
       timestamp: new Date().toISOString(),
     },
-    environment: envStatus,
-    database: databaseStatus,
-    auth: {
-      ready: authReady,
-      sessionCookie: "dc_session",
-    },
-    hostPanel: envStatus.ok
+    ...(detailedAccess
       ? {
-          enabled: envStatus.hostPanelEnabled,
-          allowlistReady: envStatus.hostAllowlistReady,
-          secondaryEnabled: envStatus.hostSecondaryEnabled,
-          route: "/host",
+          environment: envStatus,
+          database: databaseStatus,
+          auth: {
+            ready: authReady,
+            sessionCookie: "dc_session",
+          },
+          hostPanel: envStatus.ok
+            ? {
+                enabled: envStatus.hostPanelEnabled,
+                allowlistReady: envStatus.hostAllowlistReady,
+                secondaryEnabled: envStatus.hostSecondaryEnabled,
+                route: "/host",
+              }
+            : {
+                enabled: false,
+                allowlistReady: false,
+                secondaryEnabled: false,
+                route: "/host",
+              },
         }
-      : {
-          enabled: false,
-          allowlistReady: false,
-          secondaryEnabled: false,
-          route: "/host",
-        },
+      : {}),
   };
 
   return NextResponse.json(payload, {

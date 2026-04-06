@@ -101,6 +101,7 @@ export function mapDebtToDto(debt: DebtWithPayments): DebtItemDto {
     statementDay: debt.statementDay,
     dueDay: debt.dueDay,
     nextDueDate: debt.nextDueDate?.toISOString() ?? null,
+    notificationsEnabled: debt.notificationsEnabled,
     lateFeeAmount: toMoneyNumber(debt.lateFeeAmount),
     extraChargesAmount: toMoneyNumber(debt.extraChargesAmount),
     utilizationPct,

@@ -1,15 +1,21 @@
 import { BalanceSnapshotSource } from "@prisma/client";
 import Decimal from "decimal.js";
+import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 import { decimal } from "@/lib/utils/decimal";
 import { getDebtMonthlyRate } from "@/server/finance/debt-helpers";
 
+type SnapshotClient =
+  | typeof prisma
+  | Pick<Prisma.TransactionClient, "debt" | "balanceSnapshot">;
+
 export async function captureBalanceSnapshot(
   userId: string,
   source: BalanceSnapshotSource = BalanceSnapshotSource.MUTATION,
+  client: SnapshotClient = prisma,
 ) {
-  const debts = await prisma.debt.findMany({
+  const debts = await client.debt.findMany({
     where: {
       userId,
       archivedAt: null,
@@ -39,7 +45,7 @@ export async function captureBalanceSnapshot(
     },
   );
 
-  return prisma.balanceSnapshot.create({
+  return client.balanceSnapshot.create({
     data: {
       userId,
       source,

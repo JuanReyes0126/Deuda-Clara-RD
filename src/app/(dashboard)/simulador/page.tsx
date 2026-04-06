@@ -1,15 +1,14 @@
 import { SimulatorPanel } from "@/features/simulator/components/simulator-panel";
-import { requireUser } from "@/lib/auth/session";
 import { isDemoSessionUser } from "@/lib/demo/session";
 import { listUserDebts } from "@/server/debts/debt-service";
 import {
   buildMembershipConversionSnapshot,
-  getMembershipConversionSnapshot,
 } from "@/server/dashboard/dashboard-service";
-import { getUserSettingsBundle } from "@/server/settings/settings-service";
+import { getRequestSessionUser } from "@/server/request/request-user-context";
+import { getUserSettingsViewModel } from "@/server/settings/settings-service";
 
 export default async function SimulatorPage() {
-  const user = await requireUser();
+  const user = await getRequestSessionUser();
 
   if (isDemoSessionUser(user)) {
     const debts = await listUserDebts(user.id, false);
@@ -30,19 +29,25 @@ export default async function SimulatorPage() {
     );
   }
 
-  const [debts, settingsBundle, conversionSnapshot] = await Promise.all([
+  const [debts, settingsViewModel] = await Promise.all([
     listUserDebts(user.id, false),
-    getUserSettingsBundle(user.id),
-    getMembershipConversionSnapshot(user.id),
+    getUserSettingsViewModel(user.id),
   ]);
+  const conversionSnapshot = buildMembershipConversionSnapshot({
+    debts,
+    preferredStrategy: settingsViewModel.settings?.preferredStrategy ?? "AVALANCHE",
+    monthlyDebtBudget: settingsViewModel.settings?.monthlyDebtBudget ?? null,
+    hybridRateWeight: settingsViewModel.settings?.hybridRateWeight ?? 70,
+    hybridBalanceWeight: settingsViewModel.settings?.hybridBalanceWeight ?? 30,
+  });
 
   return (
     <SimulatorPanel
       debts={debts}
       conversionSnapshot={conversionSnapshot}
-      membershipTier={(settingsBundle.settings?.membershipTier ?? "FREE") as "FREE" | "NORMAL" | "PRO"}
+      membershipTier={(settingsViewModel.settings?.membershipTier ?? "FREE") as "FREE" | "NORMAL" | "PRO"}
       billingStatus={
-        (settingsBundle.settings?.membershipBillingStatus ?? "FREE") as
+        (settingsViewModel.settings?.membershipBillingStatus ?? "FREE") as
           | "FREE"
           | "PENDING"
           | "ACTIVE"

@@ -6,10 +6,15 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { fetchWithCsrf } from "@/lib/http/fetch-with-csrf";
 import { readJsonPayload } from "@/lib/http/read-json-payload";
 import { useAppNavigation } from "@/lib/navigation/use-app-navigation";
 
-export function HostUnlockForm() {
+type HostUnlockFormProps = {
+  secondaryMode: "PASSWORD" | "TOTP";
+};
+
+export function HostUnlockForm({ secondaryMode }: HostUnlockFormProps) {
   const router = useRouter();
   const { navigate } = useAppNavigation();
   const [password, setPassword] = useState("");
@@ -22,7 +27,7 @@ export function HostUnlockForm() {
     setErrorMessage(null);
 
     try {
-      const response = await fetch("/api/internal/host-gate", {
+      const response = await fetchWithCsrf("/api/internal/host-gate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -56,21 +61,29 @@ export function HostUnlockForm() {
         <CardHeader>
           <CardTitle>Acceso interno protegido</CardTitle>
           <CardDescription>
-            Esta capa adicional solo aplica al panel interno. Introduce la clave secundaria para continuar.
+            {secondaryMode === "TOTP"
+              ? "Esta capa adicional solo aplica al panel interno. Introduce el código temporal de 6 dígitos de tu app autenticadora."
+              : "Esta capa adicional solo aplica al panel interno. Introduce la clave secundaria para continuar."}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={submit}>
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground" htmlFor="hostPassword">
-                Clave secundaria
+                {secondaryMode === "TOTP"
+                  ? "Código de verificación"
+                  : "Clave secundaria"}
               </label>
               <Input
                 id="hostPassword"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                autoComplete="current-password"
+                autoComplete={
+                  secondaryMode === "TOTP" ? "one-time-code" : "current-password"
+                }
+                inputMode={secondaryMode === "TOTP" ? "numeric" : undefined}
+                maxLength={secondaryMode === "TOTP" ? 6 : undefined}
               />
             </div>
 

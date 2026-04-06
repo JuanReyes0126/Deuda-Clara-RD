@@ -20,7 +20,7 @@ export function TrustInlineNote({
   return (
     <section
       className={cn(
-        "rounded-[1.75rem] border border-border/70 bg-white/82 px-5 py-4",
+        "rounded-[1.75rem] border border-border/70 bg-white/82 px-4 py-4 sm:px-5",
         className,
       )}
     >
@@ -30,11 +30,11 @@ export function TrustInlineNote({
         </span>
         <div className="min-w-0">
           <p className="text-foreground text-sm font-semibold">{title}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap gap-2.5">
             {notes.map((note) => (
               <span
                 key={note}
-                className="rounded-full border border-border/80 bg-secondary/40 px-3 py-2 text-xs leading-6 text-foreground"
+                className="rounded-full border border-border/80 bg-secondary/40 px-3.5 py-2 text-xs leading-5 text-foreground"
               >
                 {note}
               </span>

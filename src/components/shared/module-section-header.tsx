@@ -24,18 +24,18 @@ export function ModuleSectionHeader({
         className,
       )}
     >
-      <div className="min-w-0 max-w-4xl">
+      <div className="min-w-0 max-w-none md:max-w-4xl">
         {kicker ? <p className="section-kicker">{kicker}</p> : null}
-        <h2 className="font-display text-foreground mt-3 text-[clamp(1.7rem,4vw,2.45rem)] leading-tight tracking-tight">
+        <h2 className="font-display text-foreground mt-3 text-[clamp(1.55rem,6vw,2.45rem)] leading-tight tracking-tight">
           {title}
         </h2>
         {description ? (
-          <p className="section-summary mt-3 max-w-3xl text-pretty">
+          <p className="section-summary mt-3 max-w-none text-pretty md:max-w-3xl">
             {description}
           </p>
         ) : null}
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      {action ? <div className="w-full shrink-0 md:w-auto">{action}</div> : null}
     </div>
   );
 }

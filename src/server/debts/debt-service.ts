@@ -11,6 +11,7 @@ import {
 } from "@/lib/demo/debts";
 import { deleteDemoPaymentsForDebt } from "@/lib/demo/payments";
 import { isDemoSessionUser } from "@/lib/demo/session";
+import { canAddMoreDebts } from "@/lib/feature-access";
 import { encryptSensitiveText } from "@/lib/security/encryption";
 import type { DebtInput } from "@/lib/validations/debts";
 import type {
@@ -24,6 +25,7 @@ import {
   getDebtMonthlyRate,
   mapDebtToDto,
 } from "@/server/finance/debt-helpers";
+import { getUserFeatureAccess } from "@/server/membership/membership-access-service";
 import { captureBalanceSnapshot } from "@/server/snapshots/balance-snapshot-service";
 
 import { ServiceError } from "../services/service-error";
@@ -48,6 +50,60 @@ async function getUserDebtRecord(userId: string, debtId: string) {
   }
 
   return debt;
+}
+
+function isActiveDebtState(input: {
+  status: DebtStatus;
+  archivedAt: Date | null;
+}) {
+  return (
+    input.archivedAt === null &&
+    input.status !== DebtStatus.PAID &&
+    input.status !== DebtStatus.ARCHIVED
+  );
+}
+
+async function assertDebtLimit(input: {
+  userId: string;
+  nextDebtWillBeActive: boolean;
+  activeDebtCountDelta?: number;
+}) {
+  if (!input.nextDebtWillBeActive) {
+    return;
+  }
+
+  const [access, activeDebtCount] = await Promise.all([
+    getUserFeatureAccess(input.userId),
+    prisma.debt.count({
+      where: {
+        userId: input.userId,
+        archivedAt: null,
+        status: {
+          notIn: [DebtStatus.PAID, DebtStatus.ARCHIVED],
+        },
+      },
+    }),
+  ]);
+  const effectiveActiveDebtCount =
+    activeDebtCount + (input.activeDebtCountDelta ?? 0);
+
+  if (
+    canAddMoreDebts({
+      membershipTier: access.effectiveTier,
+      membershipBillingStatus: access.billingStatus,
+      activeDebtCount: effectiveActiveDebtCount,
+    })
+  ) {
+    return;
+  }
+
+  throw new ServiceError(
+    "DEBT_LIMIT_REACHED",
+    403,
+    access.isBase
+      ? `Tienes más de ${access.maxActiveDebts} deudas activas. Estás viendo solo una parte de tu situación financiera. Desbloquea Premium para ver tu panorama completo.`
+      : `Tu plan ${access.isPro ? "Pro" : "Premium"} permite hasta ${access.maxActiveDebts} deudas activas.`,
+  );
 }
 
 export async function listUserDebts(userId: string, includeArchived = true) {
@@ -153,6 +209,11 @@ export async function createDebt(
     nextDueDate: input.nextDueDate,
   });
 
+  await assertDebtLimit({
+    userId,
+    nextDebtWillBeActive: isActiveDebtState({ status, archivedAt }),
+  });
+
   const debt = await prisma.debt.create({
     data: {
       userId,
@@ -169,6 +230,7 @@ export async function createDebt(
       statementDay: input.statementDay ?? null,
       dueDay: input.dueDay ?? null,
       nextDueDate: input.nextDueDate ?? null,
+      notificationsEnabled: input.notificationsEnabled,
       lateFeeAmount,
       extraChargesAmount,
       notes: encryptSensitiveText(input.notes),
@@ -222,9 +284,23 @@ export async function updateDebt(
     preferredStatus: input.status,
     nextDueDate: input.nextDueDate,
   });
+  const existingDebtIsActive = isActiveDebtState({
+    status: existingDebt.status,
+    archivedAt: existingDebt.archivedAt,
+  });
+  const nextDebtWillBeActive = isActiveDebtState({
+    status,
+    archivedAt,
+  });
 
-  const debt = await prisma.debt.update({
-    where: { id: debtId },
+  await assertDebtLimit({
+    userId,
+    nextDebtWillBeActive,
+    activeDebtCountDelta: existingDebtIsActive ? -1 : 0,
+  });
+
+  const updateResult = await prisma.debt.updateMany({
+    where: { id: debtId, userId },
     data: {
       name: input.name,
       creditorName: input.creditorName,
@@ -239,6 +315,7 @@ export async function updateDebt(
       statementDay: input.statementDay ?? null,
       dueDay: input.dueDay ?? null,
       nextDueDate: input.nextDueDate ?? null,
+      notificationsEnabled: input.notificationsEnabled,
       lateFeeAmount,
       extraChargesAmount,
       notes: encryptSensitiveText(input.notes),
@@ -248,14 +325,13 @@ export async function updateDebt(
       paidOffAt:
         status === DebtStatus.PAID ? existingDebt.paidOffAt ?? new Date() : null,
     },
-    include: {
-      payments: {
-        orderBy: {
-          paidAt: "desc",
-        },
-      },
-    },
   });
+
+  if (updateResult.count !== 1) {
+    throw new ServiceError("DEBT_NOT_FOUND", 404, "No se encontró la deuda.");
+  }
+
+  const debt = await getUserDebtRecord(userId, debtId);
 
   await createAuditLog({
     userId,
@@ -284,9 +360,13 @@ export async function deleteDebt(
 
   await getUserDebtRecord(userId, debtId);
 
-  await prisma.debt.delete({
-    where: { id: debtId },
+  const deleteResult = await prisma.debt.deleteMany({
+    where: { id: debtId, userId },
   });
+
+  if (deleteResult.count !== 1) {
+    throw new ServiceError("DEBT_NOT_FOUND", 404, "No se encontró la deuda.");
+  }
 
   await createAuditLog({
     userId,

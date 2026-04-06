@@ -1,6 +1,5 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import { Pencil, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -24,11 +23,15 @@ import { TrustInlineNote } from "@/components/shared/trust-inline-note";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { fetchWithCsrf } from "@/lib/http/fetch-with-csrf";
 import { readJsonPayload } from "@/lib/http/read-json-payload";
+import {
+  sanitizeMultilineText,
+  sanitizeText,
+} from "@/lib/security/sanitize";
 import type { DebtItemDto, PaymentItemDto } from "@/lib/types/app";
 import { formatCurrency } from "@/lib/utils/currency";
 import { formatDate } from "@/lib/utils/date";
-import { paymentSchema } from "@/lib/validations/payments";
 
 type PaymentFormValues = {
   debtId: string;
@@ -49,6 +52,79 @@ function optionalPaymentValue(value: string) {
 function requiredPaymentValue(value: string) {
   return value === "" ? 0 : Number(value);
 }
+
+function requiredDateValue(value: string) {
+  return value.trim();
+}
+
+function optionalNotesValue(value: string) {
+  const sanitized = sanitizeMultilineText(value);
+  return sanitized.length ? sanitized : undefined;
+}
+
+const debtIdValidation = {
+  validate: (value: string) =>
+    sanitizeText(value).length >= 1 || "Este campo es obligatorio.",
+  setValueAs: (value: string) => sanitizeText(value),
+} as const;
+
+function buildPaymentAmountValidation({
+  optional = false,
+  validateSplitTotal = false,
+} = {}) {
+  return {
+    validate: (value: number | undefined, formValues: PaymentFormValues) => {
+      if (value === undefined) {
+        return optional || "Debes introducir un monto válido.";
+      }
+
+      if (!Number.isFinite(value)) {
+        return "Debes introducir un monto válido.";
+      }
+
+      if (value < 0) {
+        return "El monto no puede ser negativo.";
+      }
+
+      if (value > 999_999_999) {
+        return "El monto es demasiado alto.";
+      }
+
+      if (validateSplitTotal) {
+        const splitTotal =
+          (formValues.principalAmount ?? 0) +
+          (formValues.interestAmount ?? 0) +
+          (formValues.lateFeeAmount ?? 0) +
+          (formValues.extraChargesAmount ?? 0);
+
+        if (splitTotal > value) {
+          return "El desglose no puede superar el monto total del pago.";
+        }
+      }
+
+      return true;
+    },
+    setValueAs: optional ? optionalPaymentValue : requiredPaymentValue,
+  } as const;
+}
+
+const paymentAmountValidation = buildPaymentAmountValidation({
+  validateSplitTotal: true,
+});
+const optionalPaymentAmountValidation = buildPaymentAmountValidation({
+  optional: true,
+});
+
+const paidAtValidation = {
+  validate: (value: string) => Boolean(value) || "Invalid Date",
+  setValueAs: requiredDateValue,
+} as const;
+
+const notesValidation = {
+  validate: (value: string | undefined) =>
+    (value?.length ?? 0) <= 4000 || "El texto es demasiado largo.",
+  setValueAs: optionalNotesValue,
+} as const;
 
 function emptyPaymentValues(defaultDebtId?: string): PaymentFormValues {
   return {
@@ -79,7 +155,7 @@ function paymentToFormValues(payment: PaymentItemDto): PaymentFormValues {
 }
 
 async function requestJson(url: string, init?: RequestInit) {
-  const response = await fetch(url, {
+  const response = await fetchWithCsrf(url, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -119,7 +195,6 @@ export function PaymentManager({
   );
   const isOnboardingFlow = entryFlow === "onboarding";
   const form = useForm<PaymentFormValues>({
-    resolver: zodResolver(paymentSchema) as never,
     defaultValues: emptyPaymentValues(defaultDebtId ?? debtOptions[0]?.id),
   });
   const watchedDebtId =
@@ -580,7 +655,7 @@ export function PaymentManager({
                   id="debtId"
                   disabled={Boolean(selectedPayment) || !debtOptions.length}
                   className="border-border text-foreground focus:border-primary/40 focus:ring-primary/10 min-w-0 h-12 w-full rounded-2xl border bg-white px-4 text-sm transition outline-none focus:ring-4 disabled:opacity-70"
-                  {...form.register("debtId")}
+                  {...form.register("debtId", debtIdValidation)}
                 >
                   <option value="">Selecciona una deuda</option>
                   {debtOptions.map((debt) => (
@@ -601,9 +676,7 @@ export function PaymentManager({
                   type="number"
                   step="0.01"
                   inputMode="decimal"
-                  {...form.register("amount", {
-                    setValueAs: requiredPaymentValue,
-                  })}
+                  {...form.register("amount", paymentAmountValidation)}
                 />
                 <p className="text-muted text-xs">
                   Registra el monto total pagado. Si no conoces el desglose
@@ -615,7 +688,11 @@ export function PaymentManager({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="paidAt">Fecha del pago</Label>
-                <Input id="paidAt" type="date" {...form.register("paidAt")} />
+                <Input
+                  id="paidAt"
+                  type="date"
+                  {...form.register("paidAt", paidAtValidation)}
+                />
               </div>
 
               <div className="space-y-2">
@@ -625,9 +702,7 @@ export function PaymentManager({
                   type="number"
                   step="0.01"
                   inputMode="decimal"
-                  {...form.register("principalAmount", {
-                    setValueAs: optionalPaymentValue,
-                  })}
+                  {...form.register("principalAmount", optionalPaymentAmountValidation)}
                 />
               </div>
               <div className="space-y-2">
@@ -637,9 +712,7 @@ export function PaymentManager({
                   type="number"
                   step="0.01"
                   inputMode="decimal"
-                  {...form.register("interestAmount", {
-                    setValueAs: optionalPaymentValue,
-                  })}
+                  {...form.register("interestAmount", optionalPaymentAmountValidation)}
                 />
               </div>
 
@@ -650,9 +723,7 @@ export function PaymentManager({
                   type="number"
                   step="0.01"
                   inputMode="decimal"
-                  {...form.register("lateFeeAmount", {
-                    setValueAs: optionalPaymentValue,
-                  })}
+                  {...form.register("lateFeeAmount", optionalPaymentAmountValidation)}
                 />
               </div>
               <div className="space-y-2">
@@ -664,9 +735,7 @@ export function PaymentManager({
                   type="number"
                   step="0.01"
                   inputMode="decimal"
-                  {...form.register("extraChargesAmount", {
-                    setValueAs: optionalPaymentValue,
-                  })}
+                  {...form.register("extraChargesAmount", optionalPaymentAmountValidation)}
                 />
               </div>
 
@@ -725,7 +794,7 @@ export function PaymentManager({
 
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="notes">Notas</Label>
-                <Textarea id="notes" {...form.register("notes")} />
+                <Textarea id="notes" {...form.register("notes", notesValidation)} />
               </div>
 
               <div className="flex flex-wrap gap-3 md:col-span-2">

@@ -1,11 +1,11 @@
 import { MembershipPanel } from "@/features/membership/components/membership-panel";
-import { requireUser } from "@/lib/auth/session";
 import { membershipConversionSnapshot } from "@/lib/demo/data";
 import { isDemoSessionUser } from "@/lib/demo/session";
 import { membershipPlanCatalog, type MembershipPlanId } from "@/lib/membership/plans";
 import { isStripeBillingConfigured } from "@/server/billing/billing-service";
 import { getMembershipConversionSnapshot } from "@/server/dashboard/dashboard-service";
-import { getUserSettingsBundle } from "@/server/settings/settings-service";
+import { getRequestSessionUser } from "@/server/request/request-user-context";
+import { getUserSettingsViewModel } from "@/server/settings/settings-service";
 
 function getSingleValue(value: string | string[] | undefined) {
   if (Array.isArray(value)) {
@@ -20,7 +20,7 @@ export default async function MembershipPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const user = await requireUser();
+  const user = await getRequestSessionUser();
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const requestedPlan = getSingleValue(resolvedSearchParams.plan);
   const requestedSource = getSingleValue(resolvedSearchParams.source);
@@ -53,19 +53,19 @@ export default async function MembershipPage({
     );
   }
 
-  const [settingsBundle, conversionSnapshot] = await Promise.all([
-    getUserSettingsBundle(user.id),
+  const [settingsViewModel, conversionSnapshot] = await Promise.all([
+    getUserSettingsViewModel(user.id),
     getMembershipConversionSnapshot(user.id),
   ]);
-  const settings = settingsBundle.settings;
+  const settings = settingsViewModel.settings;
 
   return (
     <MembershipPanel
       currentTier={(settings?.membershipTier ?? "FREE") as "FREE" | "NORMAL" | "PRO"}
       billingStatus={(settings?.membershipBillingStatus ?? "FREE") as "FREE" | "PENDING" | "ACTIVE" | "PAST_DUE" | "CANCELED" | "INACTIVE"}
       billingConfigured={isStripeBillingConfigured()}
-      canManageBilling={Boolean(settings?.stripeCustomerId)}
-      currentPeriodEnd={settings?.membershipCurrentPeriodEnd?.toISOString() ?? null}
+      canManageBilling={settings?.canManageBilling ?? false}
+      currentPeriodEnd={settings?.membershipCurrentPeriodEnd ?? null}
       cancelAtPeriodEnd={settings?.membershipCancelAtPeriodEnd ?? false}
       highlightPlanId={highlightPlanId}
       sourceContext={sourceContext}

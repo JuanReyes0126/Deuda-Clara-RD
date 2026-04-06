@@ -15,6 +15,7 @@ import { ServiceError } from "@/server/services/service-error";
 import { logServerError } from "@/server/observability/logger";
 import { buildNotificationDigest } from "@/server/notifications/notification-digest";
 import { getReportSummary } from "@/server/reports/report-service";
+import { getUserFeatureAccess } from "@/server/membership/membership-access-service";
 
 export type NotificationDispatchStats = {
   processedUsers: number;
@@ -26,6 +27,15 @@ export type NotificationDispatchStats = {
 };
 
 type WeeklyProgressSignal = ReportSummaryDto["comparison"]["signal"];
+
+const NOTIFICATION_SYNC_COOLDOWN_MS = 60_000;
+const notificationSyncState = new Map<
+  string,
+  {
+    lastCompletedAt: number;
+    promise: Promise<NotificationItemDto[]> | null;
+  }
+>();
 
 function buildWeeklyDigestCta(signal: "IMPROVING" | "STABLE" | "REGRESSION" | "NO_BASELINE") {
   const appUrl = getServerAppUrl();
@@ -202,7 +212,7 @@ async function ensureNotification(input: {
   });
 }
 
-export async function syncUserNotifications(userId: string) {
+async function runNotificationSync(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
@@ -226,6 +236,7 @@ export async function syncUserNotifications(userId: string) {
   const dueSoonBoundary = addDays(now, user.settings.upcomingDueDays);
   const currentMonthStart = startOfMonth(now);
   const currentMonthEnd = endOfMonth(now);
+  const debtNotificationTasks: Array<Promise<unknown>> = [];
 
   for (const debt of user.debts) {
     if (
@@ -234,39 +245,49 @@ export async function syncUserNotifications(userId: string) {
       debt.nextDueDate >= now &&
       debt.nextDueDate <= dueSoonBoundary
     ) {
-      await ensureNotification({
-        userId: user.id,
-        debtId: debt.id,
-        type: NotificationType.DUE_SOON,
-        severity: NotificationSeverity.WARNING,
-        title: `Vence pronto: ${debt.name}`,
-        message: `Tu deuda ${debt.name} vence pronto. Si pagas antes del ${debt.nextDueDate.toLocaleDateString("es-DO")}, evitas cargos y estrés adicional.`,
-        dueAt: debt.nextDueDate,
-      });
+      debtNotificationTasks.push(
+        ensureNotification({
+          userId: user.id,
+          debtId: debt.id,
+          type: NotificationType.DUE_SOON,
+          severity: NotificationSeverity.WARNING,
+          title: `Vence pronto: ${debt.name}`,
+          message: `Tu deuda ${debt.name} vence pronto. Si pagas antes del ${debt.nextDueDate.toLocaleDateString("es-DO")}, evitas cargos y estrés adicional.`,
+          dueAt: debt.nextDueDate,
+        }),
+      );
     }
 
     if (user.settings.notifyOverdue && debt.nextDueDate && debt.nextDueDate < now) {
-      await ensureNotification({
-        userId: user.id,
-        debtId: debt.id,
-        type: NotificationType.OVERDUE,
-        severity: NotificationSeverity.CRITICAL,
-        title: `Atraso detectado en ${debt.name}`,
-        message: `La deuda ${debt.name} está vencida. Conviene cubrirla primero para frenar mora y presión de caja.`,
-        dueAt: debt.nextDueDate,
-      });
+      debtNotificationTasks.push(
+        ensureNotification({
+          userId: user.id,
+          debtId: debt.id,
+          type: NotificationType.OVERDUE,
+          severity: NotificationSeverity.CRITICAL,
+          title: `Atraso detectado en ${debt.name}`,
+          message: `La deuda ${debt.name} está vencida. Conviene cubrirla primero para frenar mora y presión de caja.`,
+          dueAt: debt.nextDueDate,
+        }),
+      );
     }
 
     if (user.settings.notifyMinimumRisk && isMinimumPaymentRisk(debt)) {
-      await ensureNotification({
-        userId: user.id,
-        debtId: debt.id,
-        type: NotificationType.MINIMUM_PAYMENT_RISK,
-        severity: NotificationSeverity.WARNING,
-        title: `Riesgo de pagar solo mínimos en ${debt.name}`,
-        message: `El pago mínimo de ${debt.name} está demasiado cerca del interés estimado del mes. Así tardarás mucho más en salir.`,
-      });
+      debtNotificationTasks.push(
+        ensureNotification({
+          userId: user.id,
+          debtId: debt.id,
+          type: NotificationType.MINIMUM_PAYMENT_RISK,
+          severity: NotificationSeverity.WARNING,
+          title: `Riesgo de pagar solo mínimos en ${debt.name}`,
+          message: `El pago mínimo de ${debt.name} está demasiado cerca del interés estimado del mes. Así tardarás mucho más en salir.`,
+        }),
+      );
     }
+  }
+
+  if (debtNotificationTasks.length > 0) {
+    await Promise.all(debtNotificationTasks);
   }
 
   if (user.debts.length) {
@@ -371,8 +392,51 @@ export async function syncUserNotifications(userId: string) {
   return notifications.map(mapNotificationToDto);
 }
 
+export async function syncUserNotifications(
+  userId: string,
+  options?: { force?: boolean },
+) {
+  const state = notificationSyncState.get(userId);
+  const now = Date.now();
+
+  if (!options?.force) {
+    if (state?.promise) {
+      return state.promise;
+    }
+
+    if (
+      state?.lastCompletedAt &&
+      now - state.lastCompletedAt < NOTIFICATION_SYNC_COOLDOWN_MS
+    ) {
+      return [];
+    }
+  }
+
+  const promise = runNotificationSync(userId)
+    .then((result) => {
+      notificationSyncState.set(userId, {
+        lastCompletedAt: Date.now(),
+        promise: null,
+      });
+
+      return result;
+    })
+    .catch((error) => {
+      notificationSyncState.delete(userId);
+      throw error;
+    });
+
+  notificationSyncState.set(userId, {
+    lastCompletedAt: state?.lastCompletedAt ?? 0,
+    promise,
+  });
+
+  return promise;
+}
+
 export async function listUserNotifications(userId: string) {
   await syncUserNotifications(userId);
+  const access = await getUserFeatureAccess(userId);
 
   const notifications = await prisma.notification.findMany({
     where: { userId },
@@ -380,7 +444,7 @@ export async function listUserNotifications(userId: string) {
       { readAt: "asc" },
       { createdAt: "desc" },
     ],
-    take: 100,
+    take: access.notificationHistoryLimit,
   });
 
   return notifications.map(mapNotificationToDto);
@@ -398,14 +462,22 @@ export async function markNotificationAsRead(userId: string, notificationId: str
     throw new ServiceError("NOTIFICATION_NOT_FOUND", 404, "No se encontró la notificación.");
   }
 
-  const updatedNotification = await prisma.notification.update({
-    where: { id: notificationId },
+  const readAt = notification.readAt ?? new Date();
+  const updateResult = await prisma.notification.updateMany({
+    where: { id: notificationId, userId },
     data: {
-      readAt: notification.readAt ?? new Date(),
+      readAt,
     },
   });
 
-  return mapNotificationToDto(updatedNotification);
+  if (updateResult.count !== 1) {
+    throw new ServiceError("NOTIFICATION_NOT_FOUND", 404, "No se encontró la notificación.");
+  }
+
+  return mapNotificationToDto({
+    ...notification,
+    readAt,
+  });
 }
 
 export async function markAllNotificationsAsRead(userId: string) {

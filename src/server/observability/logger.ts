@@ -2,6 +2,10 @@ type LogLevel = "info" | "warn" | "error";
 
 type LogMeta = Record<string, unknown>;
 
+const REDACTED_VALUE = "[REDACTED]";
+const SENSITIVE_KEY_PATTERN =
+  /(^|[_-])(password|secret|token|authorization|cookie|set-cookie|signature|api[-_]?key)([_-]|$)/i;
+
 function serializeError(error: unknown) {
   if (error instanceof Error) {
     return {
@@ -16,6 +20,27 @@ function serializeError(error: unknown) {
   };
 }
 
+function sanitizeValue(key: string, value: unknown): unknown {
+  if (SENSITIVE_KEY_PATTERN.test(key)) {
+    return REDACTED_VALUE;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeValue(key, item));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([nestedKey, nestedValue]) => [
+        nestedKey,
+        sanitizeValue(nestedKey, nestedValue),
+      ]),
+    );
+  }
+
+  return value;
+}
+
 function normalizeMeta(meta?: LogMeta) {
   if (!meta) {
     return undefined;
@@ -24,7 +49,7 @@ function normalizeMeta(meta?: LogMeta) {
   return Object.fromEntries(
     Object.entries(meta).map(([key, value]) => [
       key,
-      key === "error" ? serializeError(value) : value,
+      sanitizeValue(key, key === "error" ? serializeError(value) : value),
     ]),
   );
 }
@@ -60,4 +85,12 @@ export function logServerWarn(message: string, meta?: LogMeta) {
 
 export function logServerError(message: string, meta?: LogMeta) {
   writeLog("error", message, meta);
+}
+
+export function logSecurityEvent(
+  event: string,
+  meta?: LogMeta,
+  level: Exclude<LogLevel, "error"> = "warn",
+) {
+  writeLog(level, `security:${event}`, meta);
 }

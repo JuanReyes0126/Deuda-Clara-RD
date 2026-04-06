@@ -142,8 +142,8 @@ export async function createPayment(
         },
       });
 
-      await transaction.debt.update({
-        where: { id: debt.id },
+      const debtUpdate = await transaction.debt.updateMany({
+        where: { id: debt.id, userId },
         data: {
           currentBalance: breakdown.debtState.currentBalance,
           lateFeeAmount: breakdown.debtState.lateFeeAmount,
@@ -161,6 +161,10 @@ export async function createPayment(
             breakdown.remainingBalanceAfter.lessThanOrEqualTo(0) ? new Date() : null,
         },
       });
+
+      if (debtUpdate.count !== 1) {
+        throw new ServiceError("DEBT_NOT_FOUND", 404, "No se encontró la deuda.");
+      }
 
       return createdPayment;
     });
@@ -220,8 +224,8 @@ export async function updatePayment(
     const breakdown = applyPaymentAllocation(revertedDebt, input);
 
     const payment = await prisma.$transaction(async (transaction) => {
-      await transaction.debt.update({
-        where: { id: revertedDebt.id },
+      const debtUpdate = await transaction.debt.updateMany({
+        where: { id: revertedDebt.id, userId },
         data: {
           currentBalance: breakdown.debtState.currentBalance,
           lateFeeAmount: breakdown.debtState.lateFeeAmount,
@@ -240,8 +244,12 @@ export async function updatePayment(
         },
       });
 
-      return transaction.payment.update({
-        where: { id: paymentId },
+      if (debtUpdate.count !== 1) {
+        throw new ServiceError("DEBT_NOT_FOUND", 404, "No se encontró la deuda.");
+      }
+
+      const paymentUpdate = await transaction.payment.updateMany({
+        where: { id: paymentId, userId },
         data: {
           amount: decimal(input.amount).toDecimalPlaces(2),
           principalAmount: breakdown.principalAmount.toDecimalPlaces(2),
@@ -253,14 +261,13 @@ export async function updatePayment(
           notes: encryptSensitiveText(input.notes),
           paidAt: input.paidAt,
         },
-        include: {
-          debt: {
-            select: {
-              name: true,
-            },
-          },
-        },
       });
+
+      if (paymentUpdate.count !== 1) {
+        throw new ServiceError("PAYMENT_NOT_FOUND", 404, "No se encontró el pago.");
+      }
+
+      return getUserPayment(userId, paymentId);
     });
 
     await createAuditLog({
@@ -312,8 +319,8 @@ export async function deletePayment(
         archivedAt: debt.archivedAt,
       });
 
-      await transaction.debt.update({
-        where: { id: debt.id },
+      const debtUpdate = await transaction.debt.updateMany({
+        where: { id: debt.id, userId },
         data: {
           currentBalance: revertedState.currentBalance.toDecimalPlaces(2),
           lateFeeAmount: revertedState.lateFeeAmount.toDecimalPlaces(2),
@@ -322,9 +329,17 @@ export async function deletePayment(
           paidOffAt: status === DebtStatus.PAID ? debt.paidOffAt : null,
         },
       });
-      await transaction.payment.delete({
-        where: { id: paymentId },
+      if (debtUpdate.count !== 1) {
+        throw new ServiceError("DEBT_NOT_FOUND", 404, "No se encontró la deuda.");
+      }
+
+      const paymentDelete = await transaction.payment.deleteMany({
+        where: { id: paymentId, userId },
       });
+
+      if (paymentDelete.count !== 1) {
+        throw new ServiceError("PAYMENT_NOT_FOUND", 404, "No se encontró el pago.");
+      }
     });
 
     await createAuditLog({

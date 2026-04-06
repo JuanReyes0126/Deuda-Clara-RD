@@ -27,6 +27,7 @@ export const demoDebts: DebtItemDto[] = [
     statementDay: 8,
     dueDay: 22,
     nextDueDate: "2026-03-24T12:00:00.000Z",
+    notificationsEnabled: true,
     lateFeeAmount: 0,
     extraChargesAmount: 0,
     utilizationPct: 71.1,
@@ -59,6 +60,7 @@ export const demoDebts: DebtItemDto[] = [
     statementDay: null,
     dueDay: 10,
     nextDueDate: "2026-03-28T12:00:00.000Z",
+    notificationsEnabled: true,
     lateFeeAmount: 0,
     extraChargesAmount: 0,
     utilizationPct: null,
@@ -138,6 +140,12 @@ export const dashboardData: DashboardDto = {
     cancelAtPeriodEnd: false,
     billingConfigured: true,
   },
+  analysisScope: {
+    activeDebtCount: 2,
+    analyzedDebtCount: 2,
+    hiddenDebtCount: 0,
+    partialAnalysis: false,
+  },
   planComparison: {
     headline: "Plan recomendado: Avalancha",
     description:
@@ -177,6 +185,37 @@ export const dashboardData: DashboardDto = {
       feasible: true,
       reason: null,
     },
+  },
+  habitSignals: {
+    weeklyStreak: 2,
+    reviewPrompt: null,
+    momentumMessage: "Vas mejor que el mes pasado.",
+    microFeedback: "Buen movimiento, estás reduciendo intereses.",
+  },
+  upcomingTimeline: {
+    headline: "Siempre a tiempo",
+    support: "Tienes 2 fechas importantes esta semana.",
+    items: [
+      {
+        debtId: "demo-card-1",
+        debtName: "Tarjeta Visa principal",
+        eventType: "STATEMENT_CLOSING",
+        eventLabel: "Fecha de corte",
+        occursOn: "2026-03-21T12:00:00.000Z",
+        daysUntil: 3,
+        summary: "Tarjeta Visa principal corta en 3 días.",
+      },
+      {
+        debtId: "demo-loan-1",
+        debtName: "Préstamo personal",
+        eventType: "PAYMENT_DUE",
+        eventLabel: "Fecha de pago",
+        occursOn: "2026-03-23T12:00:00.000Z",
+        daysUntil: 5,
+        summary: "Préstamo personal vence en 5 días.",
+      },
+    ],
+    emptyState: null,
   },
   debtBreakdown: [
     { label: "CREDIT_CARD", value: 128000 },

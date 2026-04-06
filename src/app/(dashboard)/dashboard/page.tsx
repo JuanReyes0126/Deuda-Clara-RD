@@ -1,13 +1,12 @@
 import { redirect } from "next/navigation";
 
-import { requireUser } from "@/lib/auth/session";
 import { dashboardData, membershipConversionSnapshot } from "@/lib/demo/data";
 import { isDemoSessionUser } from "@/lib/demo/session";
 import { DashboardOverview } from "@/features/dashboard/components/dashboard-overview";
 import {
-  getDashboardData,
-  getMembershipConversionSnapshot,
+  getDashboardPageData,
 } from "@/server/dashboard/dashboard-service";
+import { getRequestSessionUser } from "@/server/request/request-user-context";
 
 function getSingleValue(value: string | string[] | undefined) {
   if (Array.isArray(value)) {
@@ -22,7 +21,7 @@ export default async function DashboardPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const user = await requireUser();
+  const user = await getRequestSessionUser();
 
   if (isDemoSessionUser(user)) {
     const resolvedSearchParams = searchParams ? await searchParams : {};
@@ -46,10 +45,7 @@ export default async function DashboardPage({
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const premiumWelcome = getSingleValue(resolvedSearchParams.welcome) === "premium";
   const initialShowOptimization = getSingleValue(resolvedSearchParams.focus) === "optimization";
-  const [data, conversionSnapshot] = await Promise.all([
-    getDashboardData(user.id),
-    getMembershipConversionSnapshot(user.id),
-  ]);
+  const { data, conversionSnapshot } = await getDashboardPageData(user.id);
 
   return (
     <DashboardOverview

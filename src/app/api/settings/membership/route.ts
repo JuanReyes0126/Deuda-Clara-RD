@@ -31,13 +31,13 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const settings = await updateUserMembershipPlan(
+    const membership = await updateUserMembershipPlan(
       session.user.id,
       parsed.data,
       getRequestMeta(request),
     );
 
-    return NextResponse.json({ ok: true, settings });
+    return NextResponse.json({ ok: true, membership });
   } catch (error) {
     return handleApiError(error, "No se pudo actualizar el plan.");
   }

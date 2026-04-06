@@ -29,7 +29,14 @@ export async function PATCH(request: NextRequest) {
       getRequestMeta(request),
     );
 
-    return NextResponse.json({ ok: true, user });
+    return NextResponse.json({
+      ok: true,
+      user: {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        avatarUrl: user.avatarUrl,
+      },
+    });
   } catch (error) {
     return handleApiError(error, "No se pudo actualizar el perfil.");
   }

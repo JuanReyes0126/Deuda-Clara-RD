@@ -9,11 +9,23 @@ test("registro y onboarding inicial", async ({ page }) => {
   await page.getByPlaceholder("Correo electrónico").fill(uniqueEmail);
   await page.getByPlaceholder("Contraseña").fill("DeudaClara123!");
   await page.getByPlaceholder("Confirmar contraseña").fill("DeudaClara123!");
+  await page
+    .getByLabel("Acepto los Términos y Condiciones y la Política de Privacidad.")
+    .check();
   await page.getByRole("button", { name: "Crear cuenta" }).click();
 
   await expect(page).toHaveURL(/onboarding/);
-  await page.getByLabel("Presupuesto mensual para deudas \\(RD\\$\\)").fill("15000");
-  await page.getByRole("button", { name: "Entrar al panel" }).click();
+  await page.getByRole("button", { name: "Empezar" }).click();
+  await page.getByLabel("Ingreso mensual \\(RD\\$\\)").fill("42000");
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await page.getByRole("button", { name: "Tarjeta" }).click();
+  await page.getByLabel("Nombre").fill("Tarjeta Gold");
+  await page.getByLabel("Balance \\(RD\\$\\)").fill("95000");
+  await page.getByLabel("Pago mínimo \\(RD\\$\\)").fill("6500");
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await page.getByLabel("Monto mensual disponible \\(RD\\$\\)").fill("18000");
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await page.getByRole("button", { name: "Ver mi plan completo" }).click();
   await expect(page).toHaveURL(/dashboard/);
 });
 

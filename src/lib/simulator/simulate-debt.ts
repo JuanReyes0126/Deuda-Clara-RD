@@ -1,6 +1,8 @@
 import { addMonths, addWeeks } from "date-fns";
 import Decimal from "decimal.js";
 
+import type { ResolvedFeatureAccess } from "@/lib/feature-access";
+
 export type DebtSimulatorDebtType =
   | "CREDIT_CARD"
   | "PERSONAL_LOAN"
@@ -59,6 +61,24 @@ export type DebtSimulationResult = {
     extra: DebtSimulatorScenario;
     aggressive: DebtSimulatorScenario | null;
   };
+  recommendedScenarioId: DebtSimulatorScenarioId | null;
+  recommendedStrategyLabel: string | null;
+  proGuidance: {
+    dynamicFocus: string | null;
+    stepByStepPlan: string[];
+  };
+};
+
+export type DebtSimulationOptions = {
+  access?: Pick<
+    ResolvedFeatureAccess,
+    | "canCompareScenarios"
+    | "canSeeOptimizedSavings"
+    | "canSeeRecommendedStrategy"
+    | "canUseAdvancedExtraPayments"
+    | "canUseAutoStrategy"
+    | "canSeeStepByStepPlan"
+  >;
 };
 
 const periodsPerYearMap: Record<DebtSimulatorFrequency, number> = {
@@ -275,7 +295,67 @@ function simulateScenario(
   };
 }
 
-export function simulateDebt(input: DebtSimulatorInput): DebtSimulationResult {
+function buildSimulatorRecommendation(result: DebtSimulationResult) {
+  const comparableScenarios = [
+    result.scenarios.extra,
+    result.scenarios.aggressive,
+  ].filter(Boolean) as DebtSimulatorScenario[];
+  const rankedScenario = comparableScenarios
+    .filter((scenario) => scenario.feasible)
+    .sort((left, right) => {
+      if (left.totalInterest !== right.totalInterest) {
+        return left.totalInterest - right.totalInterest;
+      }
+
+      return (left.monthsToPayoff ?? Number.MAX_SAFE_INTEGER) -
+        (right.monthsToPayoff ?? Number.MAX_SAFE_INTEGER);
+    })[0];
+
+  if (!rankedScenario) {
+    return {
+      recommendedScenarioId: null,
+      recommendedStrategyLabel: null,
+      proGuidance: {
+        dynamicFocus: null,
+        stepByStepPlan: [],
+      },
+    };
+  }
+
+  const strategyLabel =
+    rankedScenario.id === "AGGRESSIVE"
+      ? "Ruta agresiva"
+      : "Extra inteligente";
+  const dynamicFocus =
+    rankedScenario.id === "AGGRESSIVE"
+      ? "La deuda mejora más cuando subes el pago y sostienes esa presión."
+      : "Un extra fijo ya cambia la salida si no lo redistribuyes.";
+  const stepByStepPlan =
+    rankedScenario.id === "AGGRESSIVE"
+      ? [
+          "Sube tu pago base y evita repartir el excedente.",
+          "Revisa el escenario cada vez que cambie tu flujo mensual.",
+          "Mantén la presión hasta que la deuda pierda velocidad.",
+        ]
+      : [
+          "Separa un extra fijo para esta deuda.",
+          "No bajes el pago si un mes sale mejor.",
+          "Recalcula cuando cambie tu cuota disponible.",
+        ];
+
+  return {
+    recommendedScenarioId: rankedScenario.id,
+    recommendedStrategyLabel: strategyLabel,
+    proGuidance: {
+      dynamicFocus,
+      stepByStepPlan,
+    },
+  };
+}
+
+export function runFullSimulation(
+  input: DebtSimulatorInput,
+): DebtSimulationResult {
   const normalizedInput: DebtSimulatorInput = {
     ...input,
     debtType: input.debtType,
@@ -286,7 +366,6 @@ export function simulateDebt(input: DebtSimulatorInput): DebtSimulationResult {
     extraPayment: numberMoney(input.extraPayment ?? 0),
     startDate: new Date(input.startDate),
   };
-
   const base = simulateScenario(normalizedInput, "BASE");
   const extra = simulateScenario(normalizedInput, "EXTRA");
   const aggressive =
@@ -307,6 +386,30 @@ export function simulateDebt(input: DebtSimulatorInput): DebtSimulationResult {
       ? monthValue(new Decimal(base.monthsToPayoff).minus(extra.monthsToPayoff))
       : null;
 
+  const recommendation = buildSimulatorRecommendation({
+    monthsToPayoff: base.monthsToPayoff,
+    totalPaid: base.totalPaid,
+    totalInterest: base.totalInterest,
+    amortizationSchedule: base.amortizationSchedule,
+    savingsWithExtraPayment: {
+      interestSaved,
+      monthsSaved,
+      totalPaidSaved,
+    },
+    warnings: [...new Set([...base.warnings, ...extra.warnings, ...(aggressive?.warnings ?? [])])],
+    scenarios: {
+      base,
+      extra,
+      aggressive,
+    },
+    recommendedScenarioId: null,
+    recommendedStrategyLabel: null,
+    proGuidance: {
+      dynamicFocus: null,
+      stepByStepPlan: [],
+    },
+  });
+
   return {
     monthsToPayoff: base.monthsToPayoff,
     totalPaid: base.totalPaid,
@@ -323,5 +426,77 @@ export function simulateDebt(input: DebtSimulatorInput): DebtSimulationResult {
       extra,
       aggressive,
     },
+    recommendedScenarioId: recommendation.recommendedScenarioId,
+    recommendedStrategyLabel: recommendation.recommendedStrategyLabel,
+    proGuidance: recommendation.proGuidance,
   };
+}
+
+export function filterSimulationByAccess(
+  fullResult: DebtSimulationResult,
+  access?: DebtSimulationOptions["access"],
+): DebtSimulationResult {
+  const allowScenarioComparison = access?.canCompareScenarios ?? true;
+  const allowOptimizedSavings = access?.canSeeOptimizedSavings ?? true;
+  const allowAdvancedExtraPayments = access?.canUseAdvancedExtraPayments ?? true;
+  const allowRecommendedStrategy = access?.canSeeRecommendedStrategy ?? true;
+  const allowAutoStrategy = access?.canUseAutoStrategy ?? false;
+  const allowStepByStep = access?.canSeeStepByStepPlan ?? false;
+
+  const extraScenario =
+    allowScenarioComparison && allowAdvancedExtraPayments
+      ? fullResult.scenarios.extra
+      : {
+          ...fullResult.scenarios.base,
+          id: "EXTRA" as const,
+          label: "Pago con extra",
+        };
+  const aggressiveScenario =
+    allowScenarioComparison && allowAdvancedExtraPayments
+      ? fullResult.scenarios.aggressive
+      : null;
+
+  return {
+    ...fullResult,
+    savingsWithExtraPayment: {
+      interestSaved: allowOptimizedSavings
+        ? fullResult.savingsWithExtraPayment.interestSaved
+        : 0,
+      monthsSaved: allowOptimizedSavings
+        ? fullResult.savingsWithExtraPayment.monthsSaved
+        : null,
+      totalPaidSaved: allowOptimizedSavings
+        ? fullResult.savingsWithExtraPayment.totalPaidSaved
+        : 0,
+    },
+    warnings: allowScenarioComparison
+      ? fullResult.warnings
+      : [...new Set(fullResult.scenarios.base.warnings)],
+    scenarios: {
+      base: fullResult.scenarios.base,
+      extra: extraScenario,
+      aggressive: aggressiveScenario,
+    },
+    recommendedScenarioId: allowRecommendedStrategy
+      ? fullResult.recommendedScenarioId
+      : null,
+    recommendedStrategyLabel: allowRecommendedStrategy
+      ? fullResult.recommendedStrategyLabel
+      : null,
+    proGuidance: {
+      dynamicFocus: allowAutoStrategy
+        ? fullResult.proGuidance.dynamicFocus
+        : null,
+      stepByStepPlan: allowStepByStep
+        ? fullResult.proGuidance.stepByStepPlan
+        : [],
+    },
+  };
+}
+
+export function simulateDebt(
+  input: DebtSimulatorInput,
+  options: DebtSimulationOptions = {},
+): DebtSimulationResult {
+  return filterSimulationByAccess(runFullSimulation(input), options.access);
 }

@@ -1,8 +1,10 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { AuthPageShell } from "@/features/auth/components/auth-page-shell";
 import { RegisterForm } from "@/features/auth/components/register-form";
 import { getCurrentSession } from "@/lib/auth/session";
+import { CSRF_COOKIE_NAME } from "@/lib/security/csrf";
 
 function getSearchParamValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
@@ -14,6 +16,7 @@ export default async function RegisterPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const session = await getCurrentSession();
+  const csrfToken = (await cookies()).get(CSRF_COOKIE_NAME)?.value ?? "";
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const initialError = getSearchParamValue(resolvedSearchParams.error);
 
@@ -44,7 +47,7 @@ export default async function RegisterPage({
           Necesitamos pocos datos para activar tu panel y llevarte directo al onboarding.
         </p>
       </div>
-      <RegisterForm initialError={initialError} />
+      <RegisterForm initialError={initialError} csrfToken={csrfToken} />
     </AuthPageShell>
   );
 }

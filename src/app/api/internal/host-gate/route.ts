@@ -3,8 +3,8 @@ import { z } from "zod";
 
 import { HOST_PANEL_ROUTE } from "@/lib/host/panel";
 import { assertSameOrigin } from "@/lib/security/origin";
-import { assertRateLimit } from "@/lib/security/rate-limit";
-import { logServerWarn } from "@/server/observability/logger";
+import { assertRateLimit, buildRateLimitKey } from "@/lib/security/rate-limit";
+import { logSecurityEvent, logServerWarn } from "@/server/observability/logger";
 import {
   assertHostPanelApiAccess,
   setHostPanelGateCookie,
@@ -31,6 +31,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No encontrado." }, { status: 404 });
     }
 
+    if (decision.outcome === "MFA_SETUP_REQUIRED") {
+      return NextResponse.json(
+        { error: "Activa MFA en Configuración antes de usar el panel interno." },
+        { status: 403 },
+      );
+    }
+
     const parsed = hostGateSchema.safeParse(await request.json());
 
     if (!parsed.success) {
@@ -41,12 +48,15 @@ export async function POST(request: NextRequest) {
     }
 
     const rateLimit = await assertRateLimit({
-      key: `host-gate:${decision.user.id}`,
+      key: buildRateLimitKey(request, "host-gate", decision.user.id),
       limit: 10,
       windowMs: 10 * 60 * 1000,
     });
 
     if (!rateLimit.success) {
+      logSecurityEvent("rate_limit_host_gate", {
+        userId: decision.user.id,
+      });
       return NextResponse.json(
         { error: "Demasiados intentos. Intenta más tarde." },
         { status: 429 },

@@ -52,7 +52,7 @@ export function PrimaryActionCard({
   return (
     <section
       className={cn(
-        "rounded-[2rem] border p-5 sm:p-6",
+        "rounded-[2rem] border p-4 sm:p-6",
         toneClassName[tone],
         className,
       )}
@@ -83,7 +83,7 @@ export function PrimaryActionCard({
         </div>
         <div className="flex w-full flex-col gap-3 sm:w-auto">
           <Button
-            className="w-full sm:w-auto"
+            className="min-h-12 w-full text-base sm:w-auto"
             onClick={primaryAction.onClick}
             variant={primaryAction.variant ?? "primary"}
           >
@@ -92,7 +92,7 @@ export function PrimaryActionCard({
           </Button>
           {secondaryAction ? (
             <Button
-              className="w-full sm:w-auto"
+              className="min-h-12 w-full text-base sm:w-auto"
               variant={secondaryAction.variant ?? "secondary"}
               onClick={secondaryAction.onClick}
             >

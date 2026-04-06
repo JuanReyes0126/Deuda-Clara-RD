@@ -3,7 +3,10 @@ import Link from "next/link";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getPlanFeatureBullets } from "@/lib/feature-access";
 import { formatCurrency } from "@/lib/utils/currency";
+
+export const dynamic = "force-dynamic";
 
 const dashboardMetrics = [
   {
@@ -72,46 +75,49 @@ const strategyCards = [
 
 const pricingPlans = [
   {
+    id: "FREE",
     name: "Base",
     price: "Gratis",
-    highlight: "Para organizarte sin fricción",
-    idealFor: "Empiezas a ordenar deudas, pagos y panorama sin pagar todavia.",
-    features: [
-      "Registro de deudas y pagos",
-      "Dashboard base con tu situación actual",
-      "Simulación simple",
-    ],
+    highlight: "Empieza y entiende tu situación",
+    idealFor: "Útil para ordenar deudas y ver tu escenario actual, pero sin la ruta completa de salida.",
+    features: getPlanFeatureBullets("FREE"),
   },
   {
+    id: "NORMAL",
     name: "Premium",
     price: "US$5/mes",
-    highlight: "Te dice qué pagar primero y cómo salir más rápido",
-    idealFor: "Ideal si ya tienes deudas reales y quieres reducir improvisación con una ruta clara de 6 meses.",
-    features: [
-      "Plan recomendado desbloqueado",
-      "Orden de pago optimizado",
-      "Guía clara para salir más rápido",
-    ],
+    annual: "US$49/año",
+    annualSavings: "ahorras US$11",
+    highlight: "Optimiza y paga menos",
+    idealFor:
+      "La opción recomendada para la mayoría: te muestra cuánto dinero estás perdiendo y cómo empezar a pagar menos ahora.",
+    features: getPlanFeatureBullets("NORMAL"),
     featured: true,
   },
   {
+    id: "PRO",
     name: "Pro",
     price: "US$10/mes",
-    highlight: "Seguimiento extendido por 12 meses",
-    idealFor: "Mantiene la misma logica premium con mas seguimiento y mas contexto.",
-    features: [
-      "Todo lo de Premium",
-      "Más contexto y mejores consejos",
-      "Acompañamiento más largo",
-    ],
+    annual: "US$99/año",
+    annualSavings: "ahorras US$21",
+    highlight: "Control total y estrategia inteligente",
+    idealFor:
+      "Para quien quiere control total, más seguimiento y una estrategia que evoluciona sin seguir perdiendo contexto ni dinero.",
+    features: getPlanFeatureBullets("PRO"),
   },
 ] as const;
 
 const features = [
   "Dashboard claro con deuda total, interés del mes y siguiente mejor paso.",
   "Registro de deudas y pagos sin ruido ni tecnicismos innecesarios.",
-  "Simulador para ver cuánto tardas y cuánto ahorras si pagas más.",
+  "Simulador para ver cuánto te cuesta seguir igual y dónde estás perdiendo dinero.",
   "Alertas y seguimiento para que no se te escape lo importante.",
+];
+
+const reminderHighlights = [
+  "Te avisamos antes de cada corte y cada pago.",
+  "Antes del corte. Antes del pago. Sin olvidos.",
+  "Recibe recordatorios claros para mantenerte al día.",
 ];
 
 export default function HomePage() {
@@ -162,7 +168,7 @@ export default function HomePage() {
                   href="/planes"
                   className="inline-flex h-12 items-center justify-center rounded-full border border-primary/15 bg-primary/5 px-6 text-base font-semibold text-primary transition hover:bg-primary/10"
                 >
-                  Ver Premium
+                  Desbloquear y ahorrar ahora
                 </Link>
               </div>
 
@@ -313,6 +319,40 @@ export default function HomePage() {
           </section>
 
           <section
+            id="siempre-a-tiempo"
+            className="grid gap-8 xl:grid-cols-[0.9fr_1.1fr] xl:items-center"
+          >
+            <div className="space-y-4">
+              <p className="section-kicker">Siempre a tiempo</p>
+              <h2 className="font-display text-4xl tracking-tight text-foreground">
+                Antes del corte. Antes del pago. Sin olvidos.
+              </h2>
+              <p className="section-summary max-w-2xl">
+                Deuda Clara RD no solo ordena tus deudas: también te ayuda a no dejar pasar fechas importantes.
+              </p>
+            </div>
+
+            <Card className="p-7 sm:p-8">
+              <CardHeader className="gap-4">
+                <CardTitle>Recordatorios claros para mantenerte al día</CardTitle>
+                <CardDescription className="leading-7">
+                  Configura tus fechas de corte y pago una vez, y la app te recordará por correo cuándo conviene actuar.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3">
+                {reminderHighlights.map((item) => (
+                  <div
+                    key={item}
+                    className="rounded-[1.5rem] border border-border/80 bg-secondary/45 px-5 py-4 text-sm font-medium text-foreground"
+                  >
+                    {item}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </section>
+
+          <section
             id="motor"
             className="grid gap-8 xl:grid-cols-[0.86fr_1.14fr] xl:items-start"
           >
@@ -394,6 +434,12 @@ export default function HomePage() {
                       <p className="mt-3 font-display text-[clamp(2rem,4vw,2.8rem)] tracking-tight text-foreground">
                         {plan.price}
                       </p>
+                      {"annual" in plan ? (
+                        <p className="mt-2 text-sm font-medium text-primary">
+                          {plan.annual}
+                          {"annualSavings" in plan ? ` · ${plan.annualSavings}` : ""}
+                        </p>
+                      ) : null}
                       <p className="mt-3 text-sm leading-7 text-muted">
                         {plan.idealFor}
                       </p>
@@ -419,7 +465,11 @@ export default function HomePage() {
                             : "border border-border bg-white text-foreground hover:bg-secondary/60"
                         }`}
                       >
-                        {"featured" in plan && plan.featured ? "Quiero salir mas rapido" : "Crear cuenta"}
+                        {"featured" in plan && plan.featured
+                          ? "Desbloquear y ahorrar ahora"
+                          : plan.name === "Pro"
+                            ? "Empezar a pagar menos ahora"
+                            : "Crear cuenta"}
                       </Link>
                     </div>
                   </CardContent>
@@ -453,7 +503,7 @@ export default function HomePage() {
                   href="/planes"
                   className="inline-flex h-12 items-center justify-center rounded-full border border-border bg-white px-6 text-base font-semibold text-foreground transition hover:bg-secondary/60"
                 >
-                  Comparar planes
+                  Empezar a pagar menos ahora
                 </Link>
               </div>
             </div>

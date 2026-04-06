@@ -11,6 +11,7 @@ import { demoDebts } from "@/lib/demo/data";
 import { isDemoSessionUser } from "@/lib/demo/session";
 import type { DebtItemDto, SimulatorResultDto } from "@/lib/types/app";
 import type { SimulatorInput } from "@/lib/validations/simulator";
+import { getUserFeatureAccess } from "@/server/membership/membership-access-service";
 import { calculateDebtStrategy } from "@/server/planner/strategy-engine";
 
 type SimulatorDebtSource =
@@ -199,6 +200,50 @@ function buildSimulatorResult(
   };
 }
 
+function filterSimulatorResultForAccess(
+  result: SimulatorResultDto,
+  access: Awaited<ReturnType<typeof getUserFeatureAccess>>,
+): SimulatorResultDto {
+  const baseLockedPlan = {
+    monthsToPayoff: result.basePlan.monthsToPayoff,
+    totalInterest: result.basePlan.totalInterest,
+    savings: null,
+  } as const;
+
+  return {
+    ...result,
+    extraPaymentPlan: access.canUseAdvancedExtraPayments
+      ? result.extraPaymentPlan
+      : { ...baseLockedPlan },
+    focusedDebtPlan: access.canSeeRecommendedStrategy
+      ? result.focusedDebtPlan
+      : {
+          ...baseLockedPlan,
+          focusedDebtId: null,
+        },
+    freezeCardPlan: access.canSeeOptimizedSavings
+      ? result.freezeCardPlan
+      : {
+          ...baseLockedPlan,
+          cardId: null,
+          monthlySpendStopped: 0,
+        },
+    refinancePlan: access.canSeeOptimizedSavings
+      ? result.refinancePlan
+      : {
+          ...baseLockedPlan,
+          debtId: null,
+          newRate: null,
+        },
+    selectedStrategyExplanation: access.canSeeRecommendedStrategy
+      ? result.selectedStrategyExplanation
+      : "Este es tu escenario actual. Premium desbloquea la estrategia recomendada y la comparación completa.",
+    monthlyProjection: access.canCompareScenarios
+      ? result.monthlyProjection
+      : result.monthlyProjection.slice(0, 6),
+  };
+}
+
 export function runFallbackSimulator(
   input: SimulatorInput,
   debts: SimulatorDebtSource[] = demoDebts,
@@ -210,6 +255,8 @@ export async function runSimulator(userId: string, input: SimulatorInput): Promi
   if (isDemoSessionUser({ id: userId })) {
     return runFallbackSimulator(input, await listDemoDebts(false));
   }
+
+  const access = await getUserFeatureAccess(userId);
 
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
@@ -226,8 +273,10 @@ export async function runSimulator(userId: string, input: SimulatorInput): Promi
     },
   });
 
-  return buildSimulatorResult(user.debts, input, {
+  const result = buildSimulatorResult(user.debts, input, {
     hybridRateWeight: user.settings?.hybridRateWeight,
     hybridBalanceWeight: user.settings?.hybridBalanceWeight,
   });
+
+  return filterSimulatorResultForAccess(result, access);
 }

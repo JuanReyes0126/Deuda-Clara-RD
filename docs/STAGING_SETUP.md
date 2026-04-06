@@ -2,6 +2,8 @@
 
 Esta es la ruta recomendada para dejar la app lista para una beta cerrada real.
 
+Si quieres el orden completo de ejecución sin improvisar, usa también [STAGING_GO_LIVE_RUNBOOK.md](./STAGING_GO_LIVE_RUNBOOK.md).
+
 ## Objetivo
 
 Salir de:
@@ -57,6 +59,9 @@ Tienes dos formas válidas:
 
 ## Paso 3. Variables de entorno correctas
 
+Referencia rápida completa: [ENVIRONMENT_MATRIX.md](./ENVIRONMENT_MATRIX.md)
+Plantilla copiar/pegar para Vercel: [VERCEL_ENV_TEMPLATES.md](./VERCEL_ENV_TEMPLATES.md)
+
 En Vercel configura estas variables para el entorno de staging:
 
 ### Obligatorias
@@ -68,6 +73,9 @@ En Vercel configura estas variables para el entorno de staging:
 - `DIRECT_DATABASE_URL=<connection string directa/no pooled>`
 - `CRON_SECRET=<string largo, al menos 24 caracteres>`
 - `DEMO_MODE_ENABLED=false`
+- `PASSKEY_RP_ID=<dominio registrable final>`
+- `PASSKEY_RP_NAME=Deuda Clara RD`
+- `PASSKEY_ALLOWED_ORIGINS=https://tu-staging.vercel.app`
 
 ### Recomendadas
 
@@ -106,73 +114,20 @@ Antes de invitar testers:
 2. deja `DEMO_MODE_ENABLED=false`
 3. confirma que `HOST_PANEL_ENABLED=false` salvo que quieras exponer el panel interno
 
-## Paso 5. Deploy y migraciones
+## Paso 5. Siguiente paso
 
-Después del primer deploy:
+Desde aquí, la ejecución ya no se gestiona en este documento.
 
-1. corre migraciones:
+Usa el runbook para:
 
-```bash
-npx prisma migrate deploy
-```
+- deploy
+- migraciones
+- validación funcional
+- validación técnica
+- decisión final de salida
 
-2. si necesitas data base para demos internas:
+Ver:
 
-```bash
-npm run db:seed
-```
-
-Haz esto contra la base de staging, no contra local.
-
-## Paso 6. Validación antes de invitar amigos
-
-Corre:
-
-```bash
-npm run doctor
-npm run prebeta
-npm run lint
-npm run typecheck
-npm run test:integration
-npm run build
-```
-
-Y además revisa:
-
-- `GET /api/health`
-- registro
-- login
-- crear deuda
-- registrar pago
-- simulador
-- reportes
-- planes
-
-## Paso 7. Si también quieres probar Premium/Pro
-
-Deja Stripe en modo test:
-
-- productos creados
-- `Price IDs` cargados
-- webhook a `/api/stripe/webhook`
-
-Referencia:
-
-- [STRIPE_SETUP.md](./STRIPE_SETUP.md)
-
-## Qué no deberías hacer antes de la beta
-
-- no compartir `localhost`
-- no dejar `DEMO_MODE_ENABLED=true`
-- no abrir staging sin PostgreSQL real
-- no abrir beta si `npm run prebeta` sigue marcando `fail`
-
-## Señal de “listo”
-
-Estás listo cuando:
-
-- `APP_URL` es pública y abre
-- `DEMO_MODE_ENABLED=false`
-- `DATABASE_URL` y `DIRECT_DATABASE_URL` están bien
-- `/api/health` responde bien
-- `npm run prebeta` no marca fallos
+- [STAGING_GO_LIVE_RUNBOOK.md](./STAGING_GO_LIVE_RUNBOOK.md)
+- [GO_NO_GO_CHECKLIST.md](./GO_NO_GO_CHECKLIST.md)
+- [STRIPE_SETUP.md](./STRIPE_SETUP.md) si vas a probar Premium/Pro

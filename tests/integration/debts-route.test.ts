@@ -1,7 +1,7 @@
-import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { GET, POST } from "@/app/api/debts/route";
+import { buildJsonRequest } from "./request-helpers";
 
 vi.mock("@/lib/auth/session", () => ({
   getCurrentSession: vi.fn(),
@@ -40,14 +40,7 @@ describe("api/debts", () => {
     } as never);
 
     const response = await POST(
-      new NextRequest("http://localhost/api/debts", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          origin: "http://localhost",
-          host: "localhost",
-        },
-        body: JSON.stringify({
+      buildJsonRequest("http://localhost/api/debts", {
           name: "Tarjeta principal",
           creditorName: "Banco Popular",
           type: "CREDIT_CARD",
@@ -59,11 +52,24 @@ describe("api/debts", () => {
           minimumPayment: 4000,
           lateFeeAmount: 0,
           extraChargesAmount: 0,
-        }),
+          statementDay: 12,
+          dueDay: 27,
+          notificationsEnabled: true,
       }),
     );
 
     expect(response.status).toBe(200);
-    expect(createDebt).toHaveBeenCalled();
+    expect(createDebt).toHaveBeenCalledWith(
+      "user-1",
+      expect.objectContaining({
+        statementDay: 12,
+        dueDay: 27,
+        notificationsEnabled: true,
+      }),
+      {
+        ipAddress: undefined,
+        userAgent: undefined,
+      },
+    );
   });
 });

@@ -18,7 +18,13 @@ import { ModuleSectionHeader } from "@/components/shared/module-section-header";
 import { PrimaryActionCard } from "@/components/shared/primary-action-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { fetchWithCsrf } from "@/lib/http/fetch-with-csrf";
 import { readJsonPayload } from "@/lib/http/read-json-payload";
+import { isReportRangeAllowed, resolveFeatureAccess } from "@/lib/feature-access";
+import type {
+  MembershipBillingStatus,
+  MembershipPlanId,
+} from "@/lib/membership/plans";
 import { useAppNavigation } from "@/lib/navigation/use-app-navigation";
 import type { ReportSummaryDto } from "@/lib/types/app";
 import { formatCurrency } from "@/lib/utils/currency";
@@ -32,6 +38,7 @@ const quickRanges = [
   {
     id: "THIS_MONTH",
     label: "Este mes",
+    days: 31,
     getRange: () => ({
       from: toDateInput(startOfMonth(new Date())),
       to: toDateInput(endOfMonth(new Date())),
@@ -40,6 +47,7 @@ const quickRanges = [
   {
     id: "LAST_30_DAYS",
     label: "Últimos 30 días",
+    days: 30,
     getRange: () => ({
       from: toDateInput(subDays(new Date(), 29)),
       to: toDateInput(new Date()),
@@ -48,15 +56,25 @@ const quickRanges = [
   {
     id: "LAST_90_DAYS",
     label: "Últimos 90 días",
+    days: 90,
     getRange: () => ({
       from: toDateInput(subDays(new Date(), 89)),
+      to: toDateInput(new Date()),
+    }),
+  },
+  {
+    id: "LAST_365_DAYS",
+    label: "Últimos 12 meses",
+    days: 365,
+    getRange: () => ({
+      from: toDateInput(subDays(new Date(), 364)),
       to: toDateInput(new Date()),
     }),
   },
 ] as const;
 
 async function fetchSummary(from: string, to: string) {
-  const response = await fetch(`/api/reports/summary?from=${from}&to=${to}`);
+  const response = await fetchWithCsrf(`/api/reports/summary?from=${from}&to=${to}`);
   const payload = await readJsonPayload<{
     error?: string;
     summary?: ReportSummaryDto;
@@ -206,12 +224,20 @@ function getDebtTypeLabel(type: string) {
 
 export function ReportsPanel({
   initialSummary,
-  premiumInsightsEnabled = false,
+  membershipTier,
+  billingStatus,
 }: {
   initialSummary: ReportSummaryDto;
-  premiumInsightsEnabled?: boolean;
+  membershipTier: MembershipPlanId;
+  billingStatus: MembershipBillingStatus;
 }) {
   const { navigate } = useAppNavigation();
+  const access = resolveFeatureAccess({
+    membershipTier,
+    membershipBillingStatus: billingStatus,
+  });
+  const premiumInsightsEnabled = access.canSeeExtendedInsights;
+  const canExportReports = access.canExportReports;
   const [summary, setSummary] = useState(initialSummary);
   const [from, setFrom] = useState(initialSummary.from.slice(0, 10));
   const [to, setTo] = useState(initialSummary.to.slice(0, 10));
@@ -231,6 +257,7 @@ export function ReportsPanel({
     [summary.categorySummary],
   );
   const premiumPlanHref = "/planes?plan=NORMAL&source=reportes";
+  const proPlanHref = "/planes?plan=PRO&source=reportes";
   const reportAction =
     summary.paymentCount === 0
       ? {
@@ -283,6 +310,13 @@ export function ReportsPanel({
   const reload = () => {
     if (from > to) {
       toast.error("La fecha inicial no puede ser posterior a la fecha final.");
+      return;
+    }
+
+    if (!isReportRangeAllowed(access, new Date(from), new Date(to))) {
+      toast.error(
+        `Tu plan ${access.isBase ? "Base" : access.isPremium ? "Premium" : "Pro"} permite reportes de hasta ${access.maxReportRangeDays} días.`,
+      );
       return;
     }
 
@@ -362,6 +396,7 @@ export function ReportsPanel({
                 type="button"
                 size="sm"
                 variant="secondary"
+                disabled={range.days > access.maxReportRangeDays}
                 onClick={() => {
                   const nextRange = range.getRange();
                   setFrom(nextRange.from);
@@ -372,6 +407,29 @@ export function ReportsPanel({
               </Button>
             ))}
           </div>
+
+          {!canExportReports || access.maxReportRangeDays < 365 ? (
+            <div className="rounded-[1.4rem] border border-dashed border-primary/18 bg-[rgba(255,248,241,0.76)] p-4">
+              <p className="text-sm font-semibold text-foreground">
+                {access.isBase
+                  ? "Base te deja leer hasta 31 días. Premium abre 90 días y Pro suma exportación."
+                  : access.isPremium
+                    ? "Premium ya abre 90 días. Pro añade exportación y lectura histórica extendida."
+                    : "Pro ya tiene la capa completa de reportes y exportación."}
+              </p>
+              {!canExportReports ? (
+                <div className="mt-3">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => navigate(access.isBase ? premiumPlanHref : proPlanHref)}
+                  >
+                    {access.isBase ? "Desbloquear Premium" : "Desbloquear Pro"}
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="grid gap-4 rounded-[1.6rem] border border-border/70 bg-secondary/25 p-4 sm:p-5">
             <div className="grid gap-4 md:grid-cols-2 xl:max-w-[32rem]">
@@ -402,16 +460,28 @@ export function ReportsPanel({
               >
                 {isPending ? "Actualizando..." : "Actualizar"}
               </Button>
-              <a className="w-full sm:w-auto" href={`/api/reports/export/csv?${query}`}>
-                <Button className="w-full sm:w-auto" variant="secondary">
-                  Exportar CSV
+              {canExportReports ? (
+                <>
+                  <a className="w-full sm:w-auto" href={`/api/reports/export/csv?${query}`}>
+                    <Button className="w-full sm:w-auto" variant="secondary">
+                      Exportar CSV
+                    </Button>
+                  </a>
+                  <a className="w-full sm:w-auto" href={`/api/reports/export/pdf?${query}`}>
+                    <Button className="w-full sm:w-auto" variant="secondary">
+                      Exportar PDF
+                    </Button>
+                  </a>
+                </>
+              ) : (
+                <Button
+                  className="w-full sm:w-auto"
+                  variant="secondary"
+                  onClick={() => navigate(proPlanHref)}
+                >
+                  Desbloquear seguimiento más profundo
                 </Button>
-              </a>
-              <a className="w-full sm:w-auto" href={`/api/reports/export/pdf?${query}`}>
-                <Button className="w-full sm:w-auto" variant="secondary">
-                  Exportar PDF
-                </Button>
-              </a>
+              )}
             </div>
           </div>
 

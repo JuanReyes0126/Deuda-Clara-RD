@@ -1,5 +1,6 @@
 export type AuthResponsePayload = {
   error?: string;
+  mfaRequired?: boolean;
   redirectTo?: string;
 };
 

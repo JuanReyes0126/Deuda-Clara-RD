@@ -37,6 +37,8 @@ npm run test:integration
 npm run build
 ```
 
+Y para el orden operativo de staging y salida, apóyate en [STAGING_GO_LIVE_RUNBOOK.md](./STAGING_GO_LIVE_RUNBOOK.md).
+
 ## Qué testers invitar
 
 Idealmente mezcla:
@@ -122,4 +124,14 @@ En beta cerrada vale más:
 - confianza
 - velocidad de aprendizaje
 
-que seguir expandiendo el producto.
+## 🔒 Salida a Producción
+
+La transición de beta cerrada a producción requiere:
+
+- Runbook ejecutado completamente
+- Checklist de GO/NO-GO aprobado
+
+Ver:
+
+- [STAGING_GO_LIVE_RUNBOOK.md](./STAGING_GO_LIVE_RUNBOOK.md)
+- [GO_NO_GO_CHECKLIST.md](./GO_NO_GO_CHECKLIST.md)

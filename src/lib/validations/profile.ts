@@ -1,6 +1,7 @@
 import { StrategyMethod } from "@prisma/client";
 import { z } from "zod";
 
+import { DEFAULT_REMINDER_DAYS, REMINDER_DAY_OPTIONS } from "@/config/reminders";
 import {
   moneyInputSchema,
   normalizedTextSchema,
@@ -33,6 +34,23 @@ export const preferencesSchema = z
     notifyMinimumRisk: z.boolean(),
     notifyMonthlyReport: z.boolean(),
     emailRemindersEnabled: z.boolean(),
+    preferredReminderDays: z
+      .array(
+        z
+          .number()
+          .int()
+          .refine(
+            (value) => REMINDER_DAY_OPTIONS.some((option) => option.value === value),
+            "Debes elegir una opción de recordatorio válida.",
+          ),
+      )
+      .min(1, "Debes elegir al menos un recordatorio.")
+      .default([...DEFAULT_REMINDER_DAYS]),
+    preferredReminderHour: z
+      .number()
+      .int()
+      .min(0, "La hora debe estar entre 0 y 23.")
+      .max(23, "La hora debe estar entre 0 y 23."),
     upcomingDueDays: z
       .number()
       .int()

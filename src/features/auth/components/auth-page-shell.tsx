@@ -81,7 +81,17 @@ export function AuthPageShell({
         </div>
 
         <Card className="p-7 md:p-9">
-          <CardContent className="space-y-6">{children}</CardContent>
+          <CardContent className="space-y-6">
+            {children}
+            <div className="border-border/70 flex flex-wrap items-center gap-4 border-t pt-4 text-sm text-muted">
+              <Link href="/terms" className="font-medium hover:text-foreground">
+                Términos y Condiciones
+              </Link>
+              <Link href="/privacy" className="font-medium hover:text-foreground">
+                Política de Privacidad
+              </Link>
+            </div>
+          </CardContent>
         </Card>
       </div>
     </div>

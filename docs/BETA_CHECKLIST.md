@@ -13,14 +13,18 @@
 
 ## Configuración mínima antes de invitar usuarios
 
-- `APP_URL` pública y compartible, no `localhost`
-- `DEMO_MODE_ENABLED=false` para que las cuentas de prueba sean reales y persistentes
-- PostgreSQL accesible desde `DATABASE_URL`
-- `AUTH_SECRET` y `DATA_ENCRYPTION_KEY` configurados
-- `APP_URL` apuntando a la URL real que usarán los usuarios
-- `CRON_SECRET` para jobs protegidos
-- Resend configurado si quieres recuperación por email y recordatorios
-- Stripe test configurado si quieres validar Premium/Pro antes de producción
+Usa como base:
+
+- [STAGING_SETUP.md](./STAGING_SETUP.md)
+- [STAGING_GO_LIVE_RUNBOOK.md](./STAGING_GO_LIVE_RUNBOOK.md)
+
+Y confirma al menos:
+
+- `APP_URL` pública y compartible
+- `DEMO_MODE_ENABLED=false`
+- PostgreSQL accesible
+- secretos principales cargados
+- Resend y Stripe listos si los vas a probar
 
 ## Riesgos a revisar antes de abrir beta
 
@@ -38,3 +42,7 @@
 5. `npm run test:unit`
 6. `npm run test:integration`
 7. `npm run build`
+
+Para apertura real de staging o producción, la decisión final no vive aquí:
+
+- [GO_NO_GO_CHECKLIST.md](./GO_NO_GO_CHECKLIST.md)

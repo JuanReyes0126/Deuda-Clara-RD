@@ -3,9 +3,88 @@ name: CI
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
-  skip:
+  security-and-build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: deuda_clara_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d deuda_clara_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      APP_URL: http://localhost:3000
+      AUTH_SECRET: ci-auth-secret-with-at-least-32-characters
+      CRON_SECRET: ci-cron-secret-with-at-least-24-chars
+      DATA_ENCRYPTION_KEY: ci-data-encryption-key-with-at-least-32-chars
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/deuda_clara_ci?schema=public
+      DIRECT_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/deuda_clara_ci?schema=public
+      DEMO_MODE_ENABLED: "false"
+      HEALTHCHECK_SECRET: ci-health-secret-with-at-least-24-chars
+      HOST_ALLOWED_EMAILS: admin@deudaclarard.com
+      HOST_PANEL_ENABLED: "false"
+      PASSKEY_ALLOWED_ORIGINS: http://localhost:3000
+      PASSKEY_RP_ID: localhost
+      PASSKEY_RP_NAME: Deuda Clara RD
+      RESEND_API_KEY: re_ci_placeholder
+      RESEND_FROM_EMAIL: Deuda Clara RD <no-reply@deudaclarard.com>
+      STRIPE_PREMIUM_PRICE_ID: price_ci_premium
+      STRIPE_PRO_PRICE_ID: price_ci_pro
+      STRIPE_SECRET_KEY: sk_test_ci_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
     steps:
-      - run: echo "Skipping CI for now"
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply database migrations
+        run: npm run db:migrate:deploy
+
+      - name: Audit production dependencies
+        run: npm run security:audit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Integration tests
+        run: npm run test:integration
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Passkey E2E
+        run: npx playwright test tests/e2e/passkeys.spec.ts --project=chromium --workers=1
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          PLAYWRIGHT_WEB_SERVER_COMMAND: npm run start -- --hostname 127.0.0.1

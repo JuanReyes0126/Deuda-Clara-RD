@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { cn } from "@/lib/utils/cn";
 import { buttonClasses } from "@/components/ui/button";
+import { fetchWithCsrf } from "@/lib/http/fetch-with-csrf";
 
 type LogoutButtonProps = {
   compact?: boolean;
@@ -26,7 +27,7 @@ export function LogoutButton({ compact = false }: LogoutButtonProps) {
         try {
           setIsLoading(true);
 
-          const response = await fetch("/api/auth/logout", {
+          const response = await fetchWithCsrf("/api/auth/logout", {
             method: "POST",
             credentials: "same-origin",
           });

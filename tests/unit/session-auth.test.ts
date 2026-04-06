@@ -105,4 +105,68 @@ describe("auth session access", () => {
     expect(firstSession).toMatchObject({ id: "session-a" });
     expect(secondSession).toMatchObject({ id: "session-b" });
   });
+
+  it("revoca otras sesiones y conserva la sesion actual", async () => {
+    const { revokeOtherSessions } = await import("@/lib/auth/session");
+
+    cookieStore.get.mockReturnValueOnce({ value: "token-actual" });
+
+    await revokeOtherSessions("user-a");
+
+    expect(deleteManyMock).toHaveBeenCalledWith({
+      where: {
+        userId: "user-a",
+        sessionToken: {
+          not: hashOpaqueToken("token-actual"),
+        },
+      },
+    });
+  });
+
+  it("revoca todas las sesiones si no hay cookie activa", async () => {
+    const { revokeOtherSessions } = await import("@/lib/auth/session");
+
+    cookieStore.get.mockReturnValueOnce(undefined);
+
+    await revokeOtherSessions("user-a");
+
+    expect(deleteManyMock).toHaveBeenCalledWith({
+      where: {
+        userId: "user-a",
+      },
+    });
+  });
+
+  it("rota la sesion actual despues de un cambio sensible", async () => {
+    const { rotateCurrentSession } = await import("@/lib/auth/session");
+
+    cookieStore.get.mockReturnValueOnce({ value: "token-actual" });
+
+    await rotateCurrentSession("user-a");
+
+    expect(deleteManyMock).toHaveBeenCalledWith({
+      where: {
+        userId: "user-a",
+        sessionToken: hashOpaqueToken("token-actual"),
+      },
+    });
+    expect(createMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "user-a",
+          sessionToken: expect.any(String),
+          expires: expect.any(Date),
+        }),
+      }),
+    );
+    expect(cookieStore.set).toHaveBeenCalledWith(
+      "dc_session",
+      expect.any(String),
+      expect.objectContaining({
+        httpOnly: true,
+        sameSite: "strict",
+        path: "/",
+      }),
+    );
+  });
 });

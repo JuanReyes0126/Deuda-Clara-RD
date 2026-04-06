@@ -29,6 +29,10 @@ describe("api/health", () => {
       DIRECT_DATABASE_URL:
         "postgresql://postgres:postgres@localhost:5432/deuda_clara_rd?schema=public",
       DATA_ENCRYPTION_KEY: "b".repeat(32),
+      HEALTHCHECK_SECRET: undefined,
+      PASSKEY_RP_ID: undefined,
+      PASSKEY_RP_NAME: undefined,
+      PASSKEY_ALLOWED_ORIGINS: [],
       RESEND_API_KEY: "re_test",
       RESEND_FROM_EMAIL: "Deuda Clara RD <no-reply@deudaclarard.com>",
       CRON_SECRET: "c".repeat(24),
@@ -42,10 +46,12 @@ describe("api/health", () => {
       HOST_ALLOWED_EMAILS: "admin@deudaclarard.com",
       HOST_PANEL_ENABLED: true,
       HOST_SECONDARY_PASSWORD: "host-pass-123",
+      HOST_SECONDARY_TOTP_SECRET: undefined,
+      DEMO_MODE_ENABLED: false,
     });
     vi.mocked(prisma.$queryRawUnsafe).mockResolvedValueOnce([{ ok: 1 }] as never);
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost:3000/api/health"));
     const body = (await response.json()) as {
       ok: boolean;
       database: { ok: boolean };
@@ -78,6 +84,10 @@ describe("api/health", () => {
       DIRECT_DATABASE_URL:
         "postgresql://postgres:postgres@localhost:5432/deuda_clara_rd?schema=public",
       DATA_ENCRYPTION_KEY: "b".repeat(32),
+      HEALTHCHECK_SECRET: undefined,
+      PASSKEY_RP_ID: undefined,
+      PASSKEY_RP_NAME: undefined,
+      PASSKEY_ALLOWED_ORIGINS: [],
       RESEND_API_KEY: undefined,
       RESEND_FROM_EMAIL: undefined,
       CRON_SECRET: "c".repeat(24),
@@ -91,10 +101,12 @@ describe("api/health", () => {
       HOST_ALLOWED_EMAILS: undefined,
       HOST_PANEL_ENABLED: false,
       HOST_SECONDARY_PASSWORD: undefined,
+      HOST_SECONDARY_TOTP_SECRET: undefined,
+      DEMO_MODE_ENABLED: false,
     });
     vi.mocked(prisma.$queryRawUnsafe).mockRejectedValueOnce(new Error("db down"));
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost:3000/api/health"));
     const body = (await response.json()) as {
       ok: boolean;
       database: { ok: boolean; message: string };

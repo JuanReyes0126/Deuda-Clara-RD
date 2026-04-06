@@ -13,17 +13,20 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import process from "node:process";
 
+import { loadProjectEnv } from "./load-env.mjs";
+
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const runtimeDir = path.join(projectRoot, ".runtime");
 const pidFile = path.join(runtimeDir, "private-app.pid");
 const metaFile = path.join(runtimeDir, "private-app.json");
 const logFile = path.join(runtimeDir, "private-app.log");
 const nextBin = path.join(projectRoot, "node_modules", "next", "dist", "bin", "next");
+const resolvedEnv = loadProjectEnv(projectRoot);
 
-const host = process.env.APP_HOST || "127.0.0.1";
-const port = process.env.APP_PORT || "3000";
-const appUrl = process.env.APP_URL || `http://${host}:${port}`;
-const demoModeEnabled = process.env.DEMO_MODE_ENABLED ?? "true";
+const host = resolvedEnv.APP_HOST || "127.0.0.1";
+const port = resolvedEnv.APP_PORT || "3000";
+const appUrl = resolvedEnv.APP_URL || `http://${host}:${port}`;
+const demoModeEnabled = resolvedEnv.DEMO_MODE_ENABLED ?? "true";
 const command = process.argv[2] || "status";
 
 function ensureRuntimeDir() {
@@ -96,8 +99,11 @@ function printStatus() {
 }
 
 function buildRuntimeEnv() {
+  const safeEnv = { ...resolvedEnv };
+  delete safeEnv.NODE_ENV;
+
   return {
-    ...process.env,
+    ...safeEnv,
     APP_HOST: host,
     APP_PORT: String(port),
     APP_URL: appUrl,

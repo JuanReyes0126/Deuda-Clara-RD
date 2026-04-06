@@ -25,10 +25,14 @@ export function BrandMark({
 }: BrandMarkProps) {
   return (
     <svg
+      width="96"
+      height="96"
       viewBox="0 0 96 96"
       role="img"
       aria-label={title}
       className={cn("shrink-0 text-[#2e8c80]", className)}
+      style={{ maxWidth: "100%", height: "auto" }}
+      preserveAspectRatio="xMidYMid meet"
       fill="none"
     >
       <circle
@@ -69,7 +73,7 @@ export function BrandBadge({
   return (
     <div
       className={cn(
-        "grid size-12 place-items-center rounded-2xl border border-[#d5e8e2] bg-[linear-gradient(180deg,#ffffff_0%,#f4faf8_100%)] shadow-[0_18px_40px_-28px_rgba(23,56,74,0.38)]",
+        "grid size-12 place-items-center overflow-hidden rounded-2xl border border-[#d5e8e2] bg-[linear-gradient(180deg,#ffffff_0%,#f4faf8_100%)] shadow-[0_18px_40px_-28px_rgba(23,56,74,0.38)]",
         className,
       )}
     >

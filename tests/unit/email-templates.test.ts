@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildDebtReminderEmail,
   buildMembershipActivatedEmail,
   buildPasswordResetEmail,
   buildWelcomeEmail,
@@ -33,5 +34,23 @@ describe("email-templates", () => {
     expect(result.subject).toBe("Tu plan Premium ya está activo");
     expect(result.html).toContain("Premium");
     expect(result.text).toContain("Premium");
+  });
+
+  it("construye el email de recordatorio de pago con monto y CTA", () => {
+    const result = buildDebtReminderEmail({
+      firstName: "Carla",
+      debtName: "Tarjeta Gold",
+      eventType: "PAYMENT_DUE",
+      occursOn: new Date("2026-04-10T12:00:00.000Z"),
+      daysBefore: 2,
+      minimumPayment: 5200,
+      currency: "DOP",
+      timeZone: "America/Santo_Domingo",
+    });
+
+    expect(result.subject).toContain("vence");
+    expect(result.html).toContain("Tarjeta Gold");
+    expect(result.html).toContain("RD$");
+    expect(result.text).toContain("/deudas");
   });
 });

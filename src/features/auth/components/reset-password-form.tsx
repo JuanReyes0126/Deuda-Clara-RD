@@ -1,6 +1,5 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -9,17 +8,36 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  resetPasswordSchema,
-  type ResetPasswordInput,
-} from "@/lib/validations/auth";
+import { fetchWithCsrf } from "@/lib/http/fetch-with-csrf";
+
+type ResetPasswordFormValues = {
+  token: string;
+  password: string;
+  confirmPassword: string;
+};
+
+const passwordValidation = {
+  validate: {
+    minLength: (value: string) =>
+      value.length >= 8 || "La contraseña debe tener al menos 8 caracteres.",
+    maxLength: (value: string) =>
+      value.length <= 72 || "La contraseña no puede exceder 72 caracteres.",
+    uppercase: (value: string) =>
+      /[A-Z]/.test(value) ||
+      "La contraseña debe incluir al menos una mayúscula.",
+    lowercase: (value: string) =>
+      /[a-z]/.test(value) ||
+      "La contraseña debe incluir al menos una minúscula.",
+    number: (value: string) =>
+      /\d/.test(value) || "La contraseña debe incluir al menos un número.",
+  },
+} as const;
 
 export function ResetPasswordForm({ token }: { token: string }) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const form = useForm<ResetPasswordInput>({
-    resolver: zodResolver(resetPasswordSchema),
+  const form = useForm<ResetPasswordFormValues>({
     defaultValues: {
       token,
       password: "",
@@ -31,7 +49,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
     setIsSubmitting(true);
     setErrorMessage(null);
 
-    const response = await fetch("/api/auth/restablecer-contrasena", {
+    const response = await fetchWithCsrf("/api/auth/restablecer-contrasena", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(values),
@@ -57,7 +75,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
           id="password"
           type="password"
           autoComplete="new-password"
-          {...form.register("password")}
+          {...form.register("password", passwordValidation)}
         />
         <p className="text-sm text-rose-600">{form.formState.errors.password?.message}</p>
       </div>
@@ -68,7 +86,10 @@ export function ResetPasswordForm({ token }: { token: string }) {
           id="confirmPassword"
           type="password"
           autoComplete="new-password"
-          {...form.register("confirmPassword")}
+          {...form.register("confirmPassword", {
+            validate: (value, formValues) =>
+              value === formValues.password || "Las contraseñas no coinciden.",
+          })}
         />
         <p className="text-sm text-rose-600">
           {form.formState.errors.confirmPassword?.message}

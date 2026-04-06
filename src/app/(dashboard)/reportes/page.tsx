@@ -1,26 +1,31 @@
 import { ReportsPanel } from "@/features/reports/components/reports-panel";
-import { requireUser } from "@/lib/auth/session";
 import { reportSummary } from "@/lib/demo/data";
 import { isDemoSessionUser } from "@/lib/demo/session";
-import { hasMembershipAccess } from "@/lib/membership/plans";
 import { getReportSummary } from "@/server/reports/report-service";
-import { getUserSettingsBundle } from "@/server/settings/settings-service";
+import { getRequestMembershipContext, getRequestSessionUser } from "@/server/request/request-user-context";
 
 export default async function ReportsPage() {
-  const user = await requireUser();
+  const user = await getRequestSessionUser();
 
   if (isDemoSessionUser(user)) {
-    return <ReportsPanel initialSummary={reportSummary} premiumInsightsEnabled />;
+    return (
+      <ReportsPanel
+        initialSummary={reportSummary}
+        membershipTier="NORMAL"
+        billingStatus="ACTIVE"
+      />
+    );
   }
 
-  const [summary, settingsBundle] = await Promise.all([
+  const [summary, membership] = await Promise.all([
     getReportSummary(user.id),
-    getUserSettingsBundle(user.id),
+    getRequestMembershipContext(),
   ]);
-  const premiumInsightsEnabled = hasMembershipAccess(
-    settingsBundle.settings?.membershipTier,
-    settingsBundle.settings?.membershipBillingStatus ?? "FREE",
+  return (
+    <ReportsPanel
+      initialSummary={summary}
+      membershipTier={membership.membershipTier}
+      billingStatus={membership.membershipBillingStatus}
+    />
   );
-
-  return <ReportsPanel initialSummary={summary} premiumInsightsEnabled={premiumInsightsEnabled} />;
 }

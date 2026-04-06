@@ -1,29 +1,99 @@
 import type { NextRequest } from "next/server";
 
+import { getServerEnv } from "@/lib/env/server";
+import {
+  CSRF_COOKIE_NAME,
+  CSRF_HEADER_NAME,
+  CSRF_SAFE_METHODS,
+} from "@/lib/security/csrf";
+import { logSecurityEvent } from "@/server/observability/logger";
 import { ServiceError } from "@/server/services/service-error";
 
-const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+function normalizeOrigin(value: string) {
+  return new URL(value).origin;
+}
 
-export function assertSameOrigin(request: NextRequest) {
-  if (SAFE_METHODS.has(request.method)) {
+function buildAllowedOrigins(request: NextRequest) {
+  const origins = new Set<string>();
+  const host = request.headers.get("host");
+  const protocol = request.nextUrl.protocol;
+  const appUrl = getServerEnv().APP_URL;
+
+  if (host) {
+    origins.add(`${protocol}//${host}`.replace(/\/$/, ""));
+    origins.add(`https://${host}`);
+  }
+
+  if (appUrl) {
+    origins.add(appUrl.replace(/\/$/, ""));
+  }
+
+  return origins;
+}
+
+export function assertSameOrigin(
+  request: NextRequest,
+  options?: { fallbackCsrfToken?: string | null | undefined },
+) {
+  return assertSameOriginWithOptions(request, options);
+}
+
+export function assertSameOriginWithOptions(
+  request: NextRequest,
+  options?: { fallbackCsrfToken?: string | null | undefined },
+) {
+  if (CSRF_SAFE_METHODS.has(request.method)) {
     return;
   }
 
   const origin = request.headers.get("origin");
+  const referer = request.headers.get("referer");
+  const allowedOrigins = buildAllowedOrigins(request);
+  const candidate = origin ?? referer;
 
-  if (!origin) {
-    return;
+  if (!candidate) {
+    logSecurityEvent("origin_missing", {
+      route: request.nextUrl.pathname,
+      method: request.method,
+      host: request.headers.get("host") ?? undefined,
+    });
+    throw new ServiceError("ORIGIN_MISSING", 403, "La solicitud fue bloqueada por seguridad.");
   }
 
-  const host = request.headers.get("host");
+  const normalizedCandidate = normalizeOrigin(candidate);
 
-  if (!host) {
-    throw new ServiceError("ORIGIN_HOST_MISSING", 400, "No se pudo validar la solicitud.");
-  }
-
-  const originUrl = new URL(origin);
-
-  if (originUrl.host !== host) {
+  if (!allowedOrigins.has(normalizedCandidate)) {
+    logSecurityEvent("origin_blocked", {
+      route: request.nextUrl.pathname,
+      method: request.method,
+      origin: origin ?? undefined,
+      referer: referer ?? undefined,
+      host: request.headers.get("host") ?? undefined,
+    });
     throw new ServiceError("ORIGIN_NOT_ALLOWED", 403, "La solicitud fue bloqueada por seguridad.");
+  }
+
+  const csrfCookieToken = request.cookies.get(CSRF_COOKIE_NAME)?.value;
+  const csrfRequestToken =
+    request.headers.get(CSRF_HEADER_NAME) ?? options?.fallbackCsrfToken ?? null;
+
+  if (
+    !csrfCookieToken ||
+    !csrfRequestToken ||
+    csrfCookieToken !== csrfRequestToken
+  ) {
+    logSecurityEvent("csrf_token_invalid", {
+      route: request.nextUrl.pathname,
+      method: request.method,
+      host: request.headers.get("host") ?? undefined,
+      hasCookieToken: Boolean(csrfCookieToken),
+      hasHeaderToken: Boolean(request.headers.get(CSRF_HEADER_NAME)),
+      hasFallbackToken: Boolean(options?.fallbackCsrfToken),
+    });
+    throw new ServiceError(
+      "CSRF_TOKEN_INVALID",
+      403,
+      "La solicitud fue bloqueada por seguridad.",
+    );
   }
 }
