@@ -59,7 +59,7 @@ Razón breve:
   - activación y atención de membresía
 - Panel admin con usuarios, métricas, auditoría y plantillas
 - Auditoría de eventos críticos
-- Planes Base, Premium y Pro con checkout real por Stripe y webhook de sincronización
+- Planes Base, Premium y Pro con checkout real por AZUL y activación server-side de membresía
 
 ## Arquitectura
 
@@ -79,10 +79,10 @@ Detalles más extensos:
 - [Guía de despliegue](./docs/DEPLOYMENT.md)
 - [Staging real con Vercel + Neon](./docs/STAGING_SETUP.md)
 - [Entorno privado de testing](./docs/PRIVATE_TESTING.md)
-- [Configuración de Stripe](./docs/STRIPE_SETUP.md)
-- [Checklist beta real](./docs/BETA_CHECKLIST.md)
-- [Guía de beta cerrada](./docs/CLOSED_BETA.md)
-- [Demo snapshot 1.1](./docs/DEMO_SNAPSHOT_1_1.md)
+- [Billing con AZUL](./docs/BILLING_AZUL.md)
+- [Release Candidate 1.2](./docs/RELEASE_CANDIDATE_1_2.md)
+- [Checklist go/no-go](./docs/GO_NO_GO_CHECKLIST.md)
+- [Checklist de seguridad producción](./docs/PRODUCTION_SECURITY_CHECKLIST.md)
 
 ## Requisitos
 
@@ -110,11 +110,13 @@ Variables principales:
 - `CRON_SECRET`
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-- `STRIPE_PREMIUM_PRICE_ID`
-- `STRIPE_PRO_PRICE_ID`
-- `STRIPE_PORTAL_RETURN_PATH`
+- `BILLING_PROVIDER`
+- `AZUL_PAYMENT_URL`
+- `AZUL_MERCHANT_ID`
+- `AZUL_MERCHANT_NAME`
+- `AZUL_MERCHANT_TYPE`
+- `AZUL_AUTH_KEY`
+- `AZUL_CURRENCY_CODE`
 - `DEMO_MODE_ENABLED`
 - `HOST_PANEL_ENABLED`
 - `HOST_ALLOWED_EMAILS`
@@ -161,13 +163,15 @@ Estado de la app y de PostgreSQL:
 GET /api/health
 ```
 
-Si vas a probar cobro real de planes, expón el webhook de Stripe hacia:
+Si vas a probar cobro real de planes con AZUL, configura los retornos de Página de Pagos hacia:
 
 ```bash
-/api/stripe/webhook
+/api/billing/azul/approved
+/api/billing/azul/declined
+/api/billing/azul/cancelled
 ```
 
-La configuración exacta de productos, precios y portal está en [docs/STRIPE_SETUP.md](./docs/STRIPE_SETUP.md).
+La configuración operativa está en [docs/BILLING_AZUL.md](./docs/BILLING_AZUL.md).
 
 ## Entorno privado y estable para pruebas
 
@@ -212,16 +216,18 @@ Detalles completos:
 
 - [docs/PRIVATE_TESTING.md](./docs/PRIVATE_TESTING.md)
 
-## Credenciales demo del seed
+## Credenciales QA del seed
 
 - Usuario: `demo@deudaclarard.com`
 - Admin: `admin@deudaclarard.com`
 - Contraseña: `DeudaClara123!`
 
-## Snapshot actual
+Estas credenciales son solo para entornos locales, QA o staging controlado. No deben usarse como acceso de producción.
 
-- Demo actual: [`Snapshot 1.1`](./docs/DEMO_SNAPSHOT_1_1.md)
-- Corte funcional con seguridad, legal, onboarding y dashboard ya integrados
+## Estado actual
+
+- Release candidate: `1.2`
+- Corte funcional con seguridad, legal, onboarding, dashboard, recordatorios, monetización y billing AZUL ya integrados
 
 ## Prueba real de registro y acceso
 
@@ -277,24 +283,24 @@ HOST_SECONDARY_TOTP_SECRET=BASE32SECRETO...
 HOST_SECONDARY_PASSWORD=una-clave-larga-opcional
 ```
 
-## Preparación para beta real
+## Preparación para lanzamiento oficial
 
-Antes de invitar usuarios, verifica este mínimo:
+Antes de abrir acceso real a usuarios, verifica este mínimo:
 
 - `npm run doctor`
-- `npm run prebeta`
+- `npm run prelaunch`
 - `GET /api/health`
 - PostgreSQL accesible desde `DATABASE_URL`
 - `APP_URL`, `AUTH_SECRET` y `DATA_ENCRYPTION_KEY` configurados
 - `PASSKEY_RP_ID` y `PASSKEY_ALLOWED_ORIGINS` configurados si vas a habilitar WebAuthn/passkeys
 - Resend listo si vas a probar recuperación por email
-- Stripe en modo test si vas a probar Premium y Pro
+- AZUL configurado si vas a cobrar Premium y Pro
 - `CRON_SECRET` configurado si vas a disparar recordatorios
 
 Checklist completa:
 
-- [docs/BETA_CHECKLIST.md](./docs/BETA_CHECKLIST.md)
-- [docs/CLOSED_BETA.md](./docs/CLOSED_BETA.md)
+- [docs/GO_NO_GO_CHECKLIST.md](./docs/GO_NO_GO_CHECKLIST.md)
+- [docs/PRODUCTION_SECURITY_CHECKLIST.md](./docs/PRODUCTION_SECURITY_CHECKLIST.md)
 
 ## Comandos útiles
 
@@ -309,7 +315,7 @@ npm run private:restart
 npm run private:stop
 npm run lint
 npm run typecheck
-npm run prebeta
+npm run prelaunch
 npm run test:unit
 npm run test:integration
 npm run test:e2e
@@ -460,7 +466,7 @@ Plantillas listas para Vercel en [docs/VERCEL_ENV_TEMPLATES.md](./docs/VERCEL_EN
 
 La app está funcional de extremo a extremo a nivel de código y build.
 
-La activación comercial de planes Premium y Pro ya está preparada con Stripe. Para que funcione en un entorno real debes crear los `Price IDs`, configurar el webhook y cargar las variables de entorno de billing.
+La activación comercial de planes Premium y Pro ya está preparada con AZUL. Para que funcione en producción debes configurar comercio, `AZUL_AUTH_KEY`, `AZUL_MERCHANT_ID`, URLs de retorno y variables de entorno de billing.
 
 Notas honestas:
 

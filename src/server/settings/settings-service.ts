@@ -258,7 +258,8 @@ function toUserSettingsViewModel(user: {
           | "INACTIVE";
         membershipCurrentPeriodEnd: Date | string | null;
         membershipCancelAtPeriodEnd: boolean;
-        stripeCustomerId?: string | null;
+        externalPaymentProvider?: string | null;
+        externalSubscriptionId?: string | null;
       }
     | null;
 }): UserSettingsViewModelDto {
@@ -270,7 +271,11 @@ function toUserSettingsViewModel(user: {
       ? {
           ...toUserSettingsPublic(user.settings),
           ...toMembershipSettingsPublic(user.settings),
-          canManageBilling: Boolean(user.settings.stripeCustomerId),
+          canManageBilling: Boolean(
+            user.settings.externalPaymentProvider &&
+              user.settings.externalSubscriptionId &&
+              user.settings.membershipBillingStatus === "ACTIVE",
+          ),
         }
       : null,
   };
@@ -326,7 +331,8 @@ export async function getUserSettingsViewModel(userId: string) {
           membershipBillingStatus: true,
           membershipCurrentPeriodEnd: true,
           membershipCancelAtPeriodEnd: true,
-          stripeCustomerId: true,
+          externalPaymentProvider: true,
+          externalSubscriptionId: true,
         },
       },
     },
@@ -814,8 +820,10 @@ export async function updateUserMembershipPlan(
       membershipActivatedAt: input.membershipTier === "FREE" ? null : new Date(),
       membershipCurrentPeriodEnd: null,
       membershipCancelAtPeriodEnd: false,
-      stripeSubscriptionId: null,
-      stripePriceId: null,
+      billingInterval: null,
+      externalPaymentProvider: null,
+      externalSubscriptionId: null,
+      externalPriceCode: null,
     },
     update: {
       membershipTier: input.membershipTier,
@@ -826,8 +834,10 @@ export async function updateUserMembershipPlan(
           : new Date(),
       membershipCurrentPeriodEnd: null,
       membershipCancelAtPeriodEnd: false,
-      stripeSubscriptionId: null,
-      stripePriceId: null,
+      billingInterval: null,
+      externalPaymentProvider: null,
+      externalSubscriptionId: null,
+      externalPriceCode: null,
     },
   });
 

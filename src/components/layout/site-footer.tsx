@@ -1,24 +1,30 @@
 import Link from "next/link";
 
-import { DEMO_SNAPSHOT } from "@/config/release";
+import { PRODUCT_RELEASE } from "@/config/release";
 
 export function SiteFooter() {
   return (
     <footer className="border-t border-border/80 py-10">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 text-sm text-muted md:flex-row md:items-center md:justify-between">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 text-sm text-muted md:flex-row md:items-center md:justify-between">
         <div>
           <p className="font-medium text-foreground">Deuda Clara RD</p>
           <p>Copiloto financiero personal para República Dominicana.</p>
           <p className="mt-1 text-xs uppercase tracking-[0.18em] text-primary/80">
-            Demo {DEMO_SNAPSHOT.label}
+            {PRODUCT_RELEASE.label}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
+        <nav aria-label="Navegación legal y pública" className="flex flex-wrap items-center gap-x-4 gap-y-3">
           <Link href="/login" className="hover:text-foreground">
             Acceder
           </Link>
           <Link href="/registro" className="hover:text-foreground">
             Registro
+          </Link>
+          <Link href="/about" className="hover:text-foreground">
+            Acerca de nosotros
+          </Link>
+          <Link href="/security" className="hover:text-foreground">
+            Seguridad
           </Link>
           <Link href="/terms" className="hover:text-foreground">
             Términos y Condiciones
@@ -29,7 +35,7 @@ export function SiteFooter() {
           <Link href="/recuperar-contrasena" className="hover:text-foreground">
             Recuperar acceso
           </Link>
-        </div>
+        </nav>
       </div>
     </footer>
   );

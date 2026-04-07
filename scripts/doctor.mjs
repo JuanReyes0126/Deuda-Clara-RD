@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 
 const cwd = process.cwd();
 const envPath = path.join(cwd, ".env");
+const envLocalPath = path.join(cwd, ".env.local");
 
 function parseEnvFile(raw) {
   const env = {};
@@ -47,11 +48,20 @@ function commandExists(command) {
 }
 
 function readLocalEnv() {
-  if (!fs.existsSync(envPath)) {
+  if (!fs.existsSync(envPath) && !fs.existsSync(envLocalPath)) {
     return null;
   }
 
-  return parseEnvFile(fs.readFileSync(envPath, "utf8"));
+  return [envPath, envLocalPath].reduce((env, filePath) => {
+    if (!fs.existsSync(filePath)) {
+      return env;
+    }
+
+    return {
+      ...env,
+      ...parseEnvFile(fs.readFileSync(filePath, "utf8")),
+    };
+  }, {});
 }
 
 function checkValue(label, isValid, detail) {
@@ -61,6 +71,16 @@ function checkValue(label, isValid, detail) {
   }
 
   console.log(`[fail] ${label}: ${detail}`);
+  return false;
+}
+
+function warnValue(label, isValid, detail) {
+  if (isValid) {
+    console.log(`[ok] ${label}: ${detail}`);
+    return true;
+  }
+
+  console.log(`[warn] ${label}: ${detail}`);
   return false;
 }
 
@@ -93,7 +113,7 @@ console.log("");
 const env = readLocalEnv();
 
 if (!env) {
-  console.log("[fail] .env: no existe. Crea uno con `cp .env.example .env`.");
+  console.log("[fail] .env: no existe .env ni .env.local. Crea uno con `cp .env.example .env`.");
   process.exit(1);
 }
 
@@ -173,37 +193,38 @@ if (env.APP_URL) {
 
 console.log("");
 console.log("Herramientas locales");
-checkValue("Docker", commandExists("docker"), commandExists("docker") ? "Disponible" : "No disponible");
-checkValue(
+warnValue("Docker", commandExists("docker"), commandExists("docker") ? "Disponible" : "No disponible");
+warnValue(
   "PostgreSQL CLI",
   commandExists("psql"),
   commandExists("psql") ? "Disponible" : "No disponible",
 );
 
 console.log("");
-console.log("Servicios opcionales para beta");
-checkValue(
+console.log("Servicios opcionales para lanzamiento");
+warnValue(
   "Email transaccional",
   Boolean(env.RESEND_API_KEY && env.RESEND_FROM_EMAIL),
   env.RESEND_API_KEY && env.RESEND_FROM_EMAIL
     ? "Resend configurado"
     : "Si falta, recuperación y recordatorios por email no se enviarán.",
 );
-checkValue(
-  "Stripe",
+warnValue(
+  "AZUL",
   Boolean(
-    env.STRIPE_SECRET_KEY &&
-      env.STRIPE_WEBHOOK_SECRET &&
-      env.STRIPE_PREMIUM_PRICE_ID &&
-      env.STRIPE_PRO_PRICE_ID
+    env.BILLING_PROVIDER === "AZUL" &&
+      env.AZUL_PAYMENT_URL &&
+      env.AZUL_MERCHANT_ID &&
+      env.AZUL_MERCHANT_NAME &&
+      env.AZUL_MERCHANT_TYPE &&
+      env.AZUL_AUTH_KEY &&
+      env.AZUL_CURRENCY_CODE
   ),
-  env.STRIPE_SECRET_KEY
-    ? env.STRIPE_SECRET_KEY.startsWith("sk_test_")
-      ? "Configurado en modo test"
-      : "Configurado con llaves no test"
+  env.AZUL_PAYMENT_URL
+    ? "AZUL configurado para probar checkout de membresías"
     : "Si falta, los planes pagos no se podrán probar.",
 );
-checkValue(
+warnValue(
   "CRON_SECRET",
   Boolean(env.CRON_SECRET && env.CRON_SECRET.length >= 24),
   env.CRON_SECRET
@@ -250,20 +271,23 @@ if (databaseReachable && appReachable) {
 
 if (
   !(
-    env.STRIPE_SECRET_KEY &&
-    env.STRIPE_WEBHOOK_SECRET &&
-    env.STRIPE_PREMIUM_PRICE_ID &&
-    env.STRIPE_PRO_PRICE_ID
+    env.BILLING_PROVIDER === "AZUL" &&
+    env.AZUL_PAYMENT_URL &&
+    env.AZUL_MERCHANT_ID &&
+    env.AZUL_MERCHANT_NAME &&
+    env.AZUL_MERCHANT_TYPE &&
+    env.AZUL_AUTH_KEY &&
+    env.AZUL_CURRENCY_CODE
   )
 ) {
-  console.log("- Si quieres probar activación de planes, configura Stripe en modo test.");
+  console.log("- Si quieres probar activación de planes, configura AZUL en sandbox/test.");
 }
 
 if (env.HOST_PANEL_ENABLED === "true" && !env.HOST_ALLOWED_EMAILS) {
   console.log("- Si vas a usar el panel interno, define HOST_ALLOWED_EMAILS con correos permitidos.");
 }
 
-console.log("- Credenciales demo del seed: `demo@deudaclarard.com / DeudaClara123!`.");
+console.log("- Credenciales QA del seed: `demo@deudaclarard.com / DeudaClara123!`.");
 console.log("- Si estás probando auth muchas veces en local, puedes dejar `SKIP_RATE_LIMIT_IN_DEV=true`.");
 
 if (!allRequiredOk || !databaseReachable) {

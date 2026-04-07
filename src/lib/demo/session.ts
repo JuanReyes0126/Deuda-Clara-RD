@@ -6,6 +6,7 @@ import type {
   ServerUserSettingsContextDto,
   SessionUserContextDto,
 } from "@/lib/auth/session-context";
+import { shouldUseSecureCookies } from "@/lib/security/cookie-options";
 
 export const DEMO_SESSION_COOKIE_NAME = "dc_demo_session";
 export const DEMO_PROFILE_COOKIE_NAME = "dc_demo_profile";
@@ -142,7 +143,7 @@ export async function createDemoSession(profile?: Partial<DemoProfile>) {
   store.set(DEMO_SESSION_COOKIE_NAME, "1", {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookies(),
     expires,
     path: "/",
     priority: "high",
@@ -150,7 +151,7 @@ export async function createDemoSession(profile?: Partial<DemoProfile>) {
   store.set(DEMO_PROFILE_COOKIE_NAME, encodeDemoProfile(normalizedProfile), {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookies(),
     expires,
     path: "/",
     priority: "high",

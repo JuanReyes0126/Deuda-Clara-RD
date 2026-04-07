@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
 import { getServerEnv } from "@/lib/env/server";
+import { isBillingConfigured } from "@/server/billing/billing-service";
 import { logSecurityEvent, logServerError } from "@/server/observability/logger";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ type HealthEnvironmentStatus =
       encryptionReady: boolean;
       emailReady: boolean;
       billingReady: boolean;
-      billingMode: "test" | "live" | "not-configured";
+      billingMode: "azul" | "not-configured";
       webhookReady: boolean;
       cronReady: boolean;
       hostPanelEnabled: boolean;
@@ -54,15 +55,9 @@ export async function GET(request: Request) {
       authSecretReady: Boolean(env.AUTH_SECRET),
       encryptionReady: Boolean(env.DATA_ENCRYPTION_KEY ?? env.AUTH_SECRET),
       emailReady: Boolean(env.RESEND_API_KEY && env.RESEND_FROM_EMAIL),
-      billingReady: Boolean(
-        env.STRIPE_SECRET_KEY && env.STRIPE_PREMIUM_PRICE_ID && env.STRIPE_PRO_PRICE_ID,
-      ),
-      billingMode: !env.STRIPE_SECRET_KEY
-        ? "not-configured"
-        : env.STRIPE_SECRET_KEY.startsWith("sk_test_")
-          ? "test"
-          : "live",
-      webhookReady: Boolean(env.STRIPE_WEBHOOK_SECRET),
+      billingReady: isBillingConfigured(),
+      billingMode: isBillingConfigured() ? "azul" : "not-configured",
+      webhookReady: Boolean(env.AZUL_AUTH_KEY),
       cronReady: Boolean(env.CRON_SECRET),
       hostPanelEnabled: env.HOST_PANEL_ENABLED,
       hostAllowlistReady: Boolean(env.HOST_ALLOWED_EMAILS),

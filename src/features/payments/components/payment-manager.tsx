@@ -419,9 +419,9 @@ export function PaymentManager({
           : `Si lo guardas así, el saldo visible bajaría a ${formatCurrency(estimatedRemainingBalance ?? 0)}.`;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5 sm:gap-6">
       {isOnboardingFlow ? (
-        <section className="border-primary/15 shadow-soft rounded-[2rem] border bg-[linear-gradient(135deg,rgba(13,148,136,0.12),rgba(14,116,144,0.04))] p-6">
+        <section className="border-primary/15 shadow-soft rounded-[2rem] border bg-[linear-gradient(135deg,rgba(13,148,136,0.12),rgba(14,116,144,0.04))] p-4 sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-primary text-sm font-semibold tracking-[0.18em] uppercase">
@@ -520,8 +520,8 @@ export function PaymentManager({
         tone={selectedDebt ? "default" : "warning"}
       />
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_1.15fr]">
-        <Card className="min-w-0 p-6">
+      <section className="grid gap-5 sm:gap-6 xl:grid-cols-[1fr_1.15fr]">
+        <Card className="-mx-1 min-w-0 p-4 sm:mx-0 sm:p-6">
           <CardHeader>
             <CardTitle>
               {selectedPayment ? "Editar pago" : "Registrar pago"}
@@ -554,9 +554,9 @@ export function PaymentManager({
             ) : null}
 
             {selectedDebt ? (
-              <div className="border-primary/15 mb-6 rounded-[2rem] border bg-[linear-gradient(135deg,rgba(13,148,136,0.12),rgba(14,116,144,0.04))] p-5 sm:p-6">
+              <div className="border-primary/15 mb-5 rounded-[1.75rem] border bg-[linear-gradient(135deg,rgba(13,148,136,0.12),rgba(14,116,144,0.04))] p-3.5 sm:mb-6 sm:rounded-[2rem] sm:p-6">
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-                  <div className="rounded-[1.85rem] border border-white/70 bg-white/88 p-5 sm:p-6">
+                  <div className="rounded-[1.55rem] border border-white/70 bg-white/88 p-4 sm:rounded-[1.85rem] sm:p-6">
                     <p className="text-primary/80 text-xs font-semibold tracking-[0.22em] uppercase">
                       Contexto de la deuda
                     </p>
@@ -571,14 +571,14 @@ export function PaymentManager({
                     </p>
                   </div>
 
-                  <div className="rounded-[1.85rem] border border-white/70 bg-white/82 p-5 sm:p-6">
+                  <div className="rounded-[1.55rem] border border-white/70 bg-white/82 p-4 sm:rounded-[1.85rem] sm:p-6">
                     <p className="text-muted text-[11px] font-semibold tracking-[0.22em] uppercase">
                       Acciones rápidas
                     </p>
                     <p className="text-foreground mt-3 text-lg font-semibold leading-tight">
                       Usa un atajo si quieres capturar sin escribir todo.
                     </p>
-                    <div className="mt-5 flex flex-wrap gap-2">
+                    <div className="mt-5 grid grid-cols-2 gap-2 lg:flex lg:flex-wrap">
                       {[
                         {
                           label: "Pagar mínimo",
@@ -602,7 +602,7 @@ export function PaymentManager({
                           type="button"
                           variant="secondary"
                           size="sm"
-                          className="max-w-full"
+                          className="min-h-11 max-w-full justify-center"
                           onClick={() => applyQuickAmount(option.value)}
                         >
                           {option.label}
@@ -654,7 +654,7 @@ export function PaymentManager({
                 <select
                   id="debtId"
                   disabled={Boolean(selectedPayment) || !debtOptions.length}
-                  className="border-border text-foreground focus:border-primary/40 focus:ring-primary/10 min-w-0 h-12 w-full rounded-2xl border bg-white px-4 text-sm transition outline-none focus:ring-4 disabled:opacity-70"
+                  className="border-border text-foreground focus:border-primary/40 focus:ring-primary/10 min-h-12 min-w-0 w-full rounded-2xl border bg-white px-4 text-base transition outline-none focus:ring-4 disabled:opacity-70 sm:text-sm"
                   {...form.register("debtId", debtIdValidation)}
                 >
                   <option value="">Selecciona una deuda</option>
@@ -797,14 +797,15 @@ export function PaymentManager({
                 <Textarea id="notes" {...form.register("notes", notesValidation)} />
               </div>
 
-              <div className="flex flex-wrap gap-3 md:col-span-2">
+              <div className="flex flex-col gap-3 md:col-span-2 sm:flex-row sm:flex-wrap">
                 <Button
+                  className="w-full sm:w-auto"
                   type="submit"
                   disabled={isSubmitting || !debtOptions.length}
                 >
                   {selectedPayment ? "Guardar cambios" : "Registrar pago"}
                 </Button>
-                <Button type="button" variant="secondary" onClick={resetForm}>
+                <Button className="w-full sm:w-auto" type="button" variant="secondary" onClick={resetForm}>
                   Limpiar
                 </Button>
               </div>
@@ -812,7 +813,7 @@ export function PaymentManager({
           </CardContent>
         </Card>
 
-        <Card className="min-w-0 p-6">
+        <Card className="-mx-1 min-w-0 p-4 sm:mx-0 sm:p-6">
           <CardHeader>
             <CardTitle>Historial cronológico</CardTitle>
             <CardDescription>
@@ -832,7 +833,7 @@ export function PaymentManager({
                 <select
                   value={historyDebtFilter}
                   onChange={(event) => setHistoryDebtFilter(event.target.value)}
-                  className="border-border text-foreground focus:border-primary/40 focus:ring-primary/10 min-w-0 h-12 w-full rounded-2xl border bg-white px-4 text-sm transition outline-none focus:ring-4"
+                  className="border-border text-foreground focus:border-primary/40 focus:ring-primary/10 min-h-12 min-w-0 w-full rounded-2xl border bg-white px-4 text-base transition outline-none focus:ring-4 sm:text-sm"
                 >
                   <option value="ALL">Todas las deudas</option>
                   {debtOptions.map((debt) => (
@@ -848,7 +849,7 @@ export function PaymentManager({
               filteredPayments.map((payment) => (
                 <div
                   key={payment.id}
-                  className="border-border bg-secondary/70 min-w-0 rounded-3xl border p-5 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997]"
+                  className="border-border bg-secondary/70 min-w-0 rounded-[1.65rem] border p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:rounded-3xl sm:p-5"
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
@@ -868,10 +869,11 @@ export function PaymentManager({
                       </p>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid w-full grid-cols-2 gap-2 lg:flex lg:w-auto lg:flex-wrap">
                       <Button
                         variant="secondary"
                         size="sm"
+                        className="min-h-11 w-full justify-center"
                         onClick={() => {
                           setSelectedPayment(payment);
                           form.reset(paymentToFormValues(payment));
@@ -883,6 +885,7 @@ export function PaymentManager({
                       <Button
                         variant="ghost"
                         size="sm"
+                        className="min-h-11 w-full justify-center"
                         onClick={() => handleDelete(payment.id)}
                       >
                         <Trash2 className="mr-2 size-4" />

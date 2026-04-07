@@ -54,7 +54,7 @@ const howItWorks = [
   {
     step: "3",
     title: "Activa Premium si quieres salir mas rapido",
-    copy: "Desbloquea la prioridad recomendada y compara tu ritmo actual contra una ruta más corta.",
+    copy: "Desbloquea una ruta más clara para pagar antes y dejar de perder dinero en intereses.",
   },
 ] as const;
 
@@ -159,14 +159,14 @@ export default function HomePage() {
                   Crear cuenta gratis
                 </Link>
                 <Link
-                  href="/vista-demo"
+                  href="#como-funciona"
                   className="inline-flex h-12 items-center justify-center rounded-full border border-[rgba(240,138,93,0.18)] bg-white px-6 text-base font-semibold text-foreground transition hover:bg-accent-soft/55"
                 >
-                  Ver vista demo
+                  Ver cómo funciona
                 </Link>
                 <Link
                   href="/planes"
-                  className="inline-flex h-12 items-center justify-center rounded-full border border-primary/15 bg-primary/5 px-6 text-base font-semibold text-primary transition hover:bg-primary/10"
+                  className="inline-flex h-12 items-center justify-center rounded-full bg-primary px-6 text-base font-semibold text-white shadow-[0_18px_42px_rgba(15,88,74,0.18)] transition hover:bg-primary-strong"
                 >
                   Desbloquear y ahorrar ahora
                 </Link>
@@ -297,7 +297,7 @@ export default function HomePage() {
                 Tres pasos claros para pasar de panorama borroso a plan accionable.
               </h2>
               <p className="section-summary max-w-2xl">
-                No hace falta aprender finanzas complejas. Primero registras, luego entiendes la urgencia real y solo entonces decides si Premium te conviene.
+                No hace falta aprender finanzas complejas. Primero registras, luego entiendes la urgencia real y decides si Premium te conviene.
               </p>
             </div>
 
@@ -397,9 +397,7 @@ export default function HomePage() {
                 Empieza gratis y sube a Premium solo si quieres salir más rápido.
               </h2>
               <p className="section-summary">
-                La capa premium no es humo visual. Desbloquea el orden recomendado de pago,
-                compara tu ritmo actual contra la ruta optimizada y convierte el panel en un
-                asistente mas directo.
+                Premium desbloquea una ruta más clara: qué pagar primero, cuánto podrías recortar y cómo dejar de decidir a ciegas.
               </p>
             </div>
 
@@ -515,62 +513,42 @@ export default function HomePage() {
           >
             <div className="space-y-5">
               <p className="section-kicker">
-                Seguridad razonable y seria
+                Seguridad y confianza
               </p>
               <h2 className="font-display text-4xl tracking-tight text-foreground">
-                Validacion estricta, auditoria, rate limiting y sesiones protegidas.
+                Protección de datos y accesos pensada para uso real.
               </h2>
               <p className="section-summary max-w-2xl">
-                La plataforma se esta construyendo con controles reales de
-                hardening: validacion con Zod, ORM tipado, autorizacion por
-                recurso, headers defensivos, auditoria de eventos y configuracion
-                segura de sesiones. No promete seguridad absoluta, pero si una
-                base profesional y honesta.
+                Tus datos financieros merecen una experiencia clara y protegida. Usamos controles de acceso, sesiones seguras y registros de actividad para reducir riesgos sin hacerte cargar con complejidad técnica.
               </p>
+              <Link
+                href="/security"
+                className="inline-flex h-12 items-center justify-center rounded-full bg-primary px-6 text-base font-semibold text-white shadow-[0_18px_42px_rgba(15,88,74,0.18)] transition hover:bg-primary-strong"
+              >
+                Ver cómo protegemos tus datos
+              </Link>
             </div>
 
             <div className="grid gap-4">
               <div className="rounded-3xl border border-border bg-secondary/70 p-5">
-                <p className="text-sm font-semibold text-foreground">OWASP y abuso</p>
+                <p className="text-sm font-semibold text-foreground">Acceso protegido</p>
                 <p className="mt-2 text-sm leading-7 text-muted">
-                  Login, recuperacion y endpoints sensibles se preparan con rate limiting y mensajes seguros.
+                  Protegemos inicio de sesión, recuperación de cuenta y acciones sensibles.
                 </p>
               </div>
               <div className="rounded-3xl border border-border bg-secondary/70 p-5">
-                <p className="text-sm font-semibold text-foreground">Auditoria</p>
+                <p className="text-sm font-semibold text-foreground">Actividad trazable</p>
                 <p className="mt-2 text-sm leading-7 text-muted">
-                  Eventos criticos quedan registrados para trazabilidad operativa y seguridad.
+                  Los eventos importantes quedan registrados para ayudarte a detectar actividad inusual.
                 </p>
               </div>
               <div className="rounded-3xl border border-border bg-secondary/70 p-5">
-                <p className="text-sm font-semibold text-foreground">Persistencia</p>
+                <p className="text-sm font-semibold text-foreground">Datos bajo control</p>
                 <p className="mt-2 text-sm leading-7 text-muted">
-                  PostgreSQL + Prisma como fuente de verdad, con indices y modelos orientados al dominio.
+                  No necesitas conectar bancos para empezar; tú decides qué información registrar.
                 </p>
               </div>
             </div>
-          </section>
-
-          <section id="arquitectura" className="grid gap-6 lg:grid-cols-2">
-            <Card className="p-8">
-              <CardHeader>
-                <CardTitle>Arquitectura seleccionada</CardTitle>
-                <CardDescription>
-                  Next.js App Router con route handlers y servicios de dominio en
-                  servidor para reducir complejidad operativa sin sacrificar claridad.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="p-8">
-              <CardHeader>
-                <CardTitle>Despliegue recomendado</CardTitle>
-                <CardDescription>
-                  Vercel + Neon + Resend. Flujo natural para Next.js, Postgres
-                  administrado y correo transaccional simple de operar.
-                </CardDescription>
-              </CardHeader>
-            </Card>
           </section>
         </main>
 

@@ -38,11 +38,13 @@ describe("api/health", () => {
       CRON_SECRET: "c".repeat(24),
       UPSTASH_REDIS_REST_URL: undefined,
       UPSTASH_REDIS_REST_TOKEN: undefined,
-      STRIPE_SECRET_KEY: "sk_test_ready",
-      STRIPE_WEBHOOK_SECRET: "whsec_test",
-      STRIPE_PREMIUM_PRICE_ID: "price_premium",
-      STRIPE_PRO_PRICE_ID: "price_pro",
-      STRIPE_PORTAL_RETURN_PATH: "/planes",
+      BILLING_PROVIDER: "AZUL",
+      AZUL_PAYMENT_URL: "https://pagos.azul.test/PaymentPage",
+      AZUL_MERCHANT_ID: "390000000000001",
+      AZUL_MERCHANT_NAME: "Deuda Clara RD",
+      AZUL_MERCHANT_TYPE: "ECommerce",
+      AZUL_AUTH_KEY: "azul-auth-key",
+      AZUL_CURRENCY_CODE: "USD",
       HOST_ALLOWED_EMAILS: "admin@deudaclarard.com",
       HOST_PANEL_ENABLED: true,
       HOST_SECONDARY_PASSWORD: "host-pass-123",
@@ -64,7 +66,7 @@ describe("api/health", () => {
     expect(body.ok).toBe(true);
     expect(body.database.ok).toBe(true);
     expect(body.auth.ready).toBe(true);
-    expect(body.environment.billingMode).toBe("test");
+    expect(body.environment.billingMode).toBe("azul");
     expect(body.environment.webhookReady).toBe(true);
     expect(body.environment.cronReady).toBe(true);
     expect(body.hostPanel.enabled).toBe(true);
@@ -93,11 +95,13 @@ describe("api/health", () => {
       CRON_SECRET: "c".repeat(24),
       UPSTASH_REDIS_REST_URL: undefined,
       UPSTASH_REDIS_REST_TOKEN: undefined,
-      STRIPE_SECRET_KEY: undefined,
-      STRIPE_WEBHOOK_SECRET: undefined,
-      STRIPE_PREMIUM_PRICE_ID: undefined,
-      STRIPE_PRO_PRICE_ID: undefined,
-      STRIPE_PORTAL_RETURN_PATH: undefined,
+      BILLING_PROVIDER: "AZUL",
+      AZUL_PAYMENT_URL: undefined,
+      AZUL_MERCHANT_ID: undefined,
+      AZUL_MERCHANT_NAME: undefined,
+      AZUL_MERCHANT_TYPE: undefined,
+      AZUL_AUTH_KEY: undefined,
+      AZUL_CURRENCY_CODE: undefined,
       HOST_ALLOWED_EMAILS: undefined,
       HOST_PANEL_ENABLED: false,
       HOST_SECONDARY_PASSWORD: undefined,

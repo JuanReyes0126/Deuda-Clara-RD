@@ -66,6 +66,30 @@ enum MembershipBillingStatus {
   INACTIVE
 }
 
+enum BillingInterval {
+  MONTHLY
+  ANNUAL
+}
+
+enum BillingPaymentProvider {
+  AZUL
+}
+
+enum BillingPaymentStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  CANCELED
+  FAILED
+}
+
+enum BillingProviderEventStatus {
+  PROCESSING
+  PROCESSED
+  FAILED
+  SKIPPED
+}
+
 enum NotificationType {
   DUE_SOON
   OVERDUE
@@ -138,6 +162,7 @@ enum AuditAction {
   BILLING_CHECKOUT_CREATED
   BILLING_PORTAL_OPENED
   BILLING_WEBHOOK_SYNCED
+  BILLING_PAYMENT_CONFIRMED
   NOTIFICATION_READ
   EMAIL_TEMPLATE_UPDATED
 }
@@ -173,6 +198,7 @@ model User {
   passkeyCredentials  PasskeyCredential[]
   consents            UserConsent[]
   notificationEvents  NotificationEvent[]
+  billingPayments     BillingPayment[]
 
   @@index([role, status])
   @@index([createdAt])
@@ -236,9 +262,14 @@ model UserSettings {
   preferredStrategy     StrategyMethod @default(AVALANCHE)
   membershipTier        MembershipTier @default(FREE)
   membershipBillingStatus MembershipBillingStatus @default(FREE)
+  billingInterval      BillingInterval?
   membershipActivatedAt DateTime?
   membershipCurrentPeriodEnd DateTime?
   membershipCancelAtPeriodEnd Boolean @default(false)
+  externalPaymentProvider BillingPaymentProvider?
+  externalCustomerId   String?        @unique
+  externalSubscriptionId String?      @unique
+  externalPriceCode    String?
   stripeCustomerId      String?        @unique
   stripeSubscriptionId  String?        @unique
   stripePriceId         String?
@@ -380,6 +411,52 @@ model NotificationEvent {
   @@index([userId, scheduledFor])
   @@index([status, scheduledFor])
   @@index([debtId, scheduledFor])
+}
+
+model BillingPayment {
+  id                    String                 @id @default(cuid())
+  userId                String
+  provider              BillingPaymentProvider
+  membershipTier        MembershipTier
+  billingInterval       BillingInterval
+  externalOrderId       String                 @unique
+  externalTransactionId String?
+  externalCustomerId    String?
+  externalPriceCode     String
+  amountCents           Int
+  currency              CurrencyCode           @default(USD)
+  status                BillingPaymentStatus   @default(PENDING)
+  approvedAt            DateTime?
+  declinedAt            DateTime?
+  canceledAt            DateTime?
+  failedAt              DateTime?
+  metadata              Json?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([provider, status, createdAt])
+  @@index([externalTransactionId])
+}
+
+model BillingProviderEvent {
+  id           String                     @id @default(cuid())
+  provider     BillingPaymentProvider
+  externalEventId String
+  eventType    String
+  status       BillingProviderEventStatus @default(PROCESSING)
+  processedAt  DateTime?
+  failedAt     DateTime?
+  errorMessage String?
+  payload      Json?
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  @@unique([provider, externalEventId])
+  @@index([status, createdAt])
+  @@index([provider, status, createdAt])
+  @@index([eventType, createdAt])
 }
 
 model AuditLog {

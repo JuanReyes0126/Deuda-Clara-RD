@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { demoPayments } from "@/lib/demo/data";
 import { demoDebts } from "@/lib/demo/data";
 import { getDemoDebtById, listDemoDebts, saveDemoDebts } from "@/lib/demo/debts";
+import { shouldUseSecureCookies } from "@/lib/security/cookie-options";
 import type { DebtItemDto, PaymentItemDto } from "@/lib/types/app";
 import type { PaymentInput } from "@/lib/validations/payments";
 import { decimal, toMoneyNumber } from "@/lib/utils/decimal";
@@ -68,7 +69,7 @@ async function setDemoPaymentState(payments: PaymentItemDto[]) {
   store.set(DEMO_PAYMENTS_COOKIE_NAME, encodePayments(sortPayments(payments)), {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookies(),
     path: "/",
     priority: "high",
   });

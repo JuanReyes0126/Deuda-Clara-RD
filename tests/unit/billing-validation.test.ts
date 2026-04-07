@@ -7,6 +7,7 @@ describe("billing validation", () => {
     expect(
       checkoutPlanSchema.safeParse({
         membershipTier: "NORMAL",
+        billingInterval: "monthly",
         sourceContext: "reportes",
       }).success,
     ).toBe(true);
@@ -14,9 +15,20 @@ describe("billing validation", () => {
     expect(
       checkoutPlanSchema.safeParse({
         membershipTier: "PRO",
+        billingInterval: "annual",
         sourceContext: "notificaciones",
       }).success,
     ).toBe(true);
+  });
+
+  it("usa billing mensual por defecto si no se especifica intervalo", () => {
+    const parsed = checkoutPlanSchema.safeParse({
+      membershipTier: "NORMAL",
+      sourceContext: "planes",
+    });
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.success ? parsed.data.billingInterval : null).toBe("monthly");
   });
 
   it("rechaza contextos no permitidos", () => {

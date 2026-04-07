@@ -62,6 +62,10 @@ async function requestJson(
   const payload = await readJsonPayload<{
     error?: string;
     url?: string;
+    provider?: string;
+    mode?: "form_post";
+    method?: "POST";
+    fields?: Record<string, string>;
     reauthRequired?: boolean;
   }>(
     response,
@@ -293,7 +297,7 @@ function getCheckoutNarrative({
   highlightedPlan: (typeof membershipPlanCatalog)[MembershipPlanId] | null;
 }) {
   const trustItems = [
-    "Checkout seguro con Stripe",
+    "Checkout seguro con AZUL",
     "Puedes cambiar o cancelar desde facturación",
     "Tu cuenta y tus datos siguen siendo tuyos",
   ];
@@ -357,7 +361,7 @@ function getCheckoutNarrative({
 function getActivationSteps(sourceContext: MembershipSourceContext) {
   return [
     {
-      title: "1. Pasas por Stripe",
+      title: "1. Pasas por AZUL",
       description:
         `${MEMBERSHIP_COMMERCIAL_COPY.reinforcement.checkout} No guardamos datos sensibles de tarjeta en la app.`,
     },
@@ -375,7 +379,7 @@ function getActivationSteps(sourceContext: MembershipSourceContext) {
     {
       title: "3. Lo gestionas cuando quieras",
       description:
-        `${MEMBERSHIP_COMMERCIAL_COPY.reinforcement.riskFree} Puedes cambiar o cancelar desde facturación sin perder tu cuenta.`,
+        `${MEMBERSHIP_COMMERCIAL_COPY.reinforcement.riskFree} Puedes pedir cambios de membresía sin perder tu cuenta ni tus datos.`,
     },
   ];
 }
@@ -632,7 +636,7 @@ export function MembershipPanel({
 
   return (
     <div className="flex flex-col gap-5 sm:gap-6">
-      <section className="border-border shadow-soft rounded-[2rem] border bg-white/90 p-4 sm:p-8">
+      <section className="border-border shadow-soft -mx-1 rounded-[2rem] border bg-white/90 p-4 sm:mx-0 sm:p-8">
         <ModuleSectionHeader
           kicker="Planes"
           title="Elige la capa de ayuda que mejor encaja con tu momento."
@@ -860,7 +864,7 @@ export function MembershipPanel({
                 <p className="text-muted mt-2 text-sm leading-7">
                   {billingStatus === "ACTIVE"
                     ? "Ya puedes entrar al dashboard y abrir tu plan recomendado para empezar hoy."
-                    : "Si todavía no ves el cambio reflejado, el webhook de Stripe suele tardar solo unos segundos en terminar la activación."}
+                    : "Si todavía no ves el cambio reflejado, la confirmación de AZUL suele tardar solo unos segundos en terminar la activación."}
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -986,7 +990,7 @@ export function MembershipPanel({
       </section>
 
       <section className="grid gap-5 2xl:grid-cols-[1.12fr_0.88fr]">
-        <div className="border-primary/12 shadow-soft rounded-[2rem] border bg-[rgba(240,248,245,0.92)] p-4 sm:p-6">
+        <div className="border-primary/12 shadow-soft -mx-1 rounded-[2rem] border bg-[rgba(240,248,245,0.92)] p-4 sm:mx-0 sm:p-6">
           <div className="flex flex-wrap items-center gap-3">
             <Badge variant={fitStory.badgeVariant}>{fitStory.badgeLabel}</Badge>
             <Badge variant="default">Plan sugerido {suggestedPlan.label}</Badge>
@@ -1029,7 +1033,7 @@ export function MembershipPanel({
           </div>
         </div>
 
-        <div className="border-primary/15 rounded-[2rem] border bg-[rgba(255,248,241,0.92)] p-4 shadow-[0_18px_42px_rgba(240,138,93,0.08)] sm:p-6">
+        <div className="border-primary/15 -mx-1 rounded-[2rem] border bg-[rgba(255,248,241,0.92)] p-4 shadow-[0_18px_42px_rgba(240,138,93,0.08)] sm:mx-0 sm:p-6">
           <p className="section-kicker">
             Cómo elegir sin complicarte
           </p>
@@ -1060,7 +1064,7 @@ export function MembershipPanel({
         ref={planComparisonRef}
         className="grid gap-5 sm:gap-6 2xl:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)]"
       >
-        <div className="border-border shadow-soft rounded-[2rem] border bg-white/90 p-4 sm:p-6">
+        <div className="border-border shadow-soft -mx-1 rounded-[2rem] border bg-white/90 p-4 sm:mx-0 sm:p-6">
           <p className="section-kicker">
             Qué cambia entre planes
           </p>
@@ -1161,7 +1165,7 @@ export function MembershipPanel({
           </div>
         </div>
 
-        <div className="border-primary/15 rounded-[2rem] border bg-[rgba(255,248,241,0.92)] p-4 shadow-[0_18px_42px_rgba(240,138,93,0.08)] sm:p-6">
+        <div className="border-primary/15 -mx-1 rounded-[2rem] border bg-[rgba(255,248,241,0.92)] p-4 shadow-[0_18px_42px_rgba(240,138,93,0.08)] sm:mx-0 sm:p-6">
           <p className="section-kicker">
             Recomendación comercial
           </p>
@@ -1185,7 +1189,7 @@ export function MembershipPanel({
       </section>
 
       <section className="grid gap-5 2xl:grid-cols-[minmax(0,1.14fr)_minmax(0,0.86fr)]">
-        <div className="border-border shadow-soft rounded-[2rem] border bg-white/90 p-4 sm:p-6">
+        <div className="border-border shadow-soft -mx-1 rounded-[2rem] border bg-white/90 p-4 sm:mx-0 sm:p-6">
           <p className="section-kicker">
             Qué pasa después de activar
           </p>
@@ -1206,7 +1210,7 @@ export function MembershipPanel({
           </div>
         </div>
 
-        <div className="border-primary/15 rounded-[2rem] border bg-[rgba(255,248,241,0.92)] p-4 shadow-[0_18px_42px_rgba(240,138,93,0.08)] sm:p-6">
+        <div className="border-primary/15 -mx-1 rounded-[2rem] border bg-[rgba(255,248,241,0.92)] p-4 shadow-[0_18px_42px_rgba(240,138,93,0.08)] sm:mx-0 sm:p-6">
           <p className="section-kicker">
             Antes de pagar
           </p>
@@ -1253,7 +1257,7 @@ export function MembershipPanel({
           const shouldDisableButton =
             demoMode || (isCurrent && !canManageCurrentPlan);
           const actionLabel = demoMode
-            ? "Vista demo"
+            ? "Vista QA"
             : activePlanId === plan.id
               ? "Procesando..."
               : isHighlighted && !isCurrent && plan.id === "NORMAL"
@@ -1281,7 +1285,7 @@ export function MembershipPanel({
           return (
             <Card
               key={plan.id}
-              className={`p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:shadow-[0_24px_44px_rgba(23,56,74,0.1)] sm:p-6 ${planCardClassName}`}
+              className={`-mx-1 p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:shadow-[0_24px_44px_rgba(23,56,74,0.1)] sm:mx-0 sm:p-6 ${planCardClassName}`}
             >
               <CardHeader className="gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1408,12 +1412,34 @@ export function MembershipPanel({
                               "POST",
                               {
                                 membershipTier: plan.id,
+                                billingInterval: "monthly",
                                 sourceContext: sourceContext ?? "planes",
                               },
                             );
 
                             if (!payload.url) {
                               throw new Error("No se pudo abrir el checkout.");
+                            }
+
+                            if (payload.mode === "form_post" && payload.fields) {
+                              const form = document.createElement("form");
+                              form.method = payload.method ?? "POST";
+                              form.action = payload.url;
+                              form.style.display = "none";
+
+                              Object.entries(payload.fields as Record<string, string>).forEach(
+                                ([name, value]) => {
+                                  const input = document.createElement("input");
+                                  input.type = "hidden";
+                                  input.name = name;
+                                  input.value = value;
+                                  form.appendChild(input);
+                                },
+                              );
+
+                              document.body.appendChild(form);
+                              form.submit();
+                              return;
                             }
 
                             window.location.assign(payload.url);

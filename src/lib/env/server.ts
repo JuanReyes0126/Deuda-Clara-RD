@@ -67,11 +67,13 @@ const serverEnvSchema = z.object({
   CRON_SECRET: optionalValue.pipe(z.string().min(24).optional()),
   UPSTASH_REDIS_REST_URL: optionalValue.pipe(z.string().url().optional()),
   UPSTASH_REDIS_REST_TOKEN: optionalValue,
-  STRIPE_SECRET_KEY: optionalValue,
-  STRIPE_WEBHOOK_SECRET: optionalValue,
-  STRIPE_PREMIUM_PRICE_ID: optionalValue,
-  STRIPE_PRO_PRICE_ID: optionalValue,
-  STRIPE_PORTAL_RETURN_PATH: optionalValue,
+  BILLING_PROVIDER: z.enum(["AZUL"]).optional().default("AZUL"),
+  AZUL_PAYMENT_URL: optionalValue.pipe(z.string().url().optional()),
+  AZUL_MERCHANT_ID: optionalValue,
+  AZUL_MERCHANT_NAME: optionalValue,
+  AZUL_MERCHANT_TYPE: optionalValue,
+  AZUL_AUTH_KEY: optionalValue,
+  AZUL_CURRENCY_CODE: optionalValue,
   HOST_ALLOWED_EMAILS: optionalValue,
   HOST_PANEL_ENABLED: z
     .enum(["true", "false"])

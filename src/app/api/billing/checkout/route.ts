@@ -30,7 +30,13 @@ export async function POST(request: NextRequest) {
     }
 
     const rateLimit = await assertRateLimit({
-      key: buildRateLimitKey(request, "billing-checkout", session.user.id, parsed.data.membershipTier),
+      key: buildRateLimitKey(
+        request,
+        "billing-checkout",
+        session.user.id,
+        parsed.data.membershipTier,
+        parsed.data.billingInterval,
+      ),
       limit: 10,
       windowMs: 10 * 60 * 1000,
     });
@@ -50,6 +56,7 @@ export async function POST(request: NextRequest) {
     const result = await createMembershipCheckoutSession(
       session.user.id,
       parsed.data.membershipTier,
+      parsed.data.billingInterval,
       requestMeta,
       parsed.data.sourceContext ?? "planes",
     );

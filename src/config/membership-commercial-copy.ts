@@ -17,9 +17,9 @@ export const MEMBERSHIP_COMMERCIAL_COPY = {
       "Primero ves lo que te cuesta seguir igual. Luego descubres cuánto podrías recortar.",
   },
   reinforcement: {
-    riskFree: "Cancela fácil desde facturación. Sin riesgo.",
+    riskFree: "Cancela fácil. Sin riesgo.",
     ownership: "Tus datos y tu cuenta siguen siendo tuyos.",
-    checkout: "Checkout seguro con Stripe y cobro en USD.",
+    checkout: "Checkout seguro con AZUL y cobro en USD.",
   },
   growthHooks: {
     reminders: "Recordatorios que te ayudan a mantenerte al día.",

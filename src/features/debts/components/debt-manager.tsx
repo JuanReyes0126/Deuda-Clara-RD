@@ -633,9 +633,9 @@ export function DebtManager({
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5 sm:gap-6">
       {isOnboardingFlow ? (
-        <section className="rounded-[2rem] border border-primary/15 bg-[linear-gradient(135deg,rgba(13,148,136,0.12),rgba(14,116,144,0.04))] p-6 shadow-soft">
+        <section className="rounded-[2rem] border border-primary/15 bg-[linear-gradient(135deg,rgba(13,148,136,0.12),rgba(14,116,144,0.04))] p-4 shadow-soft sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
@@ -649,13 +649,13 @@ export function DebtManager({
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               {activeDebts.length > 0 ? (
-                <Button onClick={() => router.push("/pagos?from=onboarding")}>
+                <Button className="w-full sm:w-auto" onClick={() => router.push("/pagos?from=onboarding")}>
                   Continuar a pagos
                 </Button>
               ) : null}
-              <Button variant="secondary" onClick={resetForm}>
+              <Button className="w-full sm:w-auto" variant="secondary" onClick={resetForm}>
                 Empezar limpio
               </Button>
             </div>
@@ -681,7 +681,7 @@ export function DebtManager({
       />
 
       {access.isBase ? (
-        <div className="rounded-[1.6rem] border border-dashed border-primary/18 bg-[rgba(255,248,241,0.82)] px-5 py-4">
+        <div className="rounded-[1.6rem] border border-dashed border-primary/18 bg-[rgba(255,248,241,0.82)] px-4 py-4 sm:px-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0 max-w-3xl">
               <p className="text-primary text-sm font-semibold tracking-[0.16em] uppercase">
@@ -694,8 +694,9 @@ export function DebtManager({
                 Base te ayuda a entender el problema. Premium te deja ver el panorama completo y optimizarlo sin tomar decisiones a ciegas.
               </p>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <Button
+                className="w-full sm:w-auto"
                 variant="secondary"
                 onClick={() => {
                   trackPlanEvent("upgrade_click", {
@@ -759,8 +760,8 @@ export function DebtManager({
         tone={priorityDebt?.status === "LATE" ? "warning" : "default"}
       />
 
-      <section className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
-        <Card className="order-2 min-w-0 p-6 xl:order-2">
+      <section className="grid gap-5 sm:gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+        <Card className="order-2 -mx-1 min-w-0 p-4 sm:mx-0 sm:p-6 xl:order-2">
           <CardHeader>
             <CardTitle>{selectedDebt ? "Editar deuda" : "Registrar deuda"}</CardTitle>
             <CardDescription>
@@ -768,7 +769,7 @@ export function DebtManager({
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-4">
-            <div className="mb-6 rounded-[2rem] border border-primary/15 bg-[linear-gradient(135deg,rgba(13,148,136,0.12),rgba(14,116,144,0.04))] p-5">
+            <div className="mb-5 rounded-[2rem] border border-primary/15 bg-[linear-gradient(135deg,rgba(13,148,136,0.12),rgba(14,116,144,0.04))] p-4 sm:mb-6 sm:p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="max-w-2xl">
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary/80">
@@ -784,7 +785,7 @@ export function DebtManager({
                   </p>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="grid w-full grid-cols-2 gap-2 lg:flex lg:w-auto lg:flex-wrap">
                   {debtQuickPresets.map((preset) => {
                     const isActive = watchedType === preset.values.type;
 
@@ -793,7 +794,7 @@ export function DebtManager({
                         key={preset.key}
                         type="button"
                         variant={isActive ? "primary" : "secondary"}
-                        className="min-w-[9.5rem] max-w-full"
+                        className="min-h-11 max-w-full justify-center lg:min-w-[9.5rem]"
                         onClick={() => applyPreset(preset, { preserveText: true })}
                       >
                         {preset.label}
@@ -933,7 +934,7 @@ export function DebtManager({
                 <Label htmlFor="type">Tipo</Label>
                 <select
                   id="type"
-                  className="min-w-0 h-12 w-full rounded-2xl border border-border bg-white px-4 text-sm text-foreground outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
+                  className="min-h-12 min-w-0 w-full rounded-2xl border border-border bg-white px-4 text-base text-foreground outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10 sm:text-sm"
                   {...form.register("type")}
                 >
                   <option value="CREDIT_CARD">Tarjeta de crédito</option>
@@ -948,7 +949,7 @@ export function DebtManager({
                 <Label htmlFor="status">Estado</Label>
                 <select
                   id="status"
-                  className="min-w-0 h-12 w-full rounded-2xl border border-border bg-white px-4 text-sm text-foreground outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
+                  className="min-h-12 min-w-0 w-full rounded-2xl border border-border bg-white px-4 text-base text-foreground outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10 sm:text-sm"
                   {...form.register("status")}
                 >
                   <option value="CURRENT">Al día</option>
@@ -1005,7 +1006,7 @@ export function DebtManager({
                 <Label htmlFor="interestRateType">Tipo de tasa</Label>
                 <select
                   id="interestRateType"
-                  className="min-w-0 h-12 w-full rounded-2xl border border-border bg-white px-4 text-sm text-foreground outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
+                  className="min-h-12 min-w-0 w-full rounded-2xl border border-border bg-white px-4 text-base text-foreground outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10 sm:text-sm"
                   {...form.register("interestRateType")}
                 >
                   <option value="ANNUAL">Anual</option>
@@ -1031,7 +1032,7 @@ export function DebtManager({
                 <Label htmlFor="currency">Moneda</Label>
                 <select
                   id="currency"
-                  className="min-w-0 h-12 w-full rounded-2xl border border-border bg-white px-4 text-sm text-foreground outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
+                  className="min-h-12 min-w-0 w-full rounded-2xl border border-border bg-white px-4 text-base text-foreground outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10 sm:text-sm"
                   {...form.register("currency")}
                 >
                   <option value="DOP">RD$</option>
@@ -1136,11 +1137,11 @@ export function DebtManager({
                 <Textarea id="notes" {...form.register("notes", notesValidation)} />
               </div>
 
-              <div className="flex flex-wrap gap-3 md:col-span-2">
-                <Button type="submit" disabled={isSubmitting || debtLimitReached}>
+              <div className="flex flex-col gap-3 md:col-span-2 sm:flex-row sm:flex-wrap">
+                <Button className="w-full sm:w-auto" type="submit" disabled={isSubmitting || debtLimitReached}>
                   {selectedDebt ? "Guardar cambios" : "Crear deuda"}
                 </Button>
-                <Button type="button" variant="secondary" onClick={resetForm}>
+                <Button className="w-full sm:w-auto" type="button" variant="secondary" onClick={resetForm}>
                   Limpiar
                 </Button>
               </div>
@@ -1148,7 +1149,7 @@ export function DebtManager({
           </CardContent>
         </Card>
 
-        <Card className="order-1 min-w-0 p-6 xl:order-1">
+        <Card className="order-1 -mx-1 min-w-0 p-4 sm:mx-0 sm:p-6 xl:order-1">
           <CardHeader>
             <CardTitle>Tus deudas</CardTitle>
             <CardDescription>
@@ -1156,7 +1157,7 @@ export function DebtManager({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-4">
-            <div className="rounded-[2rem] border border-border bg-secondary/45 p-4">
+            <div className="rounded-[1.75rem] border border-border bg-secondary/45 p-3.5 sm:rounded-[2rem] sm:p-4">
               <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
                 <Input
                   value={searchQuery}
@@ -1164,7 +1165,7 @@ export function DebtManager({
                   placeholder="Busca por nombre, acreedor o nota"
                 />
 
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                   {[
                     { value: "ALL" as const, label: `Todas (${debts.length})` },
                     { value: "CURRENT" as const, label: `Al día (${debts.filter((debt) => debt.status === "CURRENT").length})` },
@@ -1175,6 +1176,7 @@ export function DebtManager({
                       type="button"
                       variant={listFilter === option.value ? "primary" : "secondary"}
                       size="sm"
+                      className="min-h-11 w-full justify-center sm:w-auto"
                       onClick={() => setListFilter(option.value)}
                     >
                       {option.label}
@@ -1188,7 +1190,7 @@ export function DebtManager({
               filteredDebts.map((debt) => (
                 <div
                   key={debt.id}
-                  className="min-w-0 rounded-[1.9rem] border border-border bg-secondary/50 p-5 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:p-6"
+                  className="min-w-0 rounded-[1.65rem] border border-border bg-secondary/50 p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:rounded-[1.9rem] sm:p-6"
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
@@ -1218,10 +1220,11 @@ export function DebtManager({
                       ) : null}
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid w-full grid-cols-2 gap-2 lg:flex lg:w-auto lg:flex-wrap">
                       <Button
                         variant="secondary"
                         size="sm"
+                        className="min-h-11 w-full justify-center"
                         onClick={() => router.push(`/pagos?debtId=${debt.id}`)}
                       >
                         Ir a pagos
@@ -1229,18 +1232,29 @@ export function DebtManager({
                       <Button
                         variant="secondary"
                         size="sm"
+                        className="min-h-11 w-full justify-center"
                         onClick={() => startEditingDebt(debt)}
                       >
                         <Pencil className="mr-2 size-4" />
                         Editar
                       </Button>
                       {debt.status !== "ARCHIVED" ? (
-                        <Button variant="ghost" size="sm" onClick={() => handleArchive(debt)}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="min-h-11 w-full justify-center"
+                          onClick={() => handleArchive(debt)}
+                        >
                           <Archive className="mr-2 size-4" />
                           Archivar
                         </Button>
                       ) : null}
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(debt.id)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="min-h-11 w-full justify-center"
+                        onClick={() => handleDelete(debt.id)}
+                      >
                         <Trash2 className="mr-2 size-4" />
                         Eliminar
                       </Button>

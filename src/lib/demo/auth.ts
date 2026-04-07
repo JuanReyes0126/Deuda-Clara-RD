@@ -5,6 +5,7 @@ import {
   DEMO_LOGIN_PASSWORD,
   isDemoModeEnabled,
 } from "@/lib/demo/session";
+import { shouldUseSecureCookies } from "@/lib/security/cookie-options";
 import type { RegisterInput } from "@/lib/validations/auth";
 import { hashPassword, verifyPassword } from "@/server/auth/password";
 import { ServiceError } from "@/server/services/service-error";
@@ -62,7 +63,7 @@ async function persistAccounts(accounts: DemoAccount[]) {
   store.set(DEMO_ACCOUNTS_COOKIE_NAME, encodeAccounts(accounts), {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookies(),
     path: "/",
     priority: "high",
   });

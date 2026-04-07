@@ -48,22 +48,32 @@ describe("api/billing/checkout", () => {
     } as never);
     vi.mocked(assertRecentAuth).mockResolvedValueOnce(undefined as never);
     vi.mocked(createMembershipCheckoutSession).mockResolvedValueOnce({
-      url: "https://checkout.stripe.com/test-session",
+      provider: "AZUL",
+      mode: "form_post",
+      method: "POST",
+      url: "https://pagos.azul.test/PaymentPage",
+      fields: { MerchantId: "merchant", AuthHash: "hash" },
+      externalOrderId: "DC123",
+      externalPriceCode: "azul_normal_monthly_usd",
     } as never);
 
     const response = await POST(
       buildJsonRequest("http://localhost/api/billing/checkout", {
           membershipTier: "NORMAL",
+          billingInterval: "monthly",
           sourceContext: "dashboard",
       }),
     );
-    const body = (await response.json()) as { url: string };
+    const body = (await response.json()) as { url: string; provider: string; fields: Record<string, string> };
 
     expect(response.status).toBe(200);
-    expect(body.url).toContain("checkout.stripe.com");
+    expect(body.provider).toBe("AZUL");
+    expect(body.url).toContain("azul");
+    expect(body.fields.AuthHash).toBe("hash");
     expect(createMembershipCheckoutSession).toHaveBeenCalledWith(
       "user-1",
       "NORMAL",
+      "monthly",
       expect.any(Object),
       "dashboard",
     );

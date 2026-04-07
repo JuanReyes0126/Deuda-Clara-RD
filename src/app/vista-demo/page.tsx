@@ -1,3 +1,5 @@
+import { notFound } from "next/navigation";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AdminOverview } from "@/features/admin/components/admin-overview";
 import { DashboardOverview } from "@/features/dashboard/components/dashboard-overview";
@@ -16,22 +18,27 @@ import {
   membershipConversionSnapshot,
   reportSummary,
 } from "@/lib/demo/data";
+import { isDemoModeEnabled } from "@/lib/demo/session";
 
 export const dynamic = "force-dynamic";
 
 export default function DemoPreviewPage() {
+  if (!isDemoModeEnabled()) {
+    notFound();
+  }
+
   return (
     <div className="min-h-screen bg-background px-4 py-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-8">
         <Card className="p-8">
           <CardHeader>
-            <CardTitle>Vista demo de Deuda Clara RD</CardTitle>
+            <CardTitle>Vista guiada de Deuda Clara RD</CardTitle>
             <CardDescription>
-              Esta ruta es solo para mostrar cómo quedó visualmente la app sin depender de login ni PostgreSQL.
+              Esta ruta interna sirve para revisar visualmente la app sin depender de login durante QA.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm leading-7 text-muted">
-            Abre esta pantalla para ver el look & feel final del dashboard, gestión de deudas, pagos, reportes, notificaciones y panel admin.
+            Úsala solo para revisar el look & feel del dashboard, gestión de deudas, pagos, reportes, notificaciones y panel admin.
           </CardContent>
         </Card>
 

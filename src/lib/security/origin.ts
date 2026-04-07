@@ -15,17 +15,19 @@ function normalizeOrigin(value: string) {
 
 function buildAllowedOrigins(request: NextRequest) {
   const origins = new Set<string>();
+  const env = getServerEnv();
   const host = request.headers.get("host");
   const protocol = request.nextUrl.protocol;
-  const appUrl = getServerEnv().APP_URL;
-
-  if (host) {
-    origins.add(`${protocol}//${host}`.replace(/\/$/, ""));
-    origins.add(`https://${host}`);
-  }
+  const appUrl = env.APP_URL;
+  const isProduction = env.NODE_ENV === "production";
 
   if (appUrl) {
-    origins.add(appUrl.replace(/\/$/, ""));
+    origins.add(new URL(appUrl).origin);
+  }
+
+  if (!isProduction && host) {
+    origins.add(`${protocol}//${host}`.replace(/\/$/, ""));
+    origins.add(`https://${host}`);
   }
 
   return origins;

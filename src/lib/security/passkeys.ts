@@ -6,6 +6,7 @@ import {
   decryptSensitiveText,
   encryptSensitiveText,
 } from "@/lib/security/encryption";
+import { shouldUseSecureCookies } from "@/lib/security/cookie-options";
 
 type PasskeyChallengeKind = "authentication" | "registration";
 
@@ -83,7 +84,7 @@ export function attachPasskeyChallengeCookie(
     path: getChallengeCookiePath(kind),
     priority: "high",
     sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookies(),
   });
 }
 
@@ -96,7 +97,7 @@ export function clearPasskeyChallengeCookie(
     httpOnly: true,
     path: getChallengeCookiePath(kind),
     sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookies(),
   });
 }
 

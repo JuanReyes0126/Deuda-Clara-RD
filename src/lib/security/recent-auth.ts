@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 
 import { getServerEnv } from "@/lib/env/server";
+import { shouldUseSecureCookies } from "@/lib/security/cookie-options";
 import { ServiceError } from "@/server/services/service-error";
 
 export const RECENT_AUTH_COOKIE_NAME = "dc_reauth";
@@ -67,7 +68,7 @@ export async function refreshRecentAuth(userId: string) {
   store.set(RECENT_AUTH_COOKIE_NAME, buildRecentAuthToken(userId, expiresAt), {
     httpOnly: true,
     sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookies(),
     expires: new Date(expiresAt),
     path: "/",
     priority: "high",

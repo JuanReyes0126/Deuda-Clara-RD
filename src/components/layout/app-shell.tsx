@@ -66,8 +66,8 @@ export function AppShell({ user, children }: AppShellProps) {
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto min-h-screen w-full max-w-[1840px] px-0 py-0 lg:grid lg:grid-cols-[252px_minmax(0,1fr)] lg:items-start lg:gap-6 lg:px-6 lg:py-4 2xl:max-w-[1980px] 2xl:px-8">
-        <div className="sticky top-0 z-30 border-b border-border/70 bg-[rgba(247,250,248,0.92)] px-3 pb-3 pt-3 backdrop-blur lg:hidden">
-          <div className="rounded-[1.6rem] border border-[#dfe9e4] bg-[linear-gradient(180deg,rgba(255,255,255,0.985)_0%,rgba(245,250,248,0.97)_58%,rgba(241,247,244,0.94)_100%)] px-4 py-3 shadow-[0_18px_44px_-34px_rgba(18,61,54,0.3)] ring-1 ring-white/80">
+        <div className="sticky top-0 z-30 border-b border-border/70 bg-[rgba(247,250,248,0.92)] px-2 pb-2.5 pt-2.5 backdrop-blur sm:px-3 lg:hidden">
+          <div className="rounded-[1.5rem] border border-[#dfe9e4] bg-[linear-gradient(180deg,rgba(255,255,255,0.985)_0%,rgba(245,250,248,0.97)_58%,rgba(241,247,244,0.94)_100%)] px-4 py-3 shadow-[0_18px_44px_-34px_rgba(18,61,54,0.3)] ring-1 ring-white/80">
             <div className="flex items-center justify-between gap-3">
               <Link
                 href="/dashboard"
@@ -88,7 +88,7 @@ export function AppShell({ user, children }: AppShellProps) {
                   <p className="truncate text-sm text-muted">{activeNavItem.label}</p>
                 </div>
               </Link>
-              <span className="inline-flex min-h-10 shrink-0 items-center rounded-full border border-[#d7e8e1] bg-white/88 px-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#256e63]">
+              <span className="inline-flex min-h-9 shrink-0 items-center rounded-full border border-[#d7e8e1] bg-white/88 px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#256e63]">
                 {membershipPlan.label}
               </span>
             </div>
@@ -187,13 +187,13 @@ export function AppShell({ user, children }: AppShellProps) {
           </div>
         </aside>
 
-        <main className="flex min-w-0 flex-col gap-4 px-3 pb-[7.5rem] pt-3 sm:px-4 sm:pb-[8rem] sm:pt-4 lg:gap-6 lg:px-0 lg:pb-0 lg:pt-0">
+        <main className="flex min-w-0 flex-col gap-4 px-2 pb-[9.25rem] pt-3 sm:px-4 sm:pb-[9.5rem] sm:pt-4 lg:gap-6 lg:px-0 lg:pb-0 lg:pt-0">
           {children}
         </main>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.85rem)] lg:hidden">
-        <div className="rounded-[1.75rem] border border-[#dfe9e4] bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(245,250,248,0.96)_100%)] p-2 shadow-[0_26px_60px_-38px_rgba(18,61,54,0.34)] ring-1 ring-white/85">
+      <div className="fixed inset-x-0 bottom-0 z-40 px-2 pb-[calc(env(safe-area-inset-bottom,0px)+1.15rem)] sm:px-3 lg:hidden">
+        <div className="rounded-[1.75rem] border border-[#dfe9e4] bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(245,250,248,0.96)_100%)] p-1.5 shadow-[0_26px_60px_-38px_rgba(18,61,54,0.34)] ring-1 ring-white/85 sm:p-2">
           <div className="grid grid-cols-5 gap-1.5">
             {mobilePrimaryNavItems.map((item) => {
               const Icon = item.icon;
@@ -205,7 +205,7 @@ export function AppShell({ user, children }: AppShellProps) {
                   type="button"
                   onClick={() => navigateTo(item.href)}
                   className={cn(
-                    "flex min-h-[4.25rem] flex-col items-center justify-center gap-1 rounded-[1.35rem] px-2 py-2 text-[11px] font-medium transition-all",
+                    "flex min-h-[3.95rem] flex-col items-center justify-center gap-1 rounded-[1.35rem] px-2 py-2 text-[10.5px] font-medium transition-all",
                     isActive
                       ? "bg-primary text-white shadow-[0_18px_34px_-24px_rgba(15,88,74,0.52)]"
                       : "bg-white/78 text-muted",
@@ -220,7 +220,7 @@ export function AppShell({ user, children }: AppShellProps) {
               type="button"
               onClick={() => setIsMobileMenuOpen(true)}
               className={cn(
-                "flex min-h-[4.25rem] flex-col items-center justify-center gap-1 rounded-[1.35rem] px-2 py-2 text-[11px] font-medium transition-all",
+                "flex min-h-[3.95rem] flex-col items-center justify-center gap-1 rounded-[1.35rem] px-2 py-2 text-[10.5px] font-medium transition-all",
                 isMoreActive || isMobileMenuOpen
                   ? "bg-primary text-white shadow-[0_18px_34px_-24px_rgba(15,88,74,0.52)]"
                   : "bg-white/78 text-muted",
@@ -241,7 +241,7 @@ export function AppShell({ user, children }: AppShellProps) {
             className="absolute inset-0"
             onClick={() => setIsMobileMenuOpen(false)}
           />
-          <div className="absolute inset-x-3 bottom-3 rounded-[2rem] border border-[#dfe9e4] bg-[linear-gradient(180deg,rgba(255,255,255,0.995)_0%,rgba(245,250,248,0.98)_100%)] p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] shadow-[0_28px_70px_-36px_rgba(18,61,54,0.36)] ring-1 ring-white/90">
+          <div className="absolute inset-x-3 bottom-4 rounded-[2rem] border border-[#dfe9e4] bg-[linear-gradient(180deg,rgba(255,255,255,0.995)_0%,rgba(245,250,248,0.98)_100%)] p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1.1rem)] shadow-[0_28px_70px_-36px_rgba(18,61,54,0.36)] ring-1 ring-white/90">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/80">

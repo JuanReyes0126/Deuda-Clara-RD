@@ -40,8 +40,8 @@ Estado: [GO / GO WITH RISK / NO-GO]
 
 ### Billing
 
-- Stripe en modo correcto (`test` / `live`)
-- productos y precios configurados
+- AZUL en ambiente correcto (`test/sandbox` o producción)
+- credenciales, merchant y moneda configurados
 - flujo de pago probado
 
 Estado: [GO / GO WITH RISK / NO-GO]

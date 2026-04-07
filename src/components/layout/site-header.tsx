@@ -7,10 +7,10 @@ import { cn } from "@/lib/utils/cn";
 const navItems = [
   { href: "#producto", label: "Producto" },
   { href: "#como-funciona", label: "Como funciona" },
-  { href: "#motor", label: "Motor" },
+  { href: "#siempre-a-tiempo", label: "Recordatorios" },
   { href: "#planes", label: "Planes" },
-  { href: "#seguridad", label: "Seguridad" },
-  { href: "#arquitectura", label: "Arquitectura" },
+  { href: "/security", label: "Seguridad" },
+  { href: "/about", label: "Acerca" },
 ];
 
 export function SiteHeader() {

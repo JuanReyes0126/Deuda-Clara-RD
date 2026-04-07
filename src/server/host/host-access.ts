@@ -12,6 +12,7 @@ import {
   parseHostAllowedEmails,
 } from "@/lib/host/panel";
 import { getServerEnv } from "@/lib/env/server";
+import { shouldUseSecureCookies } from "@/lib/security/cookie-options";
 import { verifyTotpCode } from "@/lib/security/totp";
 import { hashOpaqueToken } from "@/server/auth/tokens";
 import { logServerWarn } from "@/server/observability/logger";
@@ -211,7 +212,7 @@ export async function setHostPanelGateCookie() {
   store.set(HOST_PANEL_GATE_COOKIE, config.secondaryGateTokenHash, {
     httpOnly: true,
     sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookies(),
     expires,
     path: "/",
     priority: "high",

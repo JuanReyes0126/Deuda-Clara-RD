@@ -18,7 +18,7 @@ import {
   mapPaymentToDto,
 } from "@/server/finance/debt-helpers";
 import { calculateDebtStrategy } from "@/server/planner/strategy-engine";
-import { isStripeBillingConfigured } from "@/server/billing/billing-service";
+import { isBillingConfigured } from "@/server/billing/billing-service";
 import { buildDashboardPlanComparison } from "@/server/dashboard/plan-optimization";
 import { buildUpcomingReminderTimeline } from "@/server/reminders/reminder-engine";
 
@@ -464,7 +464,7 @@ function buildDashboardDataFromUser(user: DashboardSourceUser): DashboardDto {
       description: membershipPlan.description,
       currentPeriodEnd: user.settings?.membershipCurrentPeriodEnd?.toISOString() ?? null,
       cancelAtPeriodEnd: user.settings?.membershipCancelAtPeriodEnd ?? false,
-      billingConfigured: isStripeBillingConfigured(),
+      billingConfigured: isBillingConfigured(),
     },
     analysisScope: {
       activeDebtCount: activeDebts.length,

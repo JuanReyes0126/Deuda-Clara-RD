@@ -3,6 +3,7 @@ import path from "node:path";
 
 const cwd = process.cwd();
 const envPath = path.join(cwd, ".env");
+const envLocalPath = path.join(cwd, ".env.local");
 
 function parseEnvFile(raw) {
   const env = {};
@@ -37,11 +38,20 @@ function parseEnvFile(raw) {
 }
 
 function readLocalEnv() {
-  if (!fs.existsSync(envPath)) {
+  if (!fs.existsSync(envPath) && !fs.existsSync(envLocalPath)) {
     return null;
   }
 
-  return parseEnvFile(fs.readFileSync(envPath, "utf8"));
+  return [envPath, envLocalPath].reduce((env, filePath) => {
+    if (!fs.existsSync(filePath)) {
+      return env;
+    }
+
+    return {
+      ...env,
+      ...parseEnvFile(fs.readFileSync(filePath, "utf8")),
+    };
+  }, {});
 }
 
 function isLocalAppUrl(value) {
@@ -93,13 +103,13 @@ async function healthCheck(appUrl) {
   }
 }
 
-console.log("Deuda Clara RD · Pre-beta cerrada");
+console.log("Deuda Clara RD · Release candidate");
 console.log("");
 
 const env = readLocalEnv();
 
 if (!env) {
-  printStatus("fail", ".env", "No existe. Crea uno con `cp .env.example .env`.");
+  printStatus("fail", ".env", "No existe .env ni .env.local. Crea uno con `cp .env.example .env`.");
   process.exit(1);
 }
 
@@ -164,26 +174,31 @@ requireCheck(
 warnCheck(
   env.DEMO_MODE_ENABLED === "false",
   "DEMO_MODE_ENABLED",
-  "Desactivado. Correcto para beta real.",
-  "Sigue en `true`. Para amigos reales conviene usar `false` y trabajar con base persistente.",
+  "Desactivado. Correcto para lanzamiento.",
+  "Sigue en `true`. Para lanzamiento debe usar `false` y trabajar con base persistente.",
 );
 
 if (env.APP_URL) {
   const publicAppUrl = !isLocalAppUrl(env.APP_URL);
 
-  requireCheck(
+  warnCheck(
     publicAppUrl,
     "APP_URL pública",
     publicAppUrl
       ? `Lista para compartir: ${env.APP_URL}`
-      : `Todavía apunta a local: ${env.APP_URL}`,
+      : "URL pública configurada.",
+    publicAppUrl
+      ? "URL pública configurada."
+      : "Usando URL local para QA. En producción debe apuntar al dominio público.",
   );
 
   warnCheck(
     env.APP_URL.startsWith("https://"),
     "HTTPS",
     "La URL usa HTTPS.",
-    "La URL no usa HTTPS. Para beta cerrada real es mejor compartir bajo HTTPS.",
+    publicAppUrl
+      ? "La URL pública no usa HTTPS. Corrige antes de producción."
+      : "QA local sin HTTPS. Producción debe usar HTTPS.",
   );
 
   const health = await healthCheck(env.APP_URL);
@@ -233,9 +248,9 @@ if (env.APP_URL) {
 
       warnCheck(
         Boolean(health.payload.environment.billingReady),
-        "Stripe",
+        "AZUL",
         `Billing listo en modo ${health.payload.environment.billingMode}.`,
-        "Sin Stripe listo. Puedes correr beta funcional, pero no cobrar Premium/Pro.",
+        "AZUL no está listo. Puedes validar producto, pero no cobrar Premium/Pro.",
       );
     }
   }
@@ -245,21 +260,21 @@ console.log("");
 console.log("Recomendación de salida");
 
 if (failures === 0) {
-  console.log("- El entorno está suficientemente listo para una beta cerrada con 5 o 6 personas.");
-  console.log("- Siguiente paso: invitar testers, observar registro -> primera deuda -> primer pago -> simulador.");
+  console.log("- El entorno está suficientemente listo para QA final de release candidate.");
+  console.log("- Siguiente paso: validar mobile real, AZUL sandbox y go/no-go de producción.");
 } else {
-  console.log("- Todavía no abriría la beta. Corrige primero los checks marcados como fail.");
+  console.log("- Todavía no abriría producción. Corrige primero los checks marcados como fail.");
 }
 
 if (warnings > 0) {
-  console.log("- También conviene revisar los warnings antes de compartir el enlace ampliamente.");
+  console.log("- Revisa los warnings antes de compartir el enlace públicamente.");
 }
 
 console.log("");
-console.log("Sugerencia de prueba con amigos");
-console.log("- Pídeles 20 a 30 minutos.");
-console.log("- Enfócalos en: registro, primera deuda, primer pago, simulador y plan recomendado.");
-console.log("- Pídeles que te manden 3 cosas: qué entendieron rápido, dónde dudaron, y qué los frenó.");
+console.log("Foco de QA final");
+console.log("- Mobile: dashboard, deudas, pagos, simulador y planes.");
+console.log("- Billing: checkout AZUL aprobado, declinado y cancelado.");
+console.log("- Seguridad: auth, CSRF, MFA/admin, host panel y cron.");
 
 if (failures > 0) {
   process.exitCode = 1;

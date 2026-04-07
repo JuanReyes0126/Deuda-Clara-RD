@@ -2,7 +2,7 @@ import { MembershipPanel } from "@/features/membership/components/membership-pan
 import { membershipConversionSnapshot } from "@/lib/demo/data";
 import { isDemoSessionUser } from "@/lib/demo/session";
 import { membershipPlanCatalog, type MembershipPlanId } from "@/lib/membership/plans";
-import { isStripeBillingConfigured } from "@/server/billing/billing-service";
+import { isBillingConfigured } from "@/server/billing/billing-service";
 import { getMembershipConversionSnapshot } from "@/server/dashboard/dashboard-service";
 import { getRequestSessionUser } from "@/server/request/request-user-context";
 import { getUserSettingsViewModel } from "@/server/settings/settings-service";
@@ -63,7 +63,7 @@ export default async function MembershipPage({
     <MembershipPanel
       currentTier={(settings?.membershipTier ?? "FREE") as "FREE" | "NORMAL" | "PRO"}
       billingStatus={(settings?.membershipBillingStatus ?? "FREE") as "FREE" | "PENDING" | "ACTIVE" | "PAST_DUE" | "CANCELED" | "INACTIVE"}
-      billingConfigured={isStripeBillingConfigured()}
+      billingConfigured={isBillingConfigured()}
       canManageBilling={settings?.canManageBilling ?? false}
       currentPeriodEnd={settings?.membershipCurrentPeriodEnd ?? null}
       cancelAtPeriodEnd={settings?.membershipCancelAtPeriodEnd ?? false}

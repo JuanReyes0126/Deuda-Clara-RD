@@ -21,6 +21,7 @@ import {
 import { isInfrastructureUnavailableError } from "@/server/services/infrastructure-error";
 import { generateOpaqueToken, hashOpaqueToken } from "@/server/auth/tokens";
 import { clearRecentAuth, refreshRecentAuth } from "@/lib/security/recent-auth";
+import { shouldUseSecureCookies } from "@/lib/security/cookie-options";
 
 const SESSION_COOKIE_NAME = "dc_session";
 const SESSION_MAX_AGE_DAYS = 30;
@@ -80,7 +81,7 @@ export async function setSessionCookie(rawToken: string, expires: Date) {
   store.set(SESSION_COOKIE_NAME, rawToken, {
     httpOnly: true,
     sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookies(),
     expires,
     path: "/",
     priority: "high",

@@ -17,16 +17,16 @@ import { loadProjectEnv } from "./load-env.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const runtimeDir = path.join(projectRoot, ".runtime");
-const pidFile = path.join(runtimeDir, "private-app.pid");
-const metaFile = path.join(runtimeDir, "private-app.json");
-const logFile = path.join(runtimeDir, "private-app.log");
+const pidFile = path.join(runtimeDir, "private-app.local.pid");
+const metaFile = path.join(runtimeDir, "private-app.local.json");
+const logFile = path.join(runtimeDir, "private-app.local.log");
 const nextBin = path.join(projectRoot, "node_modules", "next", "dist", "bin", "next");
 const resolvedEnv = loadProjectEnv(projectRoot);
 
 const host = resolvedEnv.APP_HOST || "127.0.0.1";
 const port = resolvedEnv.APP_PORT || "3000";
 const appUrl = resolvedEnv.APP_URL || `http://${host}:${port}`;
-const demoModeEnabled = resolvedEnv.DEMO_MODE_ENABLED ?? "true";
+const demoModeEnabled = resolvedEnv.DEMO_MODE_ENABLED ?? "false";
 const command = process.argv[2] || "status";
 
 function ensureRuntimeDir() {
@@ -51,9 +51,28 @@ function isRunning(pid) {
   try {
     process.kill(pid, 0);
     return true;
-  } catch {
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "EPERM") {
+      return true;
+    }
+
     return false;
   }
+}
+
+function findPortOwnerPid() {
+  const result = spawnSync("lsof", [`-tiTCP:${port}`, "-sTCP:LISTEN"], {
+    cwd: projectRoot,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+
+  if (result.status !== 0 || !result.stdout) {
+    return null;
+  }
+
+  const parsed = Number(result.stdout.trim().split("\n")[0]);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function cleanupRuntime() {
@@ -78,8 +97,33 @@ function readMeta() {
   }
 }
 
-function printStatus() {
-  const pid = readPid();
+async function printStatus() {
+  let pid = readPid();
+  const meta = readMeta();
+  const effectiveHost = meta?.host || host;
+  const effectivePort = meta?.port || port;
+  const recoveredPid = pid ? null : findPortOwnerPid();
+
+  if (!pid && recoveredPid) {
+    pid = recoveredPid;
+    ensureRuntimeDir();
+    writeFileSync(pidFile, String(pid));
+    writeFileSync(
+      metaFile,
+      JSON.stringify(
+        {
+          pid,
+          host,
+          port,
+          appUrl,
+          demoModeEnabled,
+          recoveredAt: new Date().toISOString(),
+        },
+        null,
+        2,
+      ),
+    );
+  }
 
   if (!pid || !isRunning(pid)) {
     cleanupRuntime();
@@ -89,10 +133,20 @@ function printStatus() {
     return;
   }
 
-  const meta = readMeta();
+  const portActive = await isPortBusy(effectiveHost, effectivePort);
+
+  if (!portActive) {
+    cleanupRuntime();
+    console.log("Estado: detenido");
+    console.log(`PID anterior sin puerto activo: ${pid}`);
+    console.log(`URL privada esperada: http://${effectiveHost}:${effectivePort}`);
+    console.log(`Logs: ${logFile}`);
+    return;
+  }
+
   console.log("Estado: activo");
   console.log(`PID: ${pid}`);
-  console.log(`URL privada: http://${meta?.host || host}:${meta?.port || port}`);
+  console.log(`URL privada: http://${effectiveHost}:${effectivePort}`);
   console.log(`APP_URL efectiva: ${meta?.appUrl || appUrl}`);
   console.log(`Modo demo por defecto: ${(meta?.demoModeEnabled || demoModeEnabled) === "true" ? "activo" : "inactivo"}`);
   console.log(`Logs: ${logFile}`);
@@ -193,48 +247,20 @@ async function startApp({ rebuild }) {
 
   let runtimePid = null;
 
-  if (process.platform === "win32") {
-    const outFd = openSync(logFile, "a");
-    const child = spawn(
-      process.execPath,
-      [nextBin, "start", "--hostname", host, "--port", String(port)],
-      {
-        cwd: projectRoot,
-        env: buildRuntimeEnv(),
-        detached: true,
-        stdio: ["ignore", outFd, outFd],
-      },
-    );
-
-    child.unref();
-    runtimePid = child.pid;
-  } else {
-    const quotedNode = JSON.stringify(process.execPath);
-    const quotedNext = JSON.stringify(nextBin);
-    const quotedHost = JSON.stringify(host);
-    const quotedPort = JSON.stringify(String(port));
-    const quotedLog = JSON.stringify(logFile);
-    const commandLine = `nohup ${quotedNode} ${quotedNext} start --hostname ${quotedHost} --port ${quotedPort} >> ${quotedLog} 2>&1 & echo $!`;
-    const result = spawnSync("sh", ["-lc", commandLine], {
+  const outFd = openSync(logFile, "a");
+  const child = spawn(
+    process.execPath,
+    [nextBin, "start", "--hostname", host, "--port", String(port)],
+    {
       cwd: projectRoot,
       env: buildRuntimeEnv(),
-      encoding: "utf8",
-    });
+      detached: true,
+      stdio: ["ignore", outFd, outFd],
+    },
+  );
 
-    if (result.status !== 0) {
-      console.error(result.stderr || "No se pudo iniciar la app privada.");
-      process.exit(result.status ?? 1);
-    }
-
-    const parsedPid = Number(result.stdout.trim().split(/\s+/).pop());
-
-    if (!Number.isFinite(parsedPid)) {
-      console.error("No se pudo capturar el PID de la app privada.");
-      process.exit(1);
-    }
-
-    runtimePid = parsedPid;
-  }
+  child.unref();
+  runtimePid = child.pid;
 
   writeFileSync(pidFile, String(runtimePid));
   writeFileSync(
@@ -255,7 +281,10 @@ async function startApp({ rebuild }) {
 
   await new Promise((resolve) => setTimeout(resolve, 1200));
 
-  if (!isRunning(runtimePid)) {
+  const started = isRunning(runtimePid) && (await isPortBusy(host, port));
+
+  if (!started) {
+    cleanupRuntime();
     console.error("La app no logró quedarse levantada. Revisa el log:");
     console.error(logFile);
     const tail = readLogTail();
@@ -309,7 +338,7 @@ async function runDevServer(mode) {
 }
 
 async function stopApp() {
-  const pid = readPid();
+  const pid = readPid() || findPortOwnerPid();
 
   if (!pid || !isRunning(pid)) {
     cleanupRuntime();
@@ -365,7 +394,7 @@ switch (command) {
     await stopApp();
     break;
   case "status":
-    printStatus();
+    await printStatus();
     break;
   case "logs":
     showLogs();

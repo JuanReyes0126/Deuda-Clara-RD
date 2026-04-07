@@ -26,7 +26,7 @@ export function ModuleSectionHeader({
     >
       <div className="min-w-0 max-w-none md:max-w-4xl">
         {kicker ? <p className="section-kicker">{kicker}</p> : null}
-        <h2 className="font-display text-foreground mt-3 text-[clamp(1.55rem,6vw,2.45rem)] leading-tight tracking-tight">
+        <h2 className="font-display text-foreground mt-3 text-[clamp(1.42rem,5.4vw,2.45rem)] leading-[1.05] tracking-tight sm:text-[clamp(1.55rem,6vw,2.45rem)]">
           {title}
         </h2>
         {description ? (

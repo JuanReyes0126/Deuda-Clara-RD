@@ -16,6 +16,7 @@ import {
   CSRF_TOKEN_MAX_AGE_SECONDS,
   createCsrfToken,
 } from "@/lib/security/csrf";
+import { shouldUseSecureCookies } from "@/lib/security/cookie-options";
 
 const HOST_ACCESS_INTERNAL_HEADER = "x-deuda-clara-host-access";
 const HOST_NOT_FOUND_ROUTE = "/private-host-404";
@@ -136,7 +137,7 @@ function secureResponse(
       maxAge: CSRF_TOKEN_MAX_AGE_SECONDS,
       path: "/",
       sameSite: "strict",
-      secure: process.env.NODE_ENV === "production",
+      secure: shouldUseSecureCookies(),
     });
   }
 

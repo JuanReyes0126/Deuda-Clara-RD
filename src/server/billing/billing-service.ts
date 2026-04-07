@@ -1,15 +1,20 @@
-import { AuditAction } from "@prisma/client";
-import Stripe from "stripe";
+import { randomBytes } from "node:crypto";
+
+import { AuditAction, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
-import { getServerEnv } from "@/lib/env/server";
 import {
   type MembershipBillingStatus,
   type MembershipPlanId,
   getMembershipPlan,
 } from "@/lib/membership/plans";
-import type { CheckoutSourceContext } from "@/lib/validations/billing";
+import type {
+  CheckoutBillingIntervalInput,
+  CheckoutSourceContext,
+} from "@/lib/validations/billing";
 import { createAuditLog } from "@/server/audit/audit-service";
+import { createAzulBillingProvider, isAzulApprovedResponse, verifyAzulResponseHash } from "@/server/billing/providers/azul-provider";
+import type { BillingProvider } from "@/server/billing/providers/types";
 import {
   buildMembershipActivatedEmail,
   buildMembershipBillingAttentionEmail,
@@ -20,6 +25,7 @@ import { ServiceError } from "@/server/services/service-error";
 
 const billableMembershipTiers = ["NORMAL", "PRO"] as const;
 const membershipBillingAccessStatuses = new Set<MembershipBillingStatus>(["ACTIVE"]);
+const BILLING_EVENT_PROCESSING_STALE_MS = 10 * 60 * 1000;
 
 type RequestMeta = {
   ipAddress?: string | undefined;
@@ -27,155 +33,193 @@ type RequestMeta = {
 };
 
 export type BillableMembershipTier = (typeof billableMembershipTiers)[number];
+type BillingInterval = "MONTHLY" | "ANNUAL";
+type PaymentProviderEventStatus = "PROCESSING" | "PROCESSED" | "FAILED" | "SKIPPED";
+type AzulReturnOutcome = "approved" | "declined" | "cancelled";
 
-declare global {
-  var __stripeClient: Stripe | undefined;
-}
+type BillingProviderProcessingDecision =
+  | { shouldProcess: true }
+  | { shouldProcess: false; reason: "duplicate" | "processing" };
 
 export function isBillableMembershipTier(value: string): value is BillableMembershipTier {
   return (billableMembershipTiers as readonly string[]).includes(value);
-}
-
-export function mapStripeSubscriptionStatus(status: string): MembershipBillingStatus {
-  switch (status) {
-    case "active":
-    case "trialing":
-      return "ACTIVE";
-    case "past_due":
-    case "unpaid":
-      return "PAST_DUE";
-    case "canceled":
-      return "CANCELED";
-    case "incomplete":
-    case "incomplete_expired":
-    case "paused":
-      return "INACTIVE";
-    default:
-      return "PENDING";
-  }
 }
 
 export function hasBillingAccess(status: MembershipBillingStatus | null | undefined) {
   return status ? membershipBillingAccessStatuses.has(status) : false;
 }
 
-export function isStripeBillingConfigured() {
-  const env = getServerEnv();
+export function getBillingProviderEventProcessingDecision(input: {
+  status: PaymentProviderEventStatus;
+  updatedAt: Date;
+  now?: Date;
+}): BillingProviderProcessingDecision {
+  if (input.status === "PROCESSED" || input.status === "SKIPPED") {
+    return { shouldProcess: false, reason: "duplicate" };
+  }
 
-  return Boolean(
-    env.STRIPE_SECRET_KEY &&
-      env.STRIPE_WEBHOOK_SECRET &&
-      env.STRIPE_PREMIUM_PRICE_ID &&
-      env.STRIPE_PRO_PRICE_ID,
-  );
+  if (input.status === "PROCESSING") {
+    const now = input.now ?? new Date();
+    const isStale = now.getTime() - input.updatedAt.getTime() > BILLING_EVENT_PROCESSING_STALE_MS;
+
+    return isStale ? { shouldProcess: true } : { shouldProcess: false, reason: "processing" };
+  }
+
+  return { shouldProcess: true };
 }
 
-function getStripeClient() {
-  const env = getServerEnv();
-
-  if (!env.STRIPE_SECRET_KEY) {
-    throw new ServiceError(
-      "BILLING_NOT_CONFIGURED",
-      503,
-      "La facturación premium todavía no está configurada en este entorno.",
-    );
-  }
-
-  if (!global.__stripeClient) {
-    global.__stripeClient = new Stripe(env.STRIPE_SECRET_KEY);
-  }
-
-  return global.__stripeClient;
+function getBillingProvider(): BillingProvider {
+  return createAzulBillingProvider();
 }
 
-function getBillingPriceMap() {
-  const env = getServerEnv();
-
-  if (!env.STRIPE_PREMIUM_PRICE_ID || !env.STRIPE_PRO_PRICE_ID) {
-    throw new ServiceError(
-      "BILLING_PRICE_NOT_CONFIGURED",
-      503,
-      "Faltan los precios de Premium y Pro en la configuración de Stripe.",
-    );
-  }
-
-  return {
-    NORMAL: env.STRIPE_PREMIUM_PRICE_ID,
-    PRO: env.STRIPE_PRO_PRICE_ID,
-  } satisfies Record<BillableMembershipTier, string>;
+export function isBillingConfigured() {
+  return getBillingProvider().isConfigured();
 }
 
 function buildAbsoluteUrl(pathname: string) {
-  const env = getServerEnv();
-  const appUrl = env.APP_URL ?? "http://localhost:3000";
+  const appUrl = process.env.APP_URL ?? "http://localhost:3000";
 
   return new URL(pathname, appUrl).toString();
 }
 
-function getPortalReturnUrl() {
-  const env = getServerEnv();
-  const returnPath = env.STRIPE_PORTAL_RETURN_PATH ?? "/planes";
-
-  return buildAbsoluteUrl(returnPath);
+function normalizeBillingInterval(input: CheckoutBillingIntervalInput | BillingInterval): BillingInterval {
+  return input === "annual" || input === "ANNUAL" ? "ANNUAL" : "MONTHLY";
 }
 
-export function resolveMembershipTierFromPriceId(
-  priceId: string,
-  priceMap: Record<BillableMembershipTier, string>,
-): BillableMembershipTier {
-  const match = (Object.entries(priceMap) as Array<[BillableMembershipTier, string]>).find(
-    ([, configuredPriceId]) => configuredPriceId === priceId,
-  );
+function getBillingAmountCents(membershipTier: BillableMembershipTier, billingInterval: BillingInterval) {
+  const plan = getMembershipPlan(membershipTier);
+  const amountUsd = billingInterval === "ANNUAL" ? plan.annualPriceUsd : plan.monthlyPriceUsd;
 
-  if (!match) {
-    throw new ServiceError(
-      "BILLING_PRICE_UNKNOWN",
-      400,
-      "No se pudo relacionar el precio de Stripe con un plan de Deuda Clara RD.",
-    );
+  if (amountUsd <= 0) {
+    throw new ServiceError("BILLING_AMOUNT_INVALID", 400, "Ese plan no tiene precio de checkout.");
   }
 
-  return match[0];
+  return amountUsd * 100;
 }
 
-async function ensureStripeCustomer(userId: string) {
-  const user = await prisma.user.findUniqueOrThrow({
-    where: { id: userId },
-    include: {
-      settings: true,
-    },
-  });
+function buildExternalPriceCode(membershipTier: BillableMembershipTier, billingInterval: BillingInterval) {
+  return `azul_${membershipTier.toLowerCase()}_${billingInterval.toLowerCase()}_usd`;
+}
 
-  if (user.settings?.stripeCustomerId) {
-    return user.settings.stripeCustomerId;
+function buildExternalOrderId() {
+  return `DC${Date.now().toString(36).toUpperCase()}${randomBytes(2).toString("hex").toUpperCase()}`.slice(0, 15);
+}
+
+function addBillingInterval(date: Date, billingInterval: BillingInterval) {
+  const result = new Date(date);
+  result.setMonth(result.getMonth() + (billingInterval === "ANNUAL" ? 12 : 1));
+
+  return result;
+}
+
+async function beginBillingProviderEvent(input: {
+  provider: "AZUL";
+  externalEventId: string;
+  eventType: string;
+  payload?: Prisma.InputJsonValue;
+}) {
+  try {
+    await prisma.billingProviderEvent.create({
+      data: {
+        provider: input.provider,
+        externalEventId: input.externalEventId,
+        eventType: input.eventType,
+        status: "PROCESSING",
+        ...(input.payload === undefined ? {} : { payload: input.payload }),
+      },
+    });
+
+    return { shouldProcess: true } as const;
+  } catch (error) {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+      throw error;
+    }
   }
 
-  const stripe = getStripeClient();
-  const customer = await stripe.customers.create({
-    email: user.email,
-    name: `${user.firstName} ${user.lastName}`.trim(),
-    metadata: {
-      userId: user.id,
+  const existing = await prisma.billingProviderEvent.findUnique({
+    where: {
+      provider_externalEventId: {
+        provider: input.provider,
+        externalEventId: input.externalEventId,
+      },
+    },
+    select: {
+      status: true,
+      updatedAt: true,
     },
   });
 
-  await prisma.userSettings.upsert({
-    where: { userId },
-    create: {
-      userId,
-      stripeCustomerId: customer.id,
+  if (!existing) {
+    return { shouldProcess: true } as const;
+  }
+
+  const decision = getBillingProviderEventProcessingDecision({
+    status: existing.status,
+    updatedAt: existing.updatedAt,
+  });
+
+  if (!decision.shouldProcess) {
+    return decision;
+  }
+
+  await prisma.billingProviderEvent.update({
+    where: {
+      provider_externalEventId: {
+        provider: input.provider,
+        externalEventId: input.externalEventId,
+      },
     },
-    update: {
-      stripeCustomerId: customer.id,
+    data: {
+      eventType: input.eventType,
+      status: "PROCESSING",
+      ...(input.payload === undefined ? {} : { payload: input.payload }),
+      processedAt: null,
+      failedAt: null,
+      errorMessage: null,
     },
   });
 
-  return customer.id;
+  return { shouldProcess: true } as const;
+}
+
+async function markBillingProviderEvent(input: {
+  provider: "AZUL";
+  externalEventId: string;
+  status: "PROCESSED" | "SKIPPED" | "FAILED";
+  error?: unknown;
+}) {
+  await prisma.billingProviderEvent.update({
+    where: {
+      provider_externalEventId: {
+        provider: input.provider,
+        externalEventId: input.externalEventId,
+      },
+    },
+    data: {
+      ...(input.status === "FAILED"
+        ? {
+            status: input.status,
+            processedAt: null,
+            failedAt: new Date(),
+            errorMessage:
+              input.error instanceof Error
+                ? input.error.message.slice(0, 500)
+                : "Unknown billing provider error",
+          }
+        : {
+            status: input.status,
+            processedAt: new Date(),
+            failedAt: null,
+            errorMessage: null,
+          }),
+    },
+  });
 }
 
 export async function createMembershipCheckoutSession(
   userId: string,
   membershipTier: MembershipPlanId,
+  billingIntervalInput: CheckoutBillingIntervalInput,
   meta: RequestMeta,
   sourceContext: CheckoutSourceContext = "planes",
 ) {
@@ -183,16 +227,16 @@ export async function createMembershipCheckoutSession(
     throw new ServiceError("BILLING_PLAN_INVALID", 400, "Ese plan no se compra por checkout.");
   }
 
-  if (!isStripeBillingConfigured()) {
+  const provider = getBillingProvider();
+
+  if (!provider.isConfigured()) {
     throw new ServiceError(
       "BILLING_NOT_CONFIGURED",
       503,
-      "La facturación premium todavía no está configurada en este entorno.",
+      "La facturación con AZUL todavía no está configurada en este entorno.",
     );
   }
 
-  const priceMap = getBillingPriceMap();
-  const stripe = getStripeClient();
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
     include: {
@@ -201,7 +245,7 @@ export async function createMembershipCheckoutSession(
   });
 
   if (
-    user.settings?.stripeSubscriptionId &&
+    user.settings?.externalSubscriptionId &&
     hasBillingAccess((user.settings.membershipBillingStatus as MembershipBillingStatus | null | undefined) ?? null)
   ) {
     throw new ServiceError(
@@ -211,216 +255,179 @@ export async function createMembershipCheckoutSession(
     );
   }
 
-  const customerId = await ensureStripeCustomer(userId);
-  const successPath = `/planes?checkout=success&plan=${membershipTier}&source=${sourceContext}`;
-  const cancelPath = `/planes?checkout=cancelled&plan=${membershipTier}&source=${sourceContext}`;
-  const checkoutSession = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    customer: customerId,
-    client_reference_id: user.id,
-    allow_promotion_codes: true,
-    success_url: buildAbsoluteUrl(successPath),
-    cancel_url: buildAbsoluteUrl(cancelPath),
-    line_items: [
-      {
-        price: priceMap[membershipTier],
-        quantity: 1,
-      },
-    ],
-    metadata: {
-      userId: user.id,
-      membershipTier,
-      sourceContext,
-    },
-    subscription_data: {
-      metadata: {
-        userId: user.id,
-        membershipTier,
-        sourceContext,
-      },
-    },
+  const billingInterval = normalizeBillingInterval(billingIntervalInput);
+  const amountCents = getBillingAmountCents(membershipTier, billingInterval);
+  const externalPriceCode = buildExternalPriceCode(membershipTier, billingInterval);
+  const externalOrderId = buildExternalOrderId();
+  const checkout = provider.createCheckoutSession({
+    userId: user.id,
+    email: user.email,
+    fullName: `${user.firstName} ${user.lastName}`.trim(),
+    membershipTier,
+    billingInterval,
+    sourceContext,
+    amountCents,
+    currencyCode: "USD",
+    externalPriceCode,
+    externalOrderId,
+    approvedUrl: buildAbsoluteUrl(`/api/billing/azul/approved?orderNumber=${externalOrderId}`),
+    declinedUrl: buildAbsoluteUrl(`/api/billing/azul/declined?orderNumber=${externalOrderId}`),
+    cancelUrl: buildAbsoluteUrl(`/api/billing/azul/cancelled?orderNumber=${externalOrderId}`),
   });
 
-  await prisma.userSettings.upsert({
-    where: { userId },
-    create: {
-      userId,
-      stripeCustomerId: customerId,
-      membershipBillingStatus: "PENDING",
-    },
-    update: {
-      stripeCustomerId: customerId,
-      membershipBillingStatus:
-        user.settings?.membershipBillingStatus === "ACTIVE"
-          ? user.settings.membershipBillingStatus
-          : "PENDING",
-    },
-  });
+  await prisma.$transaction([
+    prisma.billingPayment.create({
+      data: {
+        userId: user.id,
+        provider: "AZUL",
+        membershipTier,
+        billingInterval,
+        externalOrderId,
+        externalPriceCode,
+        amountCents,
+        currency: "USD",
+        status: "PENDING",
+        metadata: {
+          sourceContext,
+          email: user.email,
+          fullName: `${user.firstName} ${user.lastName}`.trim(),
+        },
+      },
+    }),
+    prisma.userSettings.upsert({
+      where: { userId },
+      create: {
+        userId,
+        membershipBillingStatus: "PENDING",
+        billingInterval,
+        externalPaymentProvider: "AZUL",
+        externalPriceCode,
+      },
+      update: {
+        membershipBillingStatus:
+          user.settings?.membershipBillingStatus === "ACTIVE"
+            ? user.settings.membershipBillingStatus
+            : "PENDING",
+        billingInterval,
+        externalPaymentProvider: "AZUL",
+        externalPriceCode,
+      },
+    }),
+  ]);
 
   await createAuditLog({
     userId,
     action: AuditAction.BILLING_CHECKOUT_CREATED,
     resourceType: "billing",
-    resourceId: checkoutSession.id,
+    resourceId: externalOrderId,
     ipAddress: meta.ipAddress,
     userAgent: meta.userAgent,
     metadata: {
+      provider: "AZUL",
       membershipTier,
-      stripeCustomerId: customerId,
+      billingInterval,
+      externalPriceCode,
       sourceContext,
     },
   });
 
-  if (!checkoutSession.url) {
-    throw new ServiceError("BILLING_CHECKOUT_FAILED", 500, "No se pudo abrir el checkout.");
-  }
-
-  return {
-    url: checkoutSession.url,
-  };
+  return checkout;
 }
 
-export async function createBillingPortalSession(userId: string, meta: RequestMeta) {
-  if (!isStripeBillingConfigured()) {
-    throw new ServiceError(
-      "BILLING_NOT_CONFIGURED",
-      503,
-      "La facturación premium todavía no está configurada en este entorno.",
-    );
+export async function createBillingPortalSession(..._args: [string?, RequestMeta?]) {
+  void _args;
+
+  throw new ServiceError(
+    "BILLING_PORTAL_UNAVAILABLE",
+    501,
+    "AZUL no tiene portal de autoservicio conectado todavía. La gestión de renovación queda preparada para la fase de tokenización.",
+  );
+}
+
+function normalizeAzulParams(params: URLSearchParams | Record<string, string | undefined>) {
+  if (params instanceof URLSearchParams) {
+    return Object.fromEntries(params.entries());
   }
 
+  return params;
+}
+
+function getAzulOrderNumber(params: Record<string, string | undefined>) {
+  return params.orderNumber ?? params.OrderNumber ?? params.ordernumber ?? null;
+}
+
+function getAzulTransactionId(params: Record<string, string | undefined>) {
+  return params.AzulOrderId ?? params.RRN ?? params.AuthorizationCode ?? null;
+}
+
+async function activateMembershipFromApprovedPayment(input: {
+  paymentId: string;
+  userId: string;
+  membershipTier: BillableMembershipTier;
+  billingInterval: BillingInterval;
+  externalOrderId: string;
+  externalTransactionId: string | null;
+  externalPriceCode: string;
+}) {
+  const now = new Date();
+  const currentPeriodEnd = addBillingInterval(now, input.billingInterval);
   const user = await prisma.user.findUniqueOrThrow({
-    where: { id: userId },
-    include: {
-      settings: true,
-    },
-  });
-  const customerId = user.settings?.stripeCustomerId ?? (await ensureStripeCustomer(userId));
-  const stripe = getStripeClient();
-  const portalSession = await stripe.billingPortal.sessions.create({
-    customer: customerId,
-    return_url: getPortalReturnUrl(),
-  });
-
-  await createAuditLog({
-    userId,
-    action: AuditAction.BILLING_PORTAL_OPENED,
-    resourceType: "billing",
-    resourceId: portalSession.id,
-    ipAddress: meta.ipAddress,
-    userAgent: meta.userAgent,
-    metadata: {
-      stripeCustomerId: customerId,
-    },
-  });
-
-  return {
-    url: portalSession.url,
-  };
-}
-
-async function findTargetUserIdForSubscription(subscription: Stripe.Subscription) {
-  const customerId =
-    typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
-  const userIdFromMetadata = subscription.metadata.userId;
-
-  if (userIdFromMetadata) {
-    return userIdFromMetadata;
-  }
-
-  const settings = await prisma.userSettings.findFirst({
-    where: {
-      OR: [
-        { stripeCustomerId: customerId },
-        { stripeSubscriptionId: subscription.id },
-      ],
-    },
-    select: {
-      userId: true,
-    },
-  });
-
-  return settings?.userId ?? null;
-}
-
-export async function syncMembershipFromStripeSubscription(subscription: Stripe.Subscription) {
-  const userId = await findTargetUserIdForSubscription(subscription);
-
-  if (!userId) {
-    throw new ServiceError(
-      "BILLING_USER_NOT_FOUND",
-      404,
-      "No se pudo relacionar la suscripción de Stripe con un usuario.",
-    );
-  }
-
-  const customerId =
-    typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
-  const priceId = subscription.items.data[0]?.price?.id;
-
-  if (!priceId) {
-    throw new ServiceError(
-      "BILLING_PRICE_MISSING",
-      400,
-      "La suscripción de Stripe no trae un precio válido.",
-    );
-  }
-
-  const nextTier = resolveMembershipTierFromPriceId(priceId, getBillingPriceMap());
-  const billingStatus = mapStripeSubscriptionStatus(subscription.status);
-  const shouldKeepTier = billingStatus === "ACTIVE" || billingStatus === "PAST_DUE";
-  const membershipTier = shouldKeepTier ? nextTier : "FREE";
-  const membershipActivatedAt = shouldKeepTier ? new Date(subscription.start_date * 1000) : null;
-  const currentPeriodEnd = subscription.items.data[0]?.current_period_end
-    ? new Date(subscription.items.data[0].current_period_end * 1000)
-    : null;
-  const user = await prisma.user.findUniqueOrThrow({
-    where: { id: userId },
-    include: {
-      settings: true,
-    },
+    where: { id: input.userId },
+    include: { settings: true },
   });
   const previousTier = (user.settings?.membershipTier as MembershipPlanId | null | undefined) ?? "FREE";
   const previousStatus =
     (user.settings?.membershipBillingStatus as MembershipBillingStatus | null | undefined) ?? "FREE";
   const previousCancelAtPeriodEnd = user.settings?.membershipCancelAtPeriodEnd ?? false;
 
-  const settings = await prisma.userSettings.upsert({
-    where: { userId },
-    create: {
-      userId,
-      membershipTier,
-      membershipBillingStatus: billingStatus,
-      membershipActivatedAt,
-      membershipCurrentPeriodEnd: currentPeriodEnd,
-      membershipCancelAtPeriodEnd: subscription.cancel_at_period_end,
-      stripeCustomerId: customerId,
-      stripeSubscriptionId: shouldKeepTier ? subscription.id : null,
-      stripePriceId: shouldKeepTier ? priceId : null,
-    },
-    update: {
-      membershipTier,
-      membershipBillingStatus: billingStatus,
-      membershipActivatedAt,
-      membershipCurrentPeriodEnd: currentPeriodEnd,
-      membershipCancelAtPeriodEnd: subscription.cancel_at_period_end,
-      stripeCustomerId: customerId,
-      stripeSubscriptionId: shouldKeepTier ? subscription.id : null,
-      stripePriceId: shouldKeepTier ? priceId : null,
-    },
-  });
+  await prisma.$transaction([
+    prisma.billingPayment.update({
+      where: { id: input.paymentId },
+      data: {
+        status: "APPROVED",
+        approvedAt: now,
+        externalTransactionId: input.externalTransactionId,
+      },
+    }),
+    prisma.userSettings.upsert({
+      where: { userId: input.userId },
+      create: {
+        userId: input.userId,
+        membershipTier: input.membershipTier,
+        membershipBillingStatus: "ACTIVE",
+        billingInterval: input.billingInterval,
+        membershipActivatedAt: now,
+        membershipCurrentPeriodEnd: currentPeriodEnd,
+        membershipCancelAtPeriodEnd: false,
+        externalPaymentProvider: "AZUL",
+        externalSubscriptionId: null,
+        externalPriceCode: input.externalPriceCode,
+      },
+      update: {
+        membershipTier: input.membershipTier,
+        membershipBillingStatus: "ACTIVE",
+        billingInterval: input.billingInterval,
+        membershipActivatedAt: now,
+        membershipCurrentPeriodEnd: currentPeriodEnd,
+        membershipCancelAtPeriodEnd: false,
+        externalPaymentProvider: "AZUL",
+        externalSubscriptionId: null,
+        externalPriceCode: input.externalPriceCode,
+      },
+    }),
+  ]);
 
   await createAuditLog({
-    userId,
-    action: AuditAction.BILLING_WEBHOOK_SYNCED,
+    userId: input.userId,
+    action: AuditAction.BILLING_PAYMENT_CONFIRMED,
     resourceType: "billing",
-    resourceId: subscription.id,
+    resourceId: input.externalOrderId,
     metadata: {
-      membershipTier,
-      membershipBillingStatus: billingStatus,
-      stripeCustomerId: customerId,
-      stripePriceId: priceId,
-      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      provider: "AZUL",
+      membershipTier: input.membershipTier,
+      billingInterval: input.billingInterval,
+      externalTransactionId: input.externalTransactionId,
+      externalPriceCode: input.externalPriceCode,
     },
   });
 
@@ -430,13 +437,91 @@ export async function syncMembershipFromStripeSubscription(subscription: Stripe.
     previousTier,
     previousStatus,
     previousCancelAtPeriodEnd,
-    nextTier: membershipTier,
-    nextStatus: billingStatus,
+    nextTier: input.membershipTier,
+    nextStatus: "ACTIVE",
     currentPeriodEnd,
-    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    cancelAtPeriodEnd: false,
+  });
+}
+
+export async function handleAzulPaymentReturn(outcome: AzulReturnOutcome, paramsInput: URLSearchParams | Record<string, string | undefined>) {
+  const params = normalizeAzulParams(paramsInput);
+  const externalOrderId = getAzulOrderNumber(params);
+
+  if (!externalOrderId) {
+    throw new ServiceError("BILLING_ORDER_MISSING", 400, "La respuesta de AZUL no trae número de orden.");
+  }
+
+  const externalTransactionId = getAzulTransactionId(params);
+  const externalEventId = `${outcome}:${externalOrderId}:${externalTransactionId ?? "return"}`;
+  const processing = await beginBillingProviderEvent({
+    provider: "AZUL",
+    externalEventId,
+    eventType: `azul.${outcome}`,
+    payload: params as Prisma.InputJsonObject,
   });
 
-  return settings;
+  if (!processing.shouldProcess) {
+    return { checkout: processing.reason, orderNumber: externalOrderId };
+  }
+
+  try {
+    const payment = await prisma.billingPayment.findUnique({
+      where: { externalOrderId },
+    });
+
+    if (!payment) {
+      throw new ServiceError("BILLING_PAYMENT_NOT_FOUND", 404, "No se encontró el cobro pendiente de AZUL.");
+    }
+
+    if (params.Amount && Number(params.Amount) !== payment.amountCents) {
+      throw new ServiceError("BILLING_AMOUNT_MISMATCH", 400, "El monto confirmado por AZUL no coincide.");
+    }
+
+    if (outcome === "approved" && !params.AuthHash) {
+      throw new ServiceError("BILLING_SIGNATURE_MISSING", 403, "La respuesta aprobada de AZUL no trae firma.");
+    }
+
+    if (params.AuthHash && !verifyAzulResponseHash(params)) {
+      throw new ServiceError("BILLING_SIGNATURE_INVALID", 403, "La firma de AZUL no es válida.");
+    }
+
+    if (outcome === "approved" && isAzulApprovedResponse(params)) {
+      if (payment.status !== "APPROVED") {
+        await activateMembershipFromApprovedPayment({
+          paymentId: payment.id,
+          userId: payment.userId,
+          membershipTier: payment.membershipTier as BillableMembershipTier,
+          billingInterval: payment.billingInterval as BillingInterval,
+          externalOrderId,
+          externalTransactionId,
+          externalPriceCode: payment.externalPriceCode,
+        });
+      }
+
+      await markBillingProviderEvent({ provider: "AZUL", externalEventId, status: "PROCESSED" });
+
+      return { checkout: "success", orderNumber: externalOrderId };
+    }
+
+    const declinedStatus = outcome === "cancelled" ? "CANCELED" : "DECLINED";
+    await prisma.billingPayment.update({
+      where: { id: payment.id },
+      data:
+        declinedStatus === "CANCELED"
+          ? { status: "CANCELED", canceledAt: new Date(), externalTransactionId }
+          : { status: "DECLINED", declinedAt: new Date(), externalTransactionId },
+    });
+    await markBillingProviderEvent({ provider: "AZUL", externalEventId, status: "PROCESSED" });
+
+    return {
+      checkout: outcome === "cancelled" ? "cancelled" : "declined",
+      orderNumber: externalOrderId,
+    };
+  } catch (error) {
+    await markBillingProviderEvent({ provider: "AZUL", externalEventId, status: "FAILED", error });
+    throw error;
+  }
 }
 
 async function maybeSendMembershipLifecycleEmail(input: {
@@ -514,66 +599,4 @@ async function maybeSendMembershipLifecycleEmail(input: {
       error,
     });
   }
-}
-
-export async function syncMembershipFromStripeCheckoutSession(session: Stripe.Checkout.Session) {
-  const userId = session.client_reference_id ?? session.metadata?.userId ?? null;
-  const customerId =
-    typeof session.customer === "string"
-      ? session.customer
-      : session.customer?.id ?? null;
-
-  if (userId && customerId) {
-    await prisma.userSettings.upsert({
-      where: { userId },
-      create: {
-        userId,
-        stripeCustomerId: customerId,
-        membershipBillingStatus: "PENDING",
-      },
-      update: {
-        stripeCustomerId: customerId,
-        membershipBillingStatus: "PENDING",
-      },
-    });
-  }
-
-  if (typeof session.subscription !== "string") {
-    return null;
-  }
-
-  const stripe = getStripeClient();
-  const subscription = await stripe.subscriptions.retrieve(session.subscription);
-
-  return syncMembershipFromStripeSubscription(subscription);
-}
-
-export async function handleStripeWebhook(rawBody: string, signature: string) {
-  const env = getServerEnv();
-
-  if (!env.STRIPE_WEBHOOK_SECRET) {
-    throw new ServiceError(
-      "BILLING_WEBHOOK_NOT_CONFIGURED",
-      503,
-      "El webhook de Stripe no está configurado.",
-    );
-  }
-
-  const stripe = getStripeClient();
-  const event = stripe.webhooks.constructEvent(rawBody, signature, env.STRIPE_WEBHOOK_SECRET);
-
-  switch (event.type) {
-    case "checkout.session.completed":
-      await syncMembershipFromStripeCheckoutSession(event.data.object as Stripe.Checkout.Session);
-      break;
-    case "customer.subscription.created":
-    case "customer.subscription.updated":
-    case "customer.subscription.deleted":
-      await syncMembershipFromStripeSubscription(event.data.object as Stripe.Subscription);
-      break;
-    default:
-      break;
-  }
-
-  return event.type;
 }

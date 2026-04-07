@@ -2,6 +2,7 @@ import { DebtStatus } from "@prisma/client";
 import { cookies } from "next/headers";
 
 import { demoDebts } from "@/lib/demo/data";
+import { shouldUseSecureCookies } from "@/lib/security/cookie-options";
 import type { DebtItemDto, DebtSummaryDto } from "@/lib/types/app";
 import type { DebtInput } from "@/lib/validations/debts";
 import { decimal, toMoneyNumber } from "@/lib/utils/decimal";
@@ -159,7 +160,7 @@ async function setDemoDebtState(debts: DebtItemDto[]) {
   store.set(DEMO_DEBTS_COOKIE_NAME, encodeDebts(sortDebts(debts)), {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookies(),
     path: "/",
     priority: "high",
   });

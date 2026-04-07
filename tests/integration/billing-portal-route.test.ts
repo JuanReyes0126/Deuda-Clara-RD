@@ -45,7 +45,7 @@ describe("api/billing/portal", () => {
     } as never);
     vi.mocked(assertRecentAuth).mockResolvedValueOnce(undefined as never);
     vi.mocked(createBillingPortalSession).mockResolvedValueOnce({
-      url: "https://billing.stripe.com/test-session",
+      url: "https://billing.azul.test/manage",
     } as never);
 
     const response = await POST(
@@ -54,7 +54,7 @@ describe("api/billing/portal", () => {
     const body = (await response.json()) as { url: string };
 
     expect(response.status).toBe(200);
-    expect(body.url).toContain("billing.stripe.com");
+    expect(body.url).toContain("billing.azul");
     expect(createBillingPortalSession).toHaveBeenCalledWith(
       "user-1",
       expect.any(Object),

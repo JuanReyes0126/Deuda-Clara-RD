@@ -31,11 +31,13 @@ UPSTASH_REDIS_REST_TOKEN=REEMPLAZAR_SI_LO_USAS
 RESEND_API_KEY=REEMPLAZAR_SI_LO_USAS
 RESEND_FROM_EMAIL=Deuda Clara RD <no-reply@tu-dominio-staging.com>
 
-STRIPE_SECRET_KEY=sk_test_REEMPLAZAR
-STRIPE_WEBHOOK_SECRET=whsec_REEMPLAZAR
-STRIPE_PREMIUM_PRICE_ID=price_REEMPLAZAR
-STRIPE_PRO_PRICE_ID=price_REEMPLAZAR
-STRIPE_PORTAL_RETURN_PATH=/planes
+BILLING_PROVIDER=AZUL
+AZUL_PAYMENT_URL=https://sandbox.azul.com.do/PaymentPage
+AZUL_MERCHANT_ID=REEMPLAZAR
+AZUL_MERCHANT_NAME=Deuda Clara RD
+AZUL_MERCHANT_TYPE=ECommerce
+AZUL_AUTH_KEY=REEMPLAZAR
+AZUL_CURRENCY_CODE=USD
 
 HOST_PANEL_ENABLED=false
 HOST_ALLOWED_EMAILS=
@@ -65,11 +67,13 @@ UPSTASH_REDIS_REST_TOKEN=REEMPLAZAR
 RESEND_API_KEY=REEMPLAZAR
 RESEND_FROM_EMAIL=Deuda Clara RD <no-reply@deudaclarard.com>
 
-STRIPE_SECRET_KEY=sk_live_REEMPLAZAR
-STRIPE_WEBHOOK_SECRET=whsec_REEMPLAZAR
-STRIPE_PREMIUM_PRICE_ID=price_REEMPLAZAR
-STRIPE_PRO_PRICE_ID=price_REEMPLAZAR
-STRIPE_PORTAL_RETURN_PATH=/planes
+BILLING_PROVIDER=AZUL
+AZUL_PAYMENT_URL=https://pagos.azul.com.do/PaymentPage
+AZUL_MERCHANT_ID=REEMPLAZAR
+AZUL_MERCHANT_NAME=Deuda Clara RD
+AZUL_MERCHANT_TYPE=ECommerce
+AZUL_AUTH_KEY=REEMPLAZAR
+AZUL_CURRENCY_CODE=USD
 
 HOST_PANEL_ENABLED=false
 HOST_ALLOWED_EMAILS=
@@ -113,11 +117,13 @@ Recomendación:
 3. Integraciones:
    - `RESEND_API_KEY`
    - `RESEND_FROM_EMAIL`
-   - `STRIPE_SECRET_KEY`
-   - `STRIPE_WEBHOOK_SECRET`
-   - `STRIPE_PREMIUM_PRICE_ID`
-   - `STRIPE_PRO_PRICE_ID`
-   - `STRIPE_PORTAL_RETURN_PATH`
+   - `BILLING_PROVIDER=AZUL`
+   - `AZUL_PAYMENT_URL`
+   - `AZUL_MERCHANT_ID`
+   - `AZUL_MERCHANT_NAME`
+   - `AZUL_MERCHANT_TYPE`
+   - `AZUL_AUTH_KEY`
+   - `AZUL_CURRENCY_CODE`
 4. Host interno, si aplica:
    - `HOST_PANEL_ENABLED`
    - `HOST_ALLOWED_EMAILS`
@@ -132,7 +138,7 @@ Después del deploy:
 3. probar registro y login
 4. probar MFA
 5. probar passkeys en el dominio real
-6. si hay billing, probar checkout y portal
+6. si hay billing, probar checkout AZUL aprobado, declinado y cancelado
 
 ## 6. Error típico a evitar
 
@@ -141,4 +147,4 @@ No mezcles estas combinaciones:
 - `APP_URL` de staging con `PASSKEY_ALLOWED_ORIGINS` de producción
 - `PASSKEY_RP_ID` de un subdominio que no coincide con el dominio real de login
 - `DEMO_MODE_ENABLED=true` en staging o producción
-- claves de Stripe test en producción
+- credenciales test/sandbox de AZUL en producción

@@ -5,7 +5,7 @@ import { assertSameOrigin } from "@/lib/security/origin";
 import { getRequestMeta } from "@/lib/security/request-meta";
 import { membershipPlanSchema } from "@/lib/validations/membership";
 import { apiBadRequest, handleApiError } from "@/server/api/api-response";
-import { isStripeBillingConfigured } from "@/server/billing/billing-service";
+import { isBillingConfigured } from "@/server/billing/billing-service";
 import { updateUserMembershipPlan } from "@/server/settings/settings-service";
 
 export async function PATCH(request: NextRequest) {
@@ -24,7 +24,7 @@ export async function PATCH(request: NextRequest) {
       return apiBadRequest(parsed.error.issues[0]?.message ?? "Datos inválidos.");
     }
 
-    if (isStripeBillingConfigured()) {
+    if (isBillingConfigured()) {
       return apiBadRequest(
         "La membresía se gestiona desde checkout y el portal de facturación.",
         403,

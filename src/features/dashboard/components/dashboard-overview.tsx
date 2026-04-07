@@ -1107,7 +1107,7 @@ export function DashboardOverview({
 
   return (
     <div className="flex flex-col gap-5 sm:gap-6">
-      <section className="border-border shadow-soft rounded-[2rem] border bg-white/90 p-4 sm:p-8">
+      <section className="border-border shadow-soft -mx-1 rounded-[2rem] border bg-white/90 p-4 sm:mx-0 sm:p-8">
         <div className="flex flex-col gap-5 sm:gap-6">
           {!isPremiumUnlocked ? (
             <Card className="border-amber-200 bg-[linear-gradient(135deg,rgba(255,248,241,0.98),rgba(255,255,255,0.94))] p-4 shadow-[0_22px_50px_rgba(240,138,93,0.1)] sm:p-5">
@@ -1238,7 +1238,7 @@ export function DashboardOverview({
             ]}
           />
 
-          <Card className="border-border/80 bg-white/92 p-4 sm:p-5">
+          <Card className="border-border/80 -mx-1 bg-white/92 p-4 sm:mx-0 sm:p-5">
             <CardHeader className="gap-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -1873,7 +1873,7 @@ export function DashboardOverview({
       </section>
 
       <section className="grid gap-5 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-        <Card className="min-w-0 p-4 sm:p-7">
+        <Card className="-mx-1 min-w-0 p-4 sm:mx-0 sm:p-7">
           <CardHeader className="gap-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -1896,7 +1896,7 @@ export function DashboardOverview({
 
         <div className="grid gap-4 md:grid-cols-2">
           {secondaryLeadStatCard && SecondaryLeadStatIcon ? (
-            <Card className="min-w-0 p-5 sm:p-6 md:col-span-2">
+            <Card className="-mx-1 min-w-0 p-4 sm:mx-0 sm:p-6 md:col-span-2">
               <CardHeader className="gap-3">
                 <div className="flex items-start justify-between gap-3">
                   <CardDescription className="text-[11px] font-semibold uppercase tracking-[0.2em]">
@@ -1920,7 +1920,7 @@ export function DashboardOverview({
             const Icon = card.icon;
 
             return (
-              <Card key={card.key} className="min-w-0 p-5 sm:p-6">
+              <Card key={card.key} className="-mx-1 min-w-0 p-4 sm:mx-0 sm:p-6">
                 <CardHeader className="gap-3">
                   <div className="flex items-start justify-between gap-3">
                     <CardDescription className="text-[11px] font-semibold uppercase tracking-[0.2em]">
@@ -1947,7 +1947,7 @@ export function DashboardOverview({
 
       {isPremiumUnlocked && hasDebts ? (
         <section className="grid gap-5 2xl:grid-cols-[1.08fr_0.92fr]">
-          <Card className="p-4 sm:p-6">
+          <Card className="-mx-1 p-4 sm:mx-0 sm:p-6">
             <CardHeader>
               <CardTitle>Seguimiento premium de la semana</CardTitle>
               <CardDescription>
@@ -2014,7 +2014,7 @@ export function DashboardOverview({
             </CardContent>
           </Card>
 
-          <Card className="p-4 sm:p-6">
+          <Card className="-mx-1 p-4 sm:mx-0 sm:p-6">
             <CardHeader>
               <CardTitle>
                 {isProUnlocked
@@ -2127,7 +2127,7 @@ export function DashboardOverview({
       ) : null}
 
       <section className="grid gap-5 sm:gap-6 xl:grid-cols-[1.35fr_1fr]">
-        <Card className="p-4 sm:p-6">
+        <Card className="-mx-1 p-4 sm:mx-0 sm:p-6">
           <CardHeader>
             <CardTitle>Evolución del saldo</CardTitle>
             <CardDescription>
@@ -2156,7 +2156,7 @@ export function DashboardOverview({
           </CardContent>
         </Card>
 
-        <Card className="p-4 sm:p-6">
+        <Card className="-mx-1 p-4 sm:mx-0 sm:p-6">
           <CardHeader>
             <CardTitle>Resumen por tipo</CardTitle>
             <CardDescription>
@@ -2419,7 +2419,7 @@ export function DashboardOverview({
         </Card>
 
         <div className="grid gap-5 sm:gap-6">
-          <Card className="p-4 sm:p-6">
+          <Card className="-mx-1 p-4 sm:mx-0 sm:p-6">
             <CardHeader>
               <CardTitle>Deuda más urgente</CardTitle>
               <CardDescription>
@@ -2464,7 +2464,7 @@ export function DashboardOverview({
             </CardContent>
           </Card>
 
-          <Card className="p-4 sm:p-6">
+          <Card className="-mx-1 p-4 sm:mx-0 sm:p-6">
             <CardHeader>
               <CardTitle>Alertas de riesgo</CardTitle>
               <CardDescription>
@@ -2497,7 +2497,7 @@ export function DashboardOverview({
       </section>
 
       <section className="grid gap-5 sm:gap-6 xl:grid-cols-2">
-        <Card className="p-4 sm:p-6">
+        <Card className="-mx-1 p-4 sm:mx-0 sm:p-6">
           <CardHeader>
             <CardTitle>Próximos vencimientos</CardTitle>
             <CardDescription>
@@ -2537,7 +2537,7 @@ export function DashboardOverview({
           </CardContent>
         </Card>
 
-        <Card className="p-4 sm:p-6">
+        <Card className="-mx-1 p-4 sm:mx-0 sm:p-6">
           <CardHeader>
             <CardTitle>Pagos recientes</CardTitle>
             <CardDescription>

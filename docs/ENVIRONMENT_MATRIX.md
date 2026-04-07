@@ -70,23 +70,27 @@ Esta matriz resume qué variables necesita Deuda Clara RD por entorno y cómo de
 - `PASSKEY_RP_ID` debe coincidir con el dominio donde el usuario autentica.
 - No mezcles dominios de staging y producción en el mismo valor de producción.
 
-## 3. Billing / Stripe
+## 3. Billing / AZUL
 
 ### Staging o test
 
-- `STRIPE_SECRET_KEY=sk_test_...`
-- `STRIPE_WEBHOOK_SECRET=whsec_...`
-- `STRIPE_PREMIUM_PRICE_ID=price_...`
-- `STRIPE_PRO_PRICE_ID=price_...`
-- `STRIPE_PORTAL_RETURN_PATH=/planes`
+- `BILLING_PROVIDER=AZUL`
+- `AZUL_PAYMENT_URL=<url de sandbox o test>`
+- `AZUL_MERCHANT_ID=<merchant id de test>`
+- `AZUL_MERCHANT_NAME=Deuda Clara RD`
+- `AZUL_MERCHANT_TYPE=<tipo provisto por AZUL>`
+- `AZUL_AUTH_KEY=<auth key de test>`
+- `AZUL_CURRENCY_CODE=USD`
 
 ### Production
 
-- `STRIPE_SECRET_KEY=sk_live_...`
-- `STRIPE_WEBHOOK_SECRET=whsec_...`
-- `STRIPE_PREMIUM_PRICE_ID=price_...`
-- `STRIPE_PRO_PRICE_ID=price_...`
-- `STRIPE_PORTAL_RETURN_PATH=/planes`
+- `BILLING_PROVIDER=AZUL`
+- `AZUL_PAYMENT_URL=<url de producción AZUL>`
+- `AZUL_MERCHANT_ID=<merchant id de producción>`
+- `AZUL_MERCHANT_NAME=Deuda Clara RD`
+- `AZUL_MERCHANT_TYPE=<tipo provisto por AZUL>`
+- `AZUL_AUTH_KEY=<auth key de producción>`
+- `AZUL_CURRENCY_CODE=USD`
 
 ## 4. Email / Resend
 
@@ -151,10 +155,13 @@ Esta matriz resume qué variables necesita Deuda Clara RD por entorno y cómo de
 | `RESEND_FROM_EMAIL` | Opcional | Recomendado | Sí |
 | `UPSTASH_REDIS_REST_URL` | Opcional | Recomendado | Sí |
 | `UPSTASH_REDIS_REST_TOKEN` | Opcional | Recomendado | Sí |
-| `STRIPE_SECRET_KEY` | Si pruebas billing | Si pruebas billing | Sí |
-| `STRIPE_WEBHOOK_SECRET` | Si pruebas billing | Si pruebas billing | Sí |
-| `STRIPE_PREMIUM_PRICE_ID` | Si pruebas billing | Si pruebas billing | Sí |
-| `STRIPE_PRO_PRICE_ID` | Si pruebas billing | Si pruebas billing | Sí |
+| `BILLING_PROVIDER` | Si pruebas billing | Si pruebas billing | Sí |
+| `AZUL_PAYMENT_URL` | Si pruebas billing | Si pruebas billing | Sí |
+| `AZUL_MERCHANT_ID` | Si pruebas billing | Si pruebas billing | Sí |
+| `AZUL_MERCHANT_NAME` | Si pruebas billing | Si pruebas billing | Sí |
+| `AZUL_MERCHANT_TYPE` | Si pruebas billing | Si pruebas billing | Sí |
+| `AZUL_AUTH_KEY` | Si pruebas billing | Si pruebas billing | Sí |
+| `AZUL_CURRENCY_CODE` | Si pruebas billing | Si pruebas billing | Sí |
 | `HOST_PANEL_ENABLED` | Opcional | Mejor en `false` | Mejor en `false` |
 | `HOST_ALLOWED_EMAILS` | Si host está activo | Si host está activo | Si host está activo |
 | `HOST_SECONDARY_TOTP_SECRET` | Si host está activo | Si host está activo | Si host está activo |
@@ -165,7 +172,7 @@ Esta matriz resume qué variables necesita Deuda Clara RD por entorno y cómo de
 - Cargar después `CRON_SECRET`, `HEALTHCHECK_SECRET`.
 - Si usarás passkeys, cargar `PASSKEY_RP_ID`, `PASSKEY_RP_NAME`, `PASSKEY_ALLOWED_ORIGINS`.
 - Si usarás email, cargar `RESEND_API_KEY`, `RESEND_FROM_EMAIL`.
-- Si usarás billing, cargar variables de Stripe.
+- Si usarás billing, cargar variables de AZUL.
 - Confirmar explícitamente `DEMO_MODE_ENABLED=false`.
 - Ejecutar `npx prisma migrate deploy`.
 - Verificar `/api/health`.

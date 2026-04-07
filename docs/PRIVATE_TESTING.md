@@ -8,7 +8,7 @@ La solución elegida es un entorno **local, privado y persistente**:
 - no queda expuesto a Internet
 - mantiene logs locales
 - puede quedarse corriendo en segundo plano
-- funciona bien con `DEMO_MODE_ENABLED=true` aunque PostgreSQL falle
+- puede activar `DEMO_MODE_ENABLED=true` solo cuando necesites fallback local sin PostgreSQL
 
 ## Instalación mínima
 
@@ -39,7 +39,7 @@ Ese modo:
 1. levanta la app solo en `127.0.0.1`
 2. no genera links públicos
 3. deja los logs visibles en consola
-4. usa `DEMO_MODE_ENABLED=true` por defecto si no lo definiste en el entorno
+4. usa `DEMO_MODE_ENABLED=false` por defecto si no lo definiste en el entorno
 
 ## Modo recomendado para pruebas largas y estables
 
@@ -104,9 +104,9 @@ Los archivos del entorno privado viven en:
 
 Archivos principales:
 
-- `.runtime/private-app.pid`
-- `.runtime/private-app.json`
-- `.runtime/private-app.log`
+- `.runtime/private-app.local.pid`
+- `.runtime/private-app.local.json`
+- `.runtime/private-app.local.log`
 
 ## Variables útiles
 
@@ -116,7 +116,7 @@ Host y puerto por defecto:
 - `APP_PORT=3000`
 - `APP_URL=http://127.0.0.1:3000`
 
-Si no defines `DEMO_MODE_ENABLED`, el runner privado lo deja en `true` por defecto para que puedas seguir probando aunque la base esté caída.
+Si no defines `DEMO_MODE_ENABLED`, el runner privado lo deja en `false` por defecto para mantener el comportamiento cercano a lanzamiento. Actívalo manualmente solo para pruebas locales sin DB.
 
 Si en algún momento quieres probar dentro de tu red local, puedes cambiar temporalmente:
 

@@ -1,30 +1,56 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  mapStripeSubscriptionStatus,
-  resolveMembershipTierFromPriceId,
+  getBillingProviderEventProcessingDecision,
+  isBillableMembershipTier,
 } from "@/server/billing/billing-service";
 
 describe("billing-service", () => {
-  it("mapea estados activos de Stripe a membresía activa", () => {
-    expect(mapStripeSubscriptionStatus("active")).toBe("ACTIVE");
-    expect(mapStripeSubscriptionStatus("trialing")).toBe("ACTIVE");
+  it("limita checkout a planes cobrables", () => {
+    expect(isBillableMembershipTier("NORMAL")).toBe(true);
+    expect(isBillableMembershipTier("PRO")).toBe(true);
+    expect(isBillableMembershipTier("FREE")).toBe(false);
   });
 
-  it("mapea estados morosos e inactivos correctamente", () => {
-    expect(mapStripeSubscriptionStatus("past_due")).toBe("PAST_DUE");
-    expect(mapStripeSubscriptionStatus("unpaid")).toBe("PAST_DUE");
-    expect(mapStripeSubscriptionStatus("canceled")).toBe("CANCELED");
-    expect(mapStripeSubscriptionStatus("incomplete")).toBe("INACTIVE");
+  it("evita reprocesar webhooks ya procesados o omitidos", () => {
+    const updatedAt = new Date("2026-04-07T10:00:00.000Z");
+    const now = new Date("2026-04-07T10:01:00.000Z");
+
+    expect(getBillingProviderEventProcessingDecision({ status: "PROCESSED", updatedAt, now })).toEqual({
+      shouldProcess: false,
+      reason: "duplicate",
+    });
+    expect(getBillingProviderEventProcessingDecision({ status: "SKIPPED", updatedAt, now })).toEqual({
+      shouldProcess: false,
+      reason: "duplicate",
+    });
   });
 
-  it("relaciona precios de Stripe con Premium y Pro", () => {
-    const priceMap = {
-      NORMAL: "price_premium",
-      PRO: "price_pro",
-    };
+  it("permite reintentar webhooks fallidos o processing estancados", () => {
+    const now = new Date("2026-04-07T10:20:00.000Z");
 
-    expect(resolveMembershipTierFromPriceId("price_premium", priceMap)).toBe("NORMAL");
-    expect(resolveMembershipTierFromPriceId("price_pro", priceMap)).toBe("PRO");
+    expect(
+      getBillingProviderEventProcessingDecision({
+        status: "FAILED",
+        updatedAt: new Date("2026-04-07T10:01:00.000Z"),
+        now,
+      }),
+    ).toEqual({ shouldProcess: true });
+
+    expect(
+      getBillingProviderEventProcessingDecision({
+        status: "PROCESSING",
+        updatedAt: new Date("2026-04-07T10:01:00.000Z"),
+        now,
+      }),
+    ).toEqual({ shouldProcess: true });
+
+    expect(
+      getBillingProviderEventProcessingDecision({
+        status: "PROCESSING",
+        updatedAt: new Date("2026-04-07T10:19:00.000Z"),
+        now,
+      }),
+    ).toEqual({ shouldProcess: false, reason: "processing" });
   });
 });

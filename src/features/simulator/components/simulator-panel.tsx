@@ -783,7 +783,7 @@ export function SimulatorPanel({
       />
 
       <section className="grid gap-5 sm:gap-6 xl:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)]">
-        <Card className="order-1 min-w-0 p-4 sm:p-6">
+        <Card className="order-1 -mx-1 min-w-0 p-4 sm:mx-0 sm:p-6">
           <CardHeader className="gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <Badge variant="success">Se actualiza al instante</Badge>
@@ -976,7 +976,7 @@ export function SimulatorPanel({
           </CardContent>
         </Card>
 
-        <Card className="order-2 min-w-0 p-4 sm:p-6">
+        <Card className="order-2 -mx-1 min-w-0 p-4 sm:mx-0 sm:p-6">
           <CardHeader className="gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <Badge variant="warning">Resultado inmediato</Badge>
@@ -1231,7 +1231,7 @@ export function SimulatorPanel({
           {isPremiumUnlocked ? (
             <>
               <section className="grid gap-4 2xl:grid-cols-[1.15fr_0.85fr]">
-                <Card className="min-w-0 p-4 sm:p-6">
+                <Card className="-mx-1 min-w-0 p-4 sm:mx-0 sm:p-6">
                   <CardHeader>
                     <CardTitle className="text-balance">Comparación de escenarios</CardTitle>
                     <CardDescription className="text-pretty">
@@ -1321,7 +1321,7 @@ export function SimulatorPanel({
                   </CardContent>
                 </Card>
 
-                <Card className="min-w-0 p-4 sm:p-6">
+                <Card className="-mx-1 min-w-0 p-4 sm:mx-0 sm:p-6">
                   <CardHeader>
                     <CardTitle>Lectura visual rápida</CardTitle>
                     <CardDescription className="text-pretty">
@@ -1373,7 +1373,7 @@ export function SimulatorPanel({
               </section>
 
               {isProUnlocked ? (
-                <Card className="min-w-0 border-primary/14 bg-[rgba(240,248,245,0.92)] p-4 sm:p-6">
+                <Card className="-mx-1 min-w-0 border-primary/14 bg-[rgba(240,248,245,0.92)] p-4 sm:mx-0 sm:p-6">
                   <CardHeader className="gap-3">
                     <div className="flex flex-wrap items-center gap-3">
                       <Badge variant="success">Capa Pro</Badge>
@@ -1551,7 +1551,7 @@ export function SimulatorPanel({
                 </LockedCard>
               )}
 
-              <Card className="min-w-0 p-4 sm:p-6">
+              <Card className="-mx-1 min-w-0 p-4 sm:mx-0 sm:p-6">
                 <CardHeader className="gap-3">
                   <div className="flex flex-wrap items-center gap-3">
                     <Badge variant="default">
@@ -1676,7 +1676,7 @@ export function SimulatorPanel({
           )}
 
           {!isPremiumUnlocked && upgradeNarrative ? (
-            <Card className="min-w-0 border-primary/15 bg-[rgba(240,248,245,0.9)] p-4 sm:p-6">
+            <Card className="-mx-1 min-w-0 border-primary/15 bg-[rgba(240,248,245,0.9)] p-4 sm:mx-0 sm:p-6">
               <CardHeader className="gap-3">
                 <div className="flex flex-wrap items-center gap-3">
                   <Badge variant="warning">{upgradeNarrative.eyebrow}</Badge>

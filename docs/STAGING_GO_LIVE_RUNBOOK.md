@@ -1,6 +1,6 @@
 # Runbook de Staging y Salida Controlada
 
-Este runbook está pensado para dejar Deuda Clara RD lista para una beta cerrada o un staging serio sin improvisar.
+Este runbook está pensado para dejar Deuda Clara RD lista para un staging serio y una salida oficial controlada sin improvisar.
 
 ## 1. Preparación del entorno
 
@@ -9,7 +9,7 @@ Antes de tocar Vercel, ten a mano:
 - dominio o URL de staging
 - proyecto Postgres real en Neon
 - claves de Resend
-- claves test de Stripe
+- credenciales test/sandbox de AZUL
 - secretos fuertes para auth, cifrado, cron y health
 
 Referencia exacta de variables:
@@ -56,11 +56,13 @@ Después carga estas si usarás integraciones:
 
 - `RESEND_API_KEY`
 - `RESEND_FROM_EMAIL`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-- `STRIPE_PREMIUM_PRICE_ID`
-- `STRIPE_PRO_PRICE_ID`
-- `STRIPE_PORTAL_RETURN_PATH`
+- `BILLING_PROVIDER=AZUL`
+- `AZUL_PAYMENT_URL`
+- `AZUL_MERCHANT_ID`
+- `AZUL_MERCHANT_NAME`
+- `AZUL_MERCHANT_TYPE`
+- `AZUL_AUTH_KEY`
+- `AZUL_CURRENCY_CODE`
 
 Si vas a habilitar panel interno:
 
@@ -104,7 +106,7 @@ Corre:
 
 ```bash
 npm run doctor
-npm run prebeta
+npm run prelaunch
 npm run lint
 npm run typecheck
 npm run test:unit
@@ -134,11 +136,11 @@ Recorre este orden:
 10. Registrar pago
 11. Abrir simulador
 12. Revisar reportes
-13. Probar billing si Stripe está listo
+13. Probar billing si AZUL está listo
 
 ## 8. Perímetro y observabilidad
 
-Antes de abrir beta:
+Antes de abrir producción controlada:
 
 - activa WAF/CDN
 - fuerza HTTPS
@@ -168,9 +170,9 @@ Si no lo usarás:
 
 Si todo esto queda en verde:
 
-1. abre beta cerrada
-2. invita pocos usuarios
-3. observa errores y feedback
+1. abre acceso controlado
+2. invita pocos usuarios reales primero
+3. observa errores, pagos y feedback
 4. no metas features nuevas antes de estabilizar
 
 ## 🧾 Decisión final
