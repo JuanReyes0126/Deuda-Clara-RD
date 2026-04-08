@@ -64,7 +64,7 @@ export function AuthPageShell({
             <CardHeader>
               <CardTitle className="text-white">{asideTitle}</CardTitle>
               <CardDescription className="text-white/72">
-                Disenado para bajar ruido y convertir numeros dispersos en decisiones claras.
+                Diseñado para bajar ruido y convertir números dispersos en decisiones claras.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -84,6 +84,12 @@ export function AuthPageShell({
           <CardContent className="space-y-6">
             {children}
             <div className="border-border/70 flex flex-wrap items-center gap-4 border-t pt-4 text-sm text-muted">
+              <Link href="/about" className="font-medium hover:text-foreground">
+                Acerca de nosotros
+              </Link>
+              <Link href="/security" className="font-medium hover:text-foreground">
+                Seguridad
+              </Link>
               <Link href="/terms" className="font-medium hover:text-foreground">
                 Términos y Condiciones
               </Link>

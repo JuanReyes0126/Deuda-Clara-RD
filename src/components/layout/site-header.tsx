@@ -1,12 +1,13 @@
+import type { Route } from "next";
 import Link from "next/link";
 
 import { BrandBadge } from "@/components/shared/brand-logo";
 import { buttonClasses } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 
-const navItems = [
+const navItems: ReadonlyArray<{ href: Route | `#${string}`; label: string }> = [
   { href: "#producto", label: "Producto" },
-  { href: "#como-funciona", label: "Como funciona" },
+  { href: "#como-funciona", label: "Cómo funciona" },
   { href: "#siempre-a-tiempo", label: "Recordatorios" },
   { href: "#planes", label: "Planes" },
   { href: "/security", label: "Seguridad" },
@@ -26,17 +27,21 @@ export function SiteHeader() {
         </Link>
 
         <nav className="hidden items-center gap-2 rounded-full bg-secondary/80 px-2 py-2 lg:flex">
-          {navItems.map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "rounded-full px-4 py-2 text-sm font-medium text-muted transition hover:bg-white hover:text-foreground",
-              )}
-            >
-              {item.label}
-            </a>
-          ))}
+          {navItems.map((item) => {
+            const className = cn(
+              "rounded-full px-4 py-2 text-sm font-medium text-muted transition hover:bg-white hover:text-foreground",
+            );
+
+            return item.href.startsWith("#") ? (
+              <a key={item.href} href={item.href} className={className}>
+                {item.label}
+              </a>
+            ) : (
+              <Link key={item.href} href={item.href} className={className}>
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">
@@ -44,7 +49,7 @@ export function SiteHeader() {
             Iniciar sesión
           </Link>
           <Link href="/registro" className={buttonClasses({ variant: "primary", size: "sm" })}>
-            Crear cuenta
+            Crear mi plan
           </Link>
         </div>
       </div>

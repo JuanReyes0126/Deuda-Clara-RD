@@ -44,6 +44,16 @@ const navItems: ReadonlyArray<{
   { href: "/configuracion", label: "Configuración", icon: Settings },
 ];
 
+const publicFooterLinks: ReadonlyArray<{
+  href: Route;
+  label: string;
+}> = [
+  { href: "/about" as Route, label: "Acerca" },
+  { href: "/security" as Route, label: "Seguridad" },
+  { href: "/terms" as Route, label: "Términos" },
+  { href: "/privacy" as Route, label: "Privacidad" },
+];
+
 export function AppShell({ user, children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -177,6 +187,16 @@ export function AppShell({ user, children }: AppShellProps) {
 
           <div className="mt-auto flex items-center justify-center pt-2 lg:block lg:pt-4">
             <div className="rounded-3xl border border-white/60 bg-white/72 p-1.5 sm:p-2 lg:p-3">
+              <nav
+                aria-label="Enlaces públicos"
+                className="mb-3 hidden flex-wrap gap-x-3 gap-y-2 px-1 text-xs font-medium text-muted lg:flex"
+              >
+                {publicFooterLinks.map((item) => (
+                  <Link key={item.href} href={item.href} className="hover:text-foreground">
+                    {item.label}
+                  </Link>
+                ))}
+              </nav>
               <div className="lg:hidden">
                 <LogoutButton compact />
               </div>
@@ -189,6 +209,19 @@ export function AppShell({ user, children }: AppShellProps) {
 
         <main className="flex min-w-0 flex-col gap-4 px-2 pb-[9.25rem] pt-3 sm:px-4 sm:pb-[9.5rem] sm:pt-4 lg:gap-6 lg:px-0 lg:pb-0 lg:pt-0">
           {children}
+          <footer className="rounded-[1.5rem] border border-border/70 bg-white/72 px-4 py-4 text-xs text-muted shadow-soft ring-1 ring-white/70 lg:hidden">
+            <p className="font-semibold text-foreground">Deuda Clara RD</p>
+            <nav
+              aria-label="Enlaces legales y públicos"
+              className="mt-2 flex flex-wrap gap-x-4 gap-y-2"
+            >
+              {publicFooterLinks.map((item) => (
+                <Link key={item.href} href={item.href} className="font-medium hover:text-foreground">
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+          </footer>
         </main>
       </div>
 
@@ -285,6 +318,21 @@ export function AppShell({ user, children }: AppShellProps) {
             </div>
 
             <div className="mt-4 rounded-[1.35rem] border border-border/70 bg-white/82 p-3">
+              <nav
+                aria-label="Enlaces públicos"
+                className="mb-3 flex flex-wrap gap-x-3 gap-y-2 text-xs font-medium text-muted"
+              >
+                {publicFooterLinks.map((item) => (
+                  <button
+                    key={item.href}
+                    type="button"
+                    onClick={() => navigateTo(item.href)}
+                    className="rounded-full bg-secondary/70 px-3 py-2 text-left text-foreground"
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </nav>
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-foreground">

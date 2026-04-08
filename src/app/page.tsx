@@ -15,12 +15,12 @@ const dashboardMetrics = [
     detail: "Todo en una sola vista.",
   },
   {
-    label: "Pago minimo del mes",
+    label: "Pago mínimo del mes",
     value: formatCurrency(21800),
     detail: "Lo urgente queda claro.",
   },
   {
-    label: "Interes estimado del mes",
+    label: "Interés estimado del mes",
     value: formatCurrency(11993),
     detail: "El costo de esperar se vuelve visible.",
   },
@@ -44,32 +44,32 @@ const howItWorks = [
   {
     step: "1",
     title: "Registra tus deudas reales",
-    copy: "Carga tarjetas, préstamos y pagos mínimos para ver tu panorama real desde el primer día.",
+    copy: "Carga tus tarjetas y préstamos para ver tu panorama real.",
   },
   {
     step: "2",
     title: "Ve lo urgente y lo caro",
-    copy: "La app separa vencimientos, intereses y riesgo de pagar solo mínimos para que no decidas a ciegas.",
+    copy: "Te mostramos dónde estás perdiendo dinero y qué urge primero.",
   },
   {
     step: "3",
-    title: "Activa Premium si quieres salir mas rapido",
-    copy: "Desbloquea una ruta más clara para pagar antes y dejar de perder dinero en intereses.",
+    title: "Desbloquea tu mejor ruta",
+    copy: "Premium te dice qué pagar primero y cuánto podrías ahorrar.",
   },
 ] as const;
 
 const strategyCards = [
   {
     title: "Avalanche",
-    copy: "Prioriza la tasa más cara para recortar intereses cuanto antes.",
+    copy: "Ataca primero la deuda más cara para pagar menos intereses.",
   },
   {
     title: "Snowball",
-    copy: "Ataca primero los saldos más pequeños para ganar tracción y reducir carga mental.",
+    copy: "Empieza por los saldos más pequeños para ganar impulso.",
   },
   {
-    title: "Hibrido configurable",
-    copy: "Equilibra tasa, urgencia y tamaño para una estrategia más humana y accionable.",
+    title: "Híbrido configurable",
+    copy: "Combina tasa, urgencia y saldo para una ruta más equilibrada.",
   },
 ];
 
@@ -79,7 +79,7 @@ const pricingPlans = [
     name: "Base",
     price: "Gratis",
     highlight: "Empieza y entiende tu situación",
-    idealFor: "Útil para ordenar deudas y ver tu escenario actual, pero sin la ruta completa de salida.",
+    idealFor: "Ordena tus deudas y ve tu escenario actual.",
     features: getPlanFeatureBullets("FREE"),
   },
   {
@@ -89,8 +89,7 @@ const pricingPlans = [
     annual: "US$49/año",
     annualSavings: "ahorras US$11",
     highlight: "Optimiza y paga menos",
-    idealFor:
-      "La opción recomendada para la mayoría: te muestra cuánto dinero estás perdiendo y cómo empezar a pagar menos ahora.",
+    idealFor: "Te muestra cuánto pierdes hoy y cómo empezar a pagar menos.",
     features: getPlanFeatureBullets("NORMAL"),
     featured: true,
   },
@@ -101,17 +100,16 @@ const pricingPlans = [
     annual: "US$99/año",
     annualSavings: "ahorras US$21",
     highlight: "Control total y estrategia inteligente",
-    idealFor:
-      "Para quien quiere control total, más seguimiento y una estrategia que evoluciona sin seguir perdiendo contexto ni dinero.",
+    idealFor: "Más seguimiento, más contexto y una estrategia más completa.",
     features: getPlanFeatureBullets("PRO"),
   },
 ] as const;
 
 const features = [
-  "Dashboard claro con deuda total, interés del mes y siguiente mejor paso.",
-  "Registro de deudas y pagos sin ruido ni tecnicismos innecesarios.",
-  "Simulador para ver cuánto te cuesta seguir igual y dónde estás perdiendo dinero.",
-  "Alertas y seguimiento para que no se te escape lo importante.",
+  "Dashboard claro con deuda, intereses y siguiente paso.",
+  "Registro simple de deudas y pagos.",
+  "Simulador para ver cuánto te cuesta seguir igual.",
+  "Alertas para no dejar pasar fechas importantes.",
 ];
 
 const reminderHighlights = [
@@ -143,11 +141,11 @@ export default function HomePage() {
 
               <div className="space-y-5">
                 <h1 className="max-w-4xl font-display text-5xl leading-[0.95] tracking-tight text-foreground md:text-7xl">
-                  Entiende cuánto debes y qué te conviene hacer ahora.
+                  Ve cuánto debes y cómo salir más rápido.
                 </h1>
                 <p className="max-w-2xl text-lg leading-8 text-muted md:text-xl">
-                  Deuda Clara RD organiza tus deudas, muestra el costo real y te
-                  guía con un siguiente paso claro para salir más rápido.
+                  Organiza tus deudas, muestra lo que estás perdiendo en intereses
+                  y te dice cuál es el siguiente paso.
                 </p>
               </div>
 
@@ -156,19 +154,19 @@ export default function HomePage() {
                   href="/registro"
                   className="inline-flex h-12 items-center justify-center rounded-full bg-primary px-6 text-base font-semibold text-white shadow-[0_18px_42px_rgba(15,88,74,0.22)] transition hover:bg-primary-strong"
                 >
-                  Crear cuenta gratis
+                  Crear mi plan ahora
                 </Link>
                 <Link
                   href="#como-funciona"
                   className="inline-flex h-12 items-center justify-center rounded-full border border-[rgba(240,138,93,0.18)] bg-white px-6 text-base font-semibold text-foreground transition hover:bg-accent-soft/55"
                 >
-                  Ver cómo funciona
+                  Ver cómo salir de deudas
                 </Link>
                 <Link
                   href="/planes"
                   className="inline-flex h-12 items-center justify-center rounded-full bg-primary px-6 text-base font-semibold text-white shadow-[0_18px_42px_rgba(15,88,74,0.18)] transition hover:bg-primary-strong"
                 >
-                  Desbloquear y ahorrar ahora
+                  Empieza a ahorrar hoy
                 </Link>
               </div>
 
@@ -202,15 +200,14 @@ export default function HomePage() {
                     Vista ejecutiva
                   </span>
                   <span className="rounded-full border border-white/15 px-3 py-2 text-xs font-semibold">
-                    En produccion
+                    Empieza hoy
                   </span>
                 </div>
                 <CardTitle className="max-w-sm text-4xl text-white">
-                  Panorama claro. Prioridad clara. Siguiente paso claro.
+                  Menos ruido. Más claridad para pagar mejor.
                 </CardTitle>
                 <CardDescription className="max-w-lg text-base leading-7 text-white/72">
-                  Pensado para personas con deudas reales: menos ruido, menos
-                  jerga y decisiones más accionables.
+                  Hecho para ver rápido dónde estás, qué te cuesta más y qué hacer ahora.
                 </CardDescription>
               </CardHeader>
 
@@ -251,36 +248,36 @@ export default function HomePage() {
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/60">
                       Panorama
                     </p>
-                    <p className="mt-2 text-sm font-semibold text-white">
-                      Todo en una sola vista
-                    </p>
-                    <p className="mt-1 text-sm leading-6 text-white/70">
-                      Sin hojas sueltas ni cuentas separadas.
-                    </p>
-                  </div>
+                      <p className="mt-2 text-sm font-semibold text-white">
+                        Todo en una sola vista
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-white/70">
+                        Sin hojas sueltas ni cuentas dispersas.
+                      </p>
+                    </div>
                   <div className="min-w-0 sm:col-span-2 xl:col-span-1">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/60">
                       Prioridad
                     </p>
-                    <p className="mt-2 text-sm font-semibold text-white">
-                      Lo que más te conviene hoy
-                    </p>
-                    <p className="mt-1 text-sm leading-6 text-white/70">
-                      Vencimientos, mínimo y costo visible.
-                    </p>
-                  </div>
+                      <p className="mt-2 text-sm font-semibold text-white">
+                        Lo que más te conviene hoy
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-white/70">
+                        Vencimientos, mínimos y costo visible.
+                      </p>
+                    </div>
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/60">
                       Premium
                     </p>
-                    <p className="mt-2 text-sm font-semibold text-white">
-                      Ruta más clara
-                    </p>
-                    <p className="mt-1 text-sm leading-6 text-white/70">
-                      Si quieres salir más rápido, el plan te lo dice.
-                    </p>
+                      <p className="mt-2 text-sm font-semibold text-white">
+                        Ruta más clara
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-white/70">
+                        Premium te muestra cómo pagar mejor.
+                      </p>
+                    </div>
                   </div>
-                </div>
               </CardContent>
             </Card>
           </section>
@@ -291,13 +288,13 @@ export default function HomePage() {
           >
             <div className="space-y-4">
               <p className="section-kicker">
-                Como funciona
+                Cómo funciona
               </p>
               <h2 className="font-display text-4xl tracking-tight text-foreground">
-                Tres pasos claros para pasar de panorama borroso a plan accionable.
+                Tres pasos para pasar del caos a un plan claro.
               </h2>
               <p className="section-summary max-w-2xl">
-                No hace falta aprender finanzas complejas. Primero registras, luego entiendes la urgencia real y decides si Premium te conviene.
+                Registras, ves dónde pierdes dinero y decides cómo acelerar la salida.
               </p>
             </div>
 
@@ -328,7 +325,7 @@ export default function HomePage() {
                 Antes del corte. Antes del pago. Sin olvidos.
               </h2>
               <p className="section-summary max-w-2xl">
-                Deuda Clara RD no solo ordena tus deudas: también te ayuda a no dejar pasar fechas importantes.
+                Ordena tus deudas y te ayuda a no dejar pasar fechas importantes.
               </p>
             </div>
 
@@ -336,7 +333,7 @@ export default function HomePage() {
               <CardHeader className="gap-4">
                 <CardTitle>Recordatorios claros para mantenerte al día</CardTitle>
                 <CardDescription className="leading-7">
-                  Configura tus fechas de corte y pago una vez, y la app te recordará por correo cuándo conviene actuar.
+                  Configura tus fechas una vez y recibe avisos antes del corte y antes del pago.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3">
@@ -358,13 +355,13 @@ export default function HomePage() {
           >
             <div className="space-y-4">
               <p className="section-kicker">
-                Motor de decisiones
+                Tu estrategia
               </p>
               <h2 className="font-display text-4xl tracking-tight text-foreground">
-                No todas las deudas piden la misma estrategia.
+                Te decimos qué método encaja mejor contigo.
               </h2>
               <p className="section-summary max-w-2xl">
-                La app te deja entender la logica detras de cada metodo sin llenarte de teoria. Lo importante es que veas por que una ruta cuesta menos tiempo o menos interes.
+                Menos teoría. Más claridad sobre qué pagar primero y por qué.
               </p>
             </div>
 
@@ -394,10 +391,10 @@ export default function HomePage() {
                 Planes claros
               </p>
               <h2 className="font-display text-4xl tracking-tight text-foreground">
-                Empieza gratis y sube a Premium solo si quieres salir más rápido.
+                Empieza gratis y sube cuando quieras pagar menos.
               </h2>
               <p className="section-summary">
-                Premium desbloquea una ruta más clara: qué pagar primero, cuánto podrías recortar y cómo dejar de decidir a ciegas.
+                Premium te muestra cuánto puedes ahorrar y qué pagar primero.
               </p>
             </div>
 
@@ -416,7 +413,7 @@ export default function HomePage() {
                       <CardTitle>{plan.name}</CardTitle>
                       {"featured" in plan && plan.featured ? (
                         <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                          Mas elegido
+                          Recomendado
                         </span>
                       ) : null}
                     </div>
@@ -464,10 +461,10 @@ export default function HomePage() {
                         }`}
                       >
                         {"featured" in plan && plan.featured
-                          ? "Desbloquear y ahorrar ahora"
+                          ? "Empieza a ahorrar hoy"
                           : plan.name === "Pro"
-                            ? "Empezar a pagar menos ahora"
-                            : "Crear cuenta"}
+                            ? "Ver cómo salir de deudas"
+                            : "Crear mi plan ahora"}
                       </Link>
                     </div>
                   </CardContent>
@@ -480,13 +477,13 @@ export default function HomePage() {
             <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
               <div className="space-y-4">
                 <p className="section-kicker">
-                  Empieza sin friccion
+                  Empieza hoy
                 </p>
                 <h2 className="font-display text-4xl tracking-tight text-foreground">
-                  Puedes entrar hoy con Base y subir a Premium solo cuando quieras una ruta mas rapida.
+                  Empieza gratis y sube cuando quieras pagar menos.
                 </h2>
                 <p className="section-summary max-w-2xl">
-                  No necesitas decidir todo ahora. Primero ordena tus datos, mira tu panorama real y luego activa Premium si quieres que la app te diga con claridad que pagar primero y cuanto tiempo puedes recortar.
+                  Primero entiende tu panorama. Luego desbloquea una ruta más clara para salir antes.
                 </p>
               </div>
 
@@ -495,13 +492,13 @@ export default function HomePage() {
                   href="/registro"
                   className="inline-flex h-12 items-center justify-center rounded-full bg-primary px-6 text-base font-semibold text-white shadow-[0_18px_42px_rgba(15,88,74,0.22)] transition hover:bg-primary-strong"
                 >
-                  Empezar con Base
+                  Crear mi plan ahora
                 </Link>
                 <Link
                   href="/planes"
                   className="inline-flex h-12 items-center justify-center rounded-full border border-border bg-white px-6 text-base font-semibold text-foreground transition hover:bg-secondary/60"
                 >
-                  Empezar a pagar menos ahora
+                  Empieza a ahorrar hoy
                 </Link>
               </div>
             </div>
@@ -513,39 +510,39 @@ export default function HomePage() {
           >
             <div className="space-y-5">
               <p className="section-kicker">
-                Seguridad y confianza
+                Tu información, protegida
               </p>
               <h2 className="font-display text-4xl tracking-tight text-foreground">
-                Protección de datos y accesos pensada para uso real.
+                Seguridad avanzada sin complicarte la vida.
               </h2>
               <p className="section-summary max-w-2xl">
-                Tus datos financieros merecen una experiencia clara y protegida. Usamos controles de acceso, sesiones seguras y registros de actividad para reducir riesgos sin hacerte cargar con complejidad técnica.
+                Tu información está protegida con buenas prácticas de seguridad y control de acceso.
               </p>
               <Link
                 href="/security"
                 className="inline-flex h-12 items-center justify-center rounded-full bg-primary px-6 text-base font-semibold text-white shadow-[0_18px_42px_rgba(15,88,74,0.18)] transition hover:bg-primary-strong"
               >
-                Ver cómo protegemos tus datos
+                Ver seguridad
               </Link>
             </div>
 
             <div className="grid gap-4">
               <div className="rounded-3xl border border-border bg-secondary/70 p-5">
-                <p className="text-sm font-semibold text-foreground">Acceso protegido</p>
+                <p className="text-sm font-semibold text-foreground">Acceso seguro</p>
                 <p className="mt-2 text-sm leading-7 text-muted">
-                  Protegemos inicio de sesión, recuperación de cuenta y acciones sensibles.
+                  Protegemos el inicio de sesión y las acciones sensibles.
                 </p>
               </div>
               <div className="rounded-3xl border border-border bg-secondary/70 p-5">
-                <p className="text-sm font-semibold text-foreground">Actividad trazable</p>
+                <p className="text-sm font-semibold text-foreground">Protección de datos</p>
                 <p className="mt-2 text-sm leading-7 text-muted">
-                  Los eventos importantes quedan registrados para ayudarte a detectar actividad inusual.
+                  Tú decides qué información registrar dentro de la app.
                 </p>
               </div>
               <div className="rounded-3xl border border-border bg-secondary/70 p-5">
-                <p className="text-sm font-semibold text-foreground">Datos bajo control</p>
+                <p className="text-sm font-semibold text-foreground">Buenas prácticas de seguridad</p>
                 <p className="mt-2 text-sm leading-7 text-muted">
-                  No necesitas conectar bancos para empezar; tú decides qué información registrar.
+                  Aplicamos controles razonables para proteger tu cuenta y tus datos.
                 </p>
               </div>
             </div>
