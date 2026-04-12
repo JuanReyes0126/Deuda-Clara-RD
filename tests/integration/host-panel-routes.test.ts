@@ -20,6 +20,7 @@ vi.mock("@/lib/security/rate-limit", () => ({
 
 vi.mock("@/lib/security/origin", () => ({
   assertSameOrigin: vi.fn(),
+  getAllowedOriginsForRequest: vi.fn(() => new Set(["http://localhost"])),
 }));
 
 vi.mock("@/server/observability/logger", () => ({
@@ -27,9 +28,16 @@ vi.mock("@/server/observability/logger", () => ({
 }));
 
 describe("api/internal/host", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    vi.resetAllMocks();
     vi.stubEnv("APP_URL", "http://localhost");
     vi.stubEnv("AUTH_SECRET", INTERNAL_SECRET);
+
+    const { assertSameOrigin, getAllowedOriginsForRequest } = vi.mocked(
+      await import("@/lib/security/origin"),
+    );
+    vi.mocked(assertSameOrigin).mockImplementation(() => undefined);
+    vi.mocked(getAllowedOriginsForRequest).mockReturnValue(new Set(["http://localhost"]));
   });
 
   afterEach(() => {

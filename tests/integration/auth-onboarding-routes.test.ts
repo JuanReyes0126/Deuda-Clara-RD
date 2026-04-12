@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { POST as completeOnboardingPost } from "@/app/api/auth/onboarding/route";
 import { POST as onboardingPreviewPost } from "@/app/api/auth/onboarding/preview/route";
+import { ServiceError } from "@/server/services/service-error";
 import { buildJsonRequest } from "./request-helpers";
 
 vi.mock("@/lib/auth/session", () => ({
@@ -103,5 +104,69 @@ describe("api/auth onboarding", () => {
     expect(body.ok).toBe(true);
     expect(body.preview.recommendedStrategy).toBe("AVALANCHE");
     expect(completeUserOnboarding).toHaveBeenCalledOnce();
+  });
+
+  it("devuelve errores de servicio de forma controlada en la vista previa", async () => {
+    const { getCurrentSession } = await import("@/lib/auth/session");
+    const { buildOnboardingPreview } = await import("@/server/onboarding/onboarding-service");
+
+    vi.mocked(getCurrentSession).mockResolvedValueOnce({
+      user: { id: "user-1" },
+    } as never);
+    vi.mocked(buildOnboardingPreview).mockImplementationOnce(() => {
+      throw new ServiceError("ONBOARDING_INVALID", 400, "La vista previa no pudo calcularse.");
+    });
+
+    const response = await onboardingPreviewPost(
+      buildJsonRequest("http://localhost/api/auth/onboarding/preview", {
+        monthlyIncome: 35_000,
+        monthlyDebtBudget: 18_000,
+        debts: [
+          {
+            name: "Tarjeta Gold",
+            presetType: "CREDIT_CARD",
+            currentBalance: 95_000,
+            minimumPayment: 6_500,
+            interestRate: 54,
+          },
+        ],
+      }),
+    );
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("La vista previa no pudo calcularse.");
+  });
+
+  it("devuelve errores de servicio de forma controlada al completar onboarding", async () => {
+    const { getCurrentSession } = await import("@/lib/auth/session");
+    const { completeUserOnboarding } = await import("@/server/onboarding/onboarding-service");
+
+    vi.mocked(getCurrentSession).mockResolvedValueOnce({
+      user: { id: "user-1" },
+    } as never);
+    vi.mocked(completeUserOnboarding).mockRejectedValueOnce(
+      new ServiceError("ONBOARDING_INVALID", 409, "No se pudo guardar este onboarding."),
+    );
+
+    const response = await completeOnboardingPost(
+      buildJsonRequest("http://localhost/api/auth/onboarding", {
+        monthlyIncome: 35_000,
+        monthlyDebtBudget: 18_000,
+        debts: [
+          {
+            name: "Tarjeta Gold",
+            presetType: "CREDIT_CARD",
+            currentBalance: 95_000,
+            minimumPayment: 6_500,
+            interestRate: 54,
+          },
+        ],
+      }),
+    );
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(409);
+    expect(body.error).toBe("No se pudo guardar este onboarding.");
   });
 });

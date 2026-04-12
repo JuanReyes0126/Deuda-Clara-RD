@@ -72,7 +72,20 @@ export function assertSameOriginWithOptions(
     throw new ServiceError("ORIGIN_MISSING", 403, "La solicitud fue bloqueada por seguridad.");
   }
 
-  const normalizedCandidate = normalizeOrigin(candidate);
+  let normalizedCandidate: string;
+
+  try {
+    normalizedCandidate = normalizeOrigin(candidate);
+  } catch {
+    logSecurityEvent("origin_invalid", {
+      route: request.nextUrl.pathname,
+      method: request.method,
+      origin: origin ?? undefined,
+      referer: referer ?? undefined,
+      host: request.headers.get("host") ?? undefined,
+    });
+    throw new ServiceError("ORIGIN_INVALID", 403, "La solicitud fue bloqueada por seguridad.");
+  }
 
   if (!allowedOrigins.has(normalizedCandidate)) {
     logSecurityEvent("origin_blocked", {

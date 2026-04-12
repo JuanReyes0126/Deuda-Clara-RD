@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { GET as getCsv } from "@/app/api/reports/export/csv/route";
+import { GET as getPdf } from "@/app/api/reports/export/pdf/route";
 import { GET as getSummary } from "@/app/api/reports/summary/route";
 import { resolveFeatureAccess, type ResolvedFeatureAccess } from "@/lib/feature-access";
 
@@ -20,6 +21,7 @@ vi.mock("@/server/reports/report-service", () => ({
   })),
   getReportSummary: vi.fn(),
   buildReportCsv: vi.fn(() => "header\nvalue"),
+  buildReportPdf: vi.fn(async () => new Uint8Array([37, 80, 68, 70])),
 }));
 
 describe("api/reports/export/csv", () => {
@@ -151,6 +153,22 @@ describe("api/reports/export/csv", () => {
     expect(response.status).toBe(403);
     expect(body.error).toBe("La exportación de reportes está disponible en Pro.");
   });
+
+  it("rechaza fechas inválidas con 400", async () => {
+    const { getCurrentSession } = await import("@/lib/auth/session");
+
+    vi.mocked(getCurrentSession).mockResolvedValueOnce({
+      user: { id: "user-1" },
+    } as never);
+
+    const response = await getCsv(
+      new NextRequest("http://localhost/api/reports/export/csv?from=no-es-fecha&to=2026-03-31"),
+    );
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("Rango de fechas inválido.");
+  });
 });
 
 describe("api/reports/summary", () => {
@@ -207,6 +225,46 @@ describe("api/reports/summary", () => {
 
     expect(response.status).toBe(403);
     expect(body.error).toBe("Tu plan Base permite reportes de hasta 31 días.");
+  });
+
+  it("rechaza rangos invertidos con 400", async () => {
+    const { getCurrentSession } = await import("@/lib/auth/session");
+
+    vi.mocked(getCurrentSession).mockResolvedValueOnce({
+      user: { id: "user-1" },
+    } as never);
+
+    const response = await getSummary(
+      new NextRequest(
+        "http://localhost/api/reports/summary?from=2026-04-10&to=2026-04-01",
+      ),
+    );
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("La fecha inicial no puede ser mayor que la final.");
+  });
+});
+
+describe("api/reports/export/pdf", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("rechaza fechas inválidas con 400", async () => {
+    const { getCurrentSession } = await import("@/lib/auth/session");
+
+    vi.mocked(getCurrentSession).mockResolvedValueOnce({
+      user: { id: "user-1" },
+    } as never);
+
+    const response = await getPdf(
+      new NextRequest("http://localhost/api/reports/export/pdf?from=2026-03-01&to=fecha-mala"),
+    );
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("Rango de fechas inválido.");
   });
 });
 

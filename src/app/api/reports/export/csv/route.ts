@@ -6,9 +6,9 @@ import { apiBadRequest, handleApiError } from "@/server/api/api-response";
 import { getUserFeatureAccess } from "@/server/membership/membership-access-service";
 import {
   buildReportCsv,
-  getDefaultReportRange,
   getReportSummary,
 } from "@/server/reports/report-service";
+import { parseReportRange } from "@/server/reports/report-range";
 import { ServiceError } from "@/server/services/service-error";
 
 export async function GET(request: NextRequest) {
@@ -20,9 +20,7 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const defaultRange = getDefaultReportRange();
-    const from = searchParams.get("from") ? new Date(searchParams.get("from")!) : defaultRange.from;
-    const to = searchParams.get("to") ? new Date(searchParams.get("to")!) : defaultRange.to;
+    const { from, to } = parseReportRange(searchParams);
     const access = await getUserFeatureAccess(session.user.id);
 
     if (!access.canExportReports) {

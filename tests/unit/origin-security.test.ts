@@ -79,4 +79,24 @@ describe("origin security", () => {
 
     expect(() => assertSameOriginWithOptions(request)).not.toThrow();
   });
+
+  it("bloquea headers Origin malformados sin caer en error interno", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("APP_URL", "https://app.deudaclara.test");
+    vi.stubEnv("AUTH_SECRET", "x".repeat(32));
+    vi.stubEnv("DATABASE_URL", "postgresql://user:pass@localhost:5432/app");
+    vi.stubEnv("DATA_ENCRYPTION_KEY", "x".repeat(32));
+    vi.stubEnv("DEMO_MODE_ENABLED", "false");
+
+    const request = buildPostRequest({
+      url: "https://app.deudaclara.test/api/auth/login",
+      host: "app.deudaclara.test",
+      origin: "%%%origen-roto%%%",
+    });
+
+    expect(() => assertSameOriginWithOptions(request)).toThrow(ServiceError);
+    expect(() => assertSameOriginWithOptions(request)).toThrow(
+      "La solicitud fue bloqueada por seguridad.",
+    );
+  });
 });
