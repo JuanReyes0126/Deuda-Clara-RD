@@ -5,6 +5,7 @@ import { Redis } from "@upstash/redis";
 
 import { getServerEnv } from "@/lib/env/server";
 import { getRequestMeta } from "@/lib/security/request-meta";
+import { logServerError } from "@/server/observability/logger";
 
 type RateLimitInput = {
   key: string;
@@ -45,13 +46,20 @@ export async function assertRateLimit(input: RateLimitInput) {
   const limiter = getUpstashLimiter(input, env);
 
   if (limiter) {
-    const result = await limiter.limit(input.key);
+    try {
+      const result = await limiter.limit(input.key);
 
-    return {
-      success: result.success,
-      remaining: result.remaining,
-      resetAt: result.reset,
-    };
+      return {
+        success: result.success,
+        remaining: result.remaining,
+        resetAt: result.reset,
+      };
+    } catch (error) {
+      logServerError("Upstash rate limit failed, falling back to memory store", {
+        error,
+        rateLimitKey: input.key,
+      });
+    }
   }
 
   const now = Date.now();
