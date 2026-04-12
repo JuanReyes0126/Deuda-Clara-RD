@@ -13,19 +13,29 @@ function normalizeOrigin(value: string) {
   return new URL(value).origin;
 }
 
-function buildAllowedOrigins(request: NextRequest) {
+function shouldTrustRuntimeHostOrigin() {
+  const env = getServerEnv();
+
+  if (env.NODE_ENV !== "production") {
+    return true;
+  }
+
+  return process.env.VERCEL_ENV === "preview";
+}
+
+export function getAllowedOriginsForRequest(request: NextRequest) {
   const origins = new Set<string>();
   const env = getServerEnv();
   const host = request.headers.get("host");
   const protocol = request.nextUrl.protocol;
   const appUrl = env.APP_URL;
-  const isProduction = env.NODE_ENV === "production";
 
   if (appUrl) {
     origins.add(new URL(appUrl).origin);
   }
 
-  if (!isProduction && host) {
+  if (shouldTrustRuntimeHostOrigin() && host) {
+    origins.add(request.nextUrl.origin);
     origins.add(`${protocol}//${host}`.replace(/\/$/, ""));
     origins.add(`https://${host}`);
   }
@@ -50,7 +60,7 @@ export function assertSameOriginWithOptions(
 
   const origin = request.headers.get("origin");
   const referer = request.headers.get("referer");
-  const allowedOrigins = buildAllowedOrigins(request);
+  const allowedOrigins = getAllowedOriginsForRequest(request);
   const candidate = origin ?? referer;
 
   if (!candidate) {

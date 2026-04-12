@@ -60,4 +60,23 @@ describe("origin security", () => {
 
     expect(() => assertSameOriginWithOptions(request)).not.toThrow();
   });
+
+  it("permite el host real del deployment en previews de Vercel", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("APP_URL", "https://deuda-clara-rd-beta.vercel.app");
+    vi.stubEnv("AUTH_SECRET", "x".repeat(32));
+    vi.stubEnv("DATABASE_URL", "postgresql://user:pass@localhost:5432/app");
+    vi.stubEnv("DATA_ENCRYPTION_KEY", "x".repeat(32));
+    vi.stubEnv("DEMO_MODE_ENABLED", "false");
+
+    const request = buildPostRequest({
+      url: "https://deuda-clara-rd-beta-5pzq6e40n-juanprogamer597-5269s-projects.vercel.app/api/auth/login",
+      host: "deuda-clara-rd-beta-5pzq6e40n-juanprogamer597-5269s-projects.vercel.app",
+      origin:
+        "https://deuda-clara-rd-beta-5pzq6e40n-juanprogamer597-5269s-projects.vercel.app",
+    });
+
+    expect(() => assertSameOriginWithOptions(request)).not.toThrow();
+  });
 });

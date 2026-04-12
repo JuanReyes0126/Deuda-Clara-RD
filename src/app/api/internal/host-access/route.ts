@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getServerEnv } from "@/lib/env/server";
 import { HOST_PANEL_UNLOCK_ROUTE } from "@/lib/host/panel";
+import { getAllowedOriginsForRequest } from "@/lib/security/origin";
 import { assertRateLimit, buildRateLimitKey } from "@/lib/security/rate-limit";
 import { logSecurityEvent } from "@/server/observability/logger";
 import { assertHostPanelApiAccess } from "@/server/host/host-access";
@@ -16,8 +17,7 @@ function hasTrustedRequestOrigin(request: NextRequest) {
     return true;
   }
 
-  const appUrl = getServerEnv().APP_URL?.replace(/\/$/, "");
-  const allowedOrigins = new Set([request.nextUrl.origin, appUrl].filter(Boolean));
+  const allowedOrigins = getAllowedOriginsForRequest(request);
 
   try {
     return allowedOrigins.has(new URL(candidate).origin);
