@@ -20,16 +20,25 @@ function getUpstashLimiter(input: RateLimitInput, env = getServerEnv()) {
     return null;
   }
 
-  return new Ratelimit({
-    redis: new Redis({
-      url: env.UPSTASH_REDIS_REST_URL,
-      token: env.UPSTASH_REDIS_REST_TOKEN,
-    }),
-    limiter: Ratelimit.slidingWindow(
-      input.limit,
-      `${Math.max(1, Math.ceil(input.windowMs / 1000))} s`,
-    ),
-  });
+  try {
+    return new Ratelimit({
+      redis: new Redis({
+        url: env.UPSTASH_REDIS_REST_URL,
+        token: env.UPSTASH_REDIS_REST_TOKEN,
+      }),
+      limiter: Ratelimit.slidingWindow(
+        input.limit,
+        `${Math.max(1, Math.ceil(input.windowMs / 1000))} s`,
+      ),
+    });
+  } catch (error) {
+    logServerError("Upstash rate limit initialization failed, falling back to memory store", {
+      error,
+      rateLimitKey: input.key,
+    });
+
+    return null;
+  }
 }
 
 export async function assertRateLimit(input: RateLimitInput) {

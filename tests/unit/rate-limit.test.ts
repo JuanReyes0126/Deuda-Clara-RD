@@ -68,4 +68,26 @@ describe("rate limit fallback", () => {
       }),
     );
   });
+
+  it("usa fallback en memoria si Upstash falla al inicializar", async () => {
+    redisConstructor.mockImplementationOnce(() => {
+      throw new Error("invalid upstash config");
+    });
+
+    const { assertRateLimit } = await import("@/lib/security/rate-limit");
+    const result = await assertRateLimit({
+      key: "login:admin@deudaclarard.com",
+      limit: 5,
+      windowMs: 60_000,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.remaining).toBe(4);
+    expect(logServerErrorMock).toHaveBeenCalledWith(
+      "Upstash rate limit initialization failed, falling back to memory store",
+      expect.objectContaining({
+        rateLimitKey: "login:admin@deudaclarard.com",
+      }),
+    );
+  });
 });
