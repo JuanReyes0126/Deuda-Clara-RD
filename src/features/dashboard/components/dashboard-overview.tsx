@@ -15,8 +15,6 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { LockedCard } from "@/components/membership/locked-card";
-import { UpgradeCTA } from "@/components/membership/upgrade-cta";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,9 +33,11 @@ import { NarrativeInsightCard } from "@/components/shared/narrative-insight-card
 import { PrimaryActionCard } from "@/components/shared/primary-action-card";
 import { TrustInlineNote } from "@/components/shared/trust-inline-note";
 import {
+  MEMBERSHIP_COMMERCIAL_COPY,
   getCommercialUpgradeCta,
 } from "@/config/membership-commercial-copy";
 import { UPGRADE_MESSAGES } from "@/config/upgrade-messages";
+import { useSessionUpgradePrompt } from "@/lib/membership/use-session-upgrade-prompt";
 import type {
   DashboardDto,
   DashboardPlanSnapshotDto,
@@ -48,17 +48,30 @@ import { trackPlanEvent } from "@/lib/telemetry/plan-events";
 import { formatCurrency } from "@/lib/utils/currency";
 import { formatDate, formatRelativeDistance } from "@/lib/utils/date";
 
+function ChartLoadingPlaceholder() {
+  return (
+    <div className="bg-secondary/35 flex h-full flex-col justify-end rounded-3xl p-6">
+      <div className="space-y-3">
+        <div className="h-3 w-28 rounded-full bg-white/80" />
+        <div className="grid grid-cols-5 items-end gap-3">
+          <div className="h-16 rounded-2xl bg-white/75" />
+          <div className="h-24 rounded-2xl bg-white/80" />
+          <div className="h-20 rounded-2xl bg-white/75" />
+          <div className="h-32 rounded-2xl bg-white/85" />
+          <div className="h-28 rounded-2xl bg-white/75" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const DashboardBalanceHistoryChart = dynamic(
   () =>
     import("./dashboard-balance-history-chart").then(
       (module) => module.DashboardBalanceHistoryChart,
     ),
   {
-    loading: () => (
-      <div className="bg-secondary/40 text-muted flex h-full items-center justify-center rounded-3xl text-sm">
-        Preparando visualización...
-      </div>
-    ),
+    loading: () => <ChartLoadingPlaceholder />,
   },
 );
 
@@ -68,11 +81,7 @@ const DashboardDebtBreakdownChart = dynamic(
       (module) => module.DashboardDebtBreakdownChart,
     ),
   {
-    loading: () => (
-      <div className="bg-secondary/40 text-muted flex h-full items-center justify-center rounded-3xl text-sm">
-        Preparando visualización...
-      </div>
-    ),
+    loading: () => <ChartLoadingPlaceholder />,
   },
 );
 
@@ -406,7 +415,7 @@ function getDailyFocus({
       badgeVariant: "warning" as const,
       badgeLabel: "Vence pronto",
       notes: [
-        `Minimo sugerido: ${formatCurrency(nextDueDebt.minimumPayment)}`,
+        `Mínimo sugerido: ${formatCurrency(nextDueDebt.minimumPayment)}`,
         data.dueSoonDebts.length > 1
           ? `${data.dueSoonDebts.length} vencimientos compiten esta semana.`
           : "Conviene resolverlo antes de mover excedente.",
@@ -424,7 +433,7 @@ function getDailyFocus({
       primaryLabel: "Registrar pago a prioridad 1",
       primaryHref: paymentHref,
       badgeVariant: "success" as const,
-      badgeLabel: "Accion del dia",
+      badgeLabel: "Acción del día",
       notes: [
         data.planComparison?.monthsSaved
           ? `${data.planComparison.monthsSaved} meses recortables si sostienes la prioridad.`
@@ -437,9 +446,9 @@ function getDailyFocus({
   }
 
   if (data.riskAlerts.length > 0) {
-    return {
+      return {
       eyebrow: "Siguiente mejor acción",
-      title: "Revisar el riesgo de seguir pagando solo minimos.",
+      title: "Revisar el riesgo de seguir pagando solo mínimos.",
       description:
         "Hay señales de que parte del flujo se está yendo en intereses sin mover suficiente capital. Una revisión hoy puede corregir eso rápido.",
       primaryLabel: "Abrir simulador",
@@ -483,7 +492,7 @@ function getDailyFocus({
     badgeLabel: "Ritmo activo",
     notes: [
       `${formatCurrency(data.summary.currentMonthlyBudget)} de presupuesto mensual registrado.`,
-      "Una revision semanal suele ser suficiente para no perder traccion.",
+      "Una revisión semanal suele ser suficiente para no perder tracción.",
     ],
   };
 }
@@ -598,7 +607,7 @@ function getProgressMilestones({
     {
       label: "Prioridad visible",
       complete: Boolean(data.summary.recommendedDebtName || data.urgentDebt),
-      detail: "Ya sabes que deuda mirar primero.",
+      detail: "Ya sabes qué deuda mirar primero.",
     },
     {
       label: "Plan premium",
@@ -671,6 +680,19 @@ export function DashboardOverview({
         : "Tu estructura actual todavía no está bien optimizada."
     : null;
   const hasDebts = data.summary.totalDebt > 0;
+  const dashboardPromptIntent = !isPremiumUnlocked
+    ? data.analysisScope.partialAnalysis
+      ? "partial"
+      : hasDebts && data.summary.estimatedMonthlyInterest > 0
+        ? "interest"
+        : data.riskAlerts.length > 0
+          ? "risk"
+          : null
+    : null;
+  const showDashboardPremiumPrompt = useSessionUpgradePrompt({
+    id: `dashboard:${dashboardPromptIntent ?? "idle"}`,
+    active: Boolean(dashboardPromptIntent),
+  });
   const hasHistory = data.balanceHistory.length > 0;
   const hasBreakdown = data.debtBreakdown.length > 0;
   const hasRecommendedOrder = data.recommendedOrder.length > 0;
@@ -679,6 +701,35 @@ export function DashboardOverview({
     data.membership.cancelAtPeriodEnd;
   const isProUnlocked =
     data.membership.tier === "PRO" && data.membership.billingStatus === "ACTIVE";
+  const nextTimelineItem = data.upcomingTimeline.items[0] ?? null;
+  const mobileRiskLabel =
+    data.riskAlerts.length > 0
+      ? `${data.riskAlerts.length} alerta${data.riskAlerts.length === 1 ? "" : "s"}`
+      : formatCurrency(data.summary.estimatedMonthlyInterest);
+  const mobileRiskSupport =
+    data.riskAlerts.length > 0
+      ? "Requiere atención hoy"
+      : "Interés del mes";
+  const mobileProgressLabel = data.summary.projectedDebtFreeDate
+    ? `Salida estimada: ${formatDate(data.summary.projectedDebtFreeDate, "MMM yyyy")}`
+    : formatMonthsLabel(data.summary.monthsToDebtFree);
+  const mobileActionButtons = [
+    {
+      label: "Registrar pago",
+      href: paymentPriorityHref,
+      variant: "primary" as const,
+    },
+    {
+      label: "Ver deudas",
+      href: "/deudas",
+      variant: "secondary" as const,
+    },
+    {
+      label: "Abrir simulador",
+      href: "/simulador",
+      variant: "secondary" as const,
+    },
+  ];
   const quickActions = [
     !hasDebts
       ? {
@@ -1107,9 +1158,137 @@ export function DashboardOverview({
 
   return (
     <div className="flex flex-col gap-5 sm:gap-6">
+      <section className="-mx-1 grid gap-3 lg:hidden">
+        <Card className="border-border shadow-soft rounded-[2rem] border bg-white/92 p-4">
+          <CardHeader className="gap-3 px-0 pt-0">
+            <div className="flex items-center justify-between gap-3">
+              <Badge variant="default">Dashboard</Badge>
+              <Badge variant={data.riskAlerts.length > 0 ? "warning" : "success"}>
+                {data.riskAlerts.length > 0 ? "Atención hoy" : "Bajo control"}
+              </Badge>
+            </div>
+            <CardTitle className="text-[clamp(1.55rem,6vw,2rem)] leading-tight">
+              {hasDebts ? "Qué mirar hoy" : "Activa tu panorama"}
+            </CardTitle>
+            <CardDescription className="text-sm leading-6">
+              {hasDebts
+                ? "Lo esencial para decidir y moverte hoy."
+                : "Registra tu primera deuda para activar el panel."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 px-0 pb-0">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-[1.5rem] border border-border/70 bg-secondary/45 p-4">
+                <div className="flex items-center gap-2">
+                  <CircleDollarSign className="size-4 text-primary" />
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                    Deuda total
+                  </p>
+                </div>
+                <p className="value-stable mt-3 text-[clamp(1.5rem,6vw,2rem)] font-semibold leading-none text-foreground">
+                  {formatCurrency(data.summary.totalDebt)}
+                </p>
+              </div>
+              <div className="rounded-[1.5rem] border border-border/70 bg-secondary/45 p-4">
+                <div className="flex items-center gap-2">
+                  <CalendarClock className="size-4 text-primary" />
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                    Próximo pago
+                  </p>
+                </div>
+                <p className="mt-3 text-base font-semibold leading-tight text-foreground">
+                  {nextTimelineItem?.debtName ?? "Sin fecha cercana"}
+                </p>
+                <p className="mt-1 text-xs text-muted">
+                  {nextTimelineItem
+                    ? formatDate(nextTimelineItem.occursOn)
+                    : "Configura fechas para verlo aquí"}
+                </p>
+              </div>
+              <div className="rounded-[1.5rem] border border-border/70 bg-secondary/45 p-4">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="size-4 text-primary" />
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                    Riesgo / interés
+                  </p>
+                </div>
+                <p className="value-stable mt-3 text-[clamp(1.2rem,5vw,1.7rem)] font-semibold leading-tight text-foreground">
+                  {mobileRiskLabel}
+                </p>
+                <p className="mt-1 text-xs text-muted">{mobileRiskSupport}</p>
+              </div>
+            </div>
+
+            <div className="rounded-[1.5rem] border border-primary/12 bg-[rgba(240,248,245,0.9)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/80">
+                    Progreso
+                  </p>
+                  <p className="mt-2 text-lg font-semibold text-foreground">
+                    {debtProgressPct}% pagado
+                  </p>
+                </div>
+                <p className="text-right text-xs text-muted">{mobileProgressLabel}</p>
+              </div>
+              <div className="mt-3 h-3 overflow-hidden rounded-full bg-white/85">
+                <div
+                  className="h-full rounded-full bg-[linear-gradient(135deg,#0f584a_0%,#f08a5d_140%)] transition-all"
+                  style={{ width: `${debtProgressPct}%` }}
+                />
+              </div>
+            </div>
+
+            {!isPremiumUnlocked && hasDebts && showDashboardPremiumPrompt ? (
+              <div className="rounded-[1.5rem] border border-amber-200 bg-[rgba(255,248,241,0.96)] p-4">
+                <p className="text-sm font-semibold text-foreground">
+                  {data.analysisScope.partialAnalysis
+                    ? "Todavía estás viendo solo una parte del costo real."
+                    : `Estás pagando ${formatCurrency(data.summary.estimatedMonthlyInterest)} en intereses este mes.`}
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  {data.analysisScope.partialAnalysis
+                    ? "Premium une todas tus deudas activas para que dejes de decidir con el panorama incompleto."
+                    : "Premium te dice qué mover primero para dejar de perder más dinero este mes."}
+                </p>
+                <div className="mt-3">
+                  <Button
+                    className="w-full"
+                    onClick={() => {
+                      trackPlanEvent("upgrade_click", {
+                        source: "dashboard_mobile_summary",
+                        targetPlan: "NORMAL",
+                      });
+                      navigateTo(upgradePlanHref);
+                    }}
+                  >
+                    {MEMBERSHIP_COMMERCIAL_COPY.contextualCta.dashboardPremium}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="grid gap-3">
+              {mobileActionButtons.map((action) => (
+                <Button
+                  key={action.label}
+                  variant={action.variant}
+                  size="lg"
+                  className="w-full"
+                  onClick={() => navigateTo(action.href)}
+                >
+                  {action.label}
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <div className="hidden lg:flex lg:flex-col gap-5 sm:gap-6">
       <section className="border-border shadow-soft -mx-1 rounded-[2rem] border bg-white/90 p-4 sm:mx-0 sm:p-8">
         <div className="flex flex-col gap-5 sm:gap-6">
-          {!isPremiumUnlocked ? (
+          {!isPremiumUnlocked && showDashboardPremiumPrompt ? (
             <Card className="border-amber-200 bg-[linear-gradient(135deg,rgba(255,248,241,0.98),rgba(255,255,255,0.94))] p-4 shadow-[0_22px_50px_rgba(240,138,93,0.1)] sm:p-5">
               <CardHeader className="gap-3 px-0 pt-0">
                 <div className="flex flex-wrap items-center gap-3">
@@ -1133,11 +1312,11 @@ export function DashboardOverview({
                   </div>
                   <div className="rounded-[1.4rem] border border-white/80 bg-white/90 px-4 py-4 text-sm leading-6 text-foreground">
                     {data.analysisScope.partialAnalysis
-                      ? "Hay deudas fuera del análisis Base. Estás tomando decisiones sin ver toda tu realidad."
-                      : "Tu panorama ya muestra el problema, pero todavía no te enseña la mejor salida."}
+                      ? "Hay deudas fuera del análisis Base. Tu lectura de hoy todavía está dejando dinero fuera del mapa."
+                      : "Tu panorama ya muestra el costo. Lo que falta es ver la salida que menos te castiga."}
                   </div>
                   <div className="rounded-[1.4rem] border border-white/80 bg-white/90 px-4 py-4 text-sm leading-6 text-foreground">
-                    Premium compara tu escenario actual contra una ruta mejorada para que veas cuánto tiempo y dinero estás perdiendo hoy.
+                    Premium compara tu ruta actual contra una mejor para mostrarte cuánto podrías recuperar en tiempo y dinero.
                   </div>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -1151,7 +1330,7 @@ export function DashboardOverview({
                       navigateTo(upgradePlanHref);
                     }}
                   >
-                    {getCommercialUpgradeCta("Premium")}
+                    {MEMBERSHIP_COMMERCIAL_COPY.contextualCta.dashboardPremium}
                   </Button>
                   <Button className="w-full sm:w-auto" variant="secondary" onClick={() => navigateTo("/simulador")}>
                     Abrir simulador
@@ -1186,33 +1365,6 @@ export function DashboardOverview({
           />
 
           <ExecutiveSummaryStrip items={dashboardSummaryItems} />
-
-          {!isPremiumUnlocked && data.analysisScope.partialAnalysis ? (
-            <LockedCard
-              title={UPGRADE_MESSAGES.PARTIAL_VIEW}
-              description={`${UPGRADE_MESSAGES.HIDDEN_DEBTS} ${UPGRADE_MESSAGES.INTEREST_LOSS}`}
-              requiredPlan="Premium"
-              reason={`Tienes ${data.analysisScope.hiddenDebtCount} deuda${data.analysisScope.hiddenDebtCount === 1 ? "" : "s"} fuera del análisis Base. Hoy estás viendo ${data.analysisScope.analyzedDebtCount} de ${data.analysisScope.activeDebtCount} deuda${data.analysisScope.activeDebtCount === 1 ? "" : "s"} activa${data.analysisScope.activeDebtCount === 1 ? "" : "s"}.`}
-            >
-              <UpgradeCTA
-                title="Estás viendo solo una parte de tu situación financiera"
-                description="Premium toma todas tus deudas activas, compara escenarios y te muestra cuánto dinero y tiempo estás perdiendo por no ver el panorama completo."
-                requiredPlan="Premium"
-                ctaText={getCommercialUpgradeCta("Premium")}
-                onClick={() => {
-                  trackPlanEvent("feature_blocked", {
-                    source: "dashboard_partial_analysis",
-                    hiddenDebtCount: data.analysisScope.hiddenDebtCount,
-                  });
-                  trackPlanEvent("upgrade_click", {
-                    source: "dashboard_partial_analysis",
-                    targetPlan: "NORMAL",
-                  });
-                  navigateTo(upgradePlanHref);
-                }}
-              />
-            </LockedCard>
-          ) : null}
 
           <PrimaryActionCard
             eyebrow="Tu siguiente mejor paso"
@@ -2131,17 +2283,14 @@ export function DashboardOverview({
           <CardHeader>
             <CardTitle>Evolución del saldo</CardTitle>
             <CardDescription>
-              Historial de snapshots guardados por el sistema para que veas si
-              el saldo total baja o se estanca.
+              Mira si tu saldo total va bajando o si se está estancando.
             </CardDescription>
           </CardHeader>
           <CardContent className="h-80 pt-6">
             {hasHistory && chartsReady ? (
               <DashboardBalanceHistoryChart data={data.balanceHistory} />
             ) : hasHistory ? (
-              <div className="bg-secondary/40 text-muted flex h-full items-center justify-center rounded-3xl text-sm">
-                Preparando visualización...
-              </div>
+              <ChartLoadingPlaceholder />
             ) : (
               <div className="border-border bg-secondary/30 flex h-full flex-col items-center justify-center rounded-3xl border border-dashed px-6 text-center">
                 <p className="text-foreground text-base font-semibold">
@@ -2167,9 +2316,7 @@ export function DashboardOverview({
             {hasBreakdown && chartsReady ? (
               <DashboardDebtBreakdownChart data={data.debtBreakdown} />
             ) : hasBreakdown ? (
-              <div className="bg-secondary/40 text-muted flex h-full items-center justify-center rounded-3xl text-sm">
-                Preparando visualización...
-              </div>
+              <ChartLoadingPlaceholder />
             ) : (
               <div className="border-border bg-secondary/30 flex h-full flex-col items-center justify-center rounded-3xl border border-dashed px-6 text-center">
                 <p className="text-foreground text-base font-semibold">
@@ -2577,6 +2724,7 @@ export function DashboardOverview({
           </CardContent>
         </Card>
       </section>
+      </div>
     </div>
   );
 }

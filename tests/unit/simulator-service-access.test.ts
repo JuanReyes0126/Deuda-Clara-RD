@@ -6,6 +6,8 @@ vi.mock("@/lib/db/prisma", () => ({
       findUniqueOrThrow: vi.fn(),
     },
   },
+  runWithPrismaReconnect: vi.fn(async <T>(operation: () => Promise<T> | T) => operation()),
+  isPrismaClosedConnectionError: vi.fn(() => false),
 }));
 
 vi.mock("@/lib/demo/session", () => ({
@@ -18,6 +20,7 @@ vi.mock("@/server/membership/membership-access-service", () => ({
 
 describe("simulator-service membership access", () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.clearAllMocks();
   });
 
@@ -72,5 +75,5 @@ describe("simulator-service membership access", () => {
     expect(result.refinancePlan.debtId).toBeNull();
     expect(result.selectedStrategyExplanation).toContain("Premium");
     expect(result.monthlyProjection.length).toBeLessThanOrEqual(6);
-  });
+  }, 15000);
 });

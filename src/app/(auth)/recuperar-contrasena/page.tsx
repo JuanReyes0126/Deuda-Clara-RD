@@ -11,9 +11,9 @@ export default function ForgotPasswordPage() {
       description="Enviaremos un enlace seguro de un solo uso al correo asociado a tu cuenta."
       asideTitle="Seguridad del proceso"
       asideItems={[
-        "Tokens unicos con expiracion corta.",
-        "Mensajes neutros para evitar filtracion de cuentas existentes.",
-        "Revocacion de sesiones al completar el cambio de contraseña.",
+        "Tokens únicos con expiración corta.",
+        "Mensajes neutros para evitar filtración de cuentas existentes.",
+        "Revocación de sesiones al completar el cambio de contraseña.",
       ]}
     >
       <div className="space-y-2">

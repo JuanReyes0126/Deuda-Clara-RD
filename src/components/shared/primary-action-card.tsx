@@ -72,10 +72,10 @@ export function PrimaryActionCard({
               </span>
             ) : null}
             <div className="min-w-0">
-              <p className="text-foreground text-[clamp(1.4rem,3.2vw,2rem)] font-semibold leading-tight">
+              <p className="text-foreground text-[clamp(1.22rem,5.2vw,2rem)] font-semibold leading-[1.08] text-balance">
                 {title}
               </p>
-              <p className="section-summary mt-3 max-w-3xl text-pretty">
+              <p className="section-summary mt-2.5 max-w-3xl text-pretty text-sm leading-6 sm:text-base sm:leading-7">
                 {description}
               </p>
             </div>
@@ -103,7 +103,7 @@ export function PrimaryActionCard({
       </div>
 
       {notes.length ? (
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
           {notes.map((note) => (
             <div
               key={note}

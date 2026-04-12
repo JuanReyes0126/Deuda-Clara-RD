@@ -187,8 +187,8 @@ export function LoginForm({
         <p className="text-sm font-semibold text-foreground">Al entrar recuperas tu contexto completo</p>
         <div className="mt-3 grid gap-3 md:grid-cols-3">
           {[
-            "Tu dashboard con vencimientos y presion mensual.",
-            "Tus alertas sin leer y el siguiente pago mas importante.",
+            "Tu dashboard con vencimientos y presión mensual.",
+            "Tus alertas sin leer y el siguiente pago más importante.",
             "Tu plan recomendado si ya activaste Premium o Pro.",
           ].map((item) => (
             <div

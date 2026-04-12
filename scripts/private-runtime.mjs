@@ -22,12 +22,43 @@ const metaFile = path.join(runtimeDir, "private-app.local.json");
 const logFile = path.join(runtimeDir, "private-app.local.log");
 const nextBin = path.join(projectRoot, "node_modules", "next", "dist", "bin", "next");
 const resolvedEnv = loadProjectEnv(projectRoot);
-
-const host = resolvedEnv.APP_HOST || "127.0.0.1";
-const port = resolvedEnv.APP_PORT || "3000";
-const appUrl = resolvedEnv.APP_URL || `http://${host}:${port}`;
-const demoModeEnabled = resolvedEnv.DEMO_MODE_ENABLED ?? "false";
 const command = process.argv[2] || "status";
+const rawArgs = process.argv.slice(3);
+
+function parseCliFlags(args) {
+  const values = {};
+
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index];
+    const nextValue = args[index + 1];
+
+    if (!token?.startsWith("--")) {
+      continue;
+    }
+
+    const key = token.slice(2);
+
+    if (!nextValue || nextValue.startsWith("--")) {
+      values[key] = "true";
+      continue;
+    }
+
+    values[key] = nextValue;
+    index += 1;
+  }
+
+  return values;
+}
+
+const cliFlags = parseCliFlags(rawArgs);
+const host = cliFlags.hostname || resolvedEnv.APP_HOST || "127.0.0.1";
+const port = cliFlags.port || resolvedEnv.APP_PORT || "3000";
+const hasNetworkOverride = Boolean(cliFlags.hostname || cliFlags.port);
+const appUrl =
+  cliFlags["app-url"] ||
+  (hasNetworkOverride ? `http://${host}:${port}` : resolvedEnv.APP_URL || `http://${host}:${port}`);
+const demoModeEnabled =
+  cliFlags["demo-mode"] || (resolvedEnv.DEMO_MODE_ENABLED ?? "false");
 
 function ensureRuntimeDir() {
   mkdirSync(runtimeDir, { recursive: true });
@@ -200,12 +231,16 @@ function isPortBusy(checkHost, checkPort) {
 
 async function assertPortAvailable() {
   const busy = await isPortBusy(host, port);
+  const portOwnerPid = findPortOwnerPid();
 
-  if (!busy) {
+  if (!busy && !portOwnerPid) {
     return;
   }
 
   console.error(`El puerto ${port} en ${host} ya está ocupado.`);
+  if (portOwnerPid) {
+    console.error(`PID detectado en escucha: ${portOwnerPid}`);
+  }
   console.error(`Detén el proceso que lo usa o cambia el puerto, por ejemplo: APP_PORT=3001 npm run private:up`);
   process.exit(1);
 }
@@ -234,8 +269,16 @@ async function startApp({ rebuild }) {
 
   if (existingPid && isRunning(existingPid)) {
     const meta = readMeta();
-    console.log(`La app ya está activa en http://${meta?.host || host}:${meta?.port || port}`);
-    return;
+    const existingHost = meta?.host || host;
+    const existingPort = meta?.port || port;
+    const existingStarted = await isPortBusy(existingHost, existingPort);
+
+    if (existingStarted) {
+      console.log(`La app ya está activa en http://${existingHost}:${existingPort}`);
+      return;
+    }
+
+    cleanupRuntime();
   }
 
   cleanupRuntime();

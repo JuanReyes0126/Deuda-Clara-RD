@@ -361,6 +361,44 @@ async function requestJson(url: string, init?: RequestInit) {
   return payload;
 }
 
+function getDebtPriorityLabel(
+  debt: DebtItemDto,
+  options: { isPriority: boolean },
+) {
+  if (debt.status === "LATE") {
+    return "Riesgo alto";
+  }
+
+  if (options.isPriority) {
+    return "Prioridad";
+  }
+
+  if (debt.nextDueDate) {
+    return "Por vencer";
+  }
+
+  return "Estable";
+}
+
+function getDebtPriorityVariant(
+  debt: DebtItemDto,
+  options: { isPriority: boolean },
+): "danger" | "warning" | "success" | "default" {
+  if (debt.status === "LATE") {
+    return "danger";
+  }
+
+  if (options.isPriority) {
+    return "warning";
+  }
+
+  if (debt.status === "CURRENT") {
+    return "success";
+  }
+
+  return "default";
+}
+
 export function DebtManager({
   debts,
   summary,
@@ -381,6 +419,7 @@ export function DebtManager({
   });
   const upgradeHref = `/planes?plan=${access.upgradeTargetTier}&source=deudas`;
   const [selectedDebt, setSelectedDebt] = useState<DebtItemDto | null>(null);
+  const [expandedDebtId, setExpandedDebtId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [listFilter, setListFilter] = useState<DebtListFilter>("ALL");
@@ -538,6 +577,7 @@ export function DebtManager({
 
   const resetForm = () => {
     setSelectedDebt(null);
+    setExpandedDebtId(null);
     form.reset(emptyDebtValues());
   };
 
@@ -564,7 +604,14 @@ export function DebtManager({
 
   const startEditingDebt = (debt: DebtItemDto) => {
     setSelectedDebt(debt);
+    setExpandedDebtId(debt.id);
     form.reset(debtToFormValues(debt));
+    window.requestAnimationFrame(() => {
+      document.getElementById("debt-form-card")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
   };
 
   const submit = form.handleSubmit(async (values) => {
@@ -665,8 +712,8 @@ export function DebtManager({
 
       <ModuleSectionHeader
         kicker="Deudas"
-        title="Ordena tus deudas y detecta cuál necesita atención primero."
-        description="Arriba ves el panorama, luego una recomendación directa. El listado va primero para que entiendas tu realidad antes de editar."
+        title="Ordena tus deudas y detecta la prioridad de hoy."
+        description="Mira qué cuenta presiona más y actúa sin ruido."
         action={
           debtLimitReached ? (
             <Button className="w-full sm:w-auto" onClick={() => router.push(upgradeHref as never)}>
@@ -681,7 +728,7 @@ export function DebtManager({
       />
 
       {access.isBase ? (
-        <div className="rounded-[1.6rem] border border-dashed border-primary/18 bg-[rgba(255,248,241,0.82)] px-4 py-4 sm:px-5">
+        <div className="hidden rounded-[1.6rem] border border-dashed border-primary/18 bg-[rgba(255,248,241,0.82)] px-4 py-4 sm:px-5 lg:block">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0 max-w-3xl">
               <p className="text-primary text-sm font-semibold tracking-[0.16em] uppercase">
@@ -713,59 +760,130 @@ export function DebtManager({
         </div>
       ) : null}
 
-      <ExecutiveSummaryStrip items={debtSummaryItems} />
+      <section className="-mx-1 grid gap-3 lg:hidden">
+        <div className="rounded-[1.5rem] border border-border bg-white/92 p-4 shadow-soft">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="min-w-0 rounded-[1.2rem] border border-border/70 bg-secondary/45 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+                Saldo visible
+              </p>
+              <p className="value-stable mt-1 text-lg font-semibold text-foreground">
+                {formatCurrency(summary.totalBalance)}
+              </p>
+            </div>
+            <div className="min-w-0 rounded-[1.2rem] border border-border/70 bg-secondary/45 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+                Próxima atención
+              </p>
+              <p className="mt-1 text-sm font-semibold leading-5 text-foreground">
+                {priorityDebt?.name ?? "Registra una deuda"}
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                {priorityDebt?.nextDueDate
+                  ? formatDate(priorityDebt.nextDueDate)
+                  : priorityDebt
+                    ? debtStatusLabels[priorityDebt.status as DebtFormValues["status"]]
+                    : "Activa tu primer panorama"}
+              </p>
+            </div>
+            <div className="min-w-0 rounded-[1.2rem] border border-border/70 bg-secondary/45 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+                Riesgo actual
+              </p>
+              <p className="mt-1 text-sm font-semibold leading-5 text-foreground">
+                {priorityDebt?.status === "LATE"
+                  ? "Alto"
+                  : activeDebts.length > 1
+                    ? "Medio"
+                    : activeDebts.length
+                      ? "Controlado"
+                      : "Sin datos"}
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                {priorityDebt?.status === "LATE"
+                  ? "Hay una deuda que ya requiere acción."
+                  : "Usa la lista para decidir qué revisar ahora."}
+              </p>
+            </div>
+          </div>
+        </div>
 
-      <PrimaryActionCard
-        eyebrow="Lo que más te conviene hoy"
-        title={
-          priorityDebt
-            ? `Tu deuda más sensible hoy es ${priorityDebt.name}.`
-            : "Registra tu primera deuda para activar una prioridad real."
-        }
-        description={
-          priorityDebt
-            ? priorityDebt.status === "LATE"
-              ? "Ya viene atrasada. Si la atiendes primero, reduces presión y evitas que la mora siga ganando terreno."
-              : priorityDebt.nextDueDate
-                ? "Es la que más conviene proteger ahora por vencimiento, interés o presión sobre el flujo."
-                : "Hoy es la que más conviene revisar antes de repartir dinero entre varias cuentas."
-            : "Con una sola deuda ya podemos mostrarte costo mensual, riesgo y qué conviene atacar primero."
-        }
-        badgeLabel={priorityDebt?.status === "LATE" ? "Urgente" : "Siguiente mejor paso"}
-        badgeVariant={priorityDebt?.status === "LATE" ? "danger" : "default"}
-        primaryAction={{
-          label: priorityDebt ? "Registrar deuda / editar prioridad" : "Registrar deuda",
-          onClick: () => form.setFocus(priorityDebt ? "name" : "name"),
-        }}
-        secondaryAction={
-          activeDebts.length
-            ? {
-                label: "Ir a pagos",
-                onClick: () => router.push("/pagos"),
-                variant: "secondary",
-              }
-            : undefined
-        }
-        notes={
-          priorityDebt
-            ? [
-                `Saldo visible: ${formatCurrency(priorityDebt.effectiveBalance)}.`,
-                `Pago mínimo: ${formatCurrency(priorityDebt.minimumPayment)}.`,
-              ]
-            : [
-                "Empieza por saldo, pago mínimo y vencimiento.",
-                "Luego la app te ayuda con prioridad y alertas.",
-              ]
-        }
-        tone={priorityDebt?.status === "LATE" ? "warning" : "default"}
-      />
+        {access.isBase ? (
+          <div className="rounded-[1.5rem] border border-dashed border-primary/18 bg-[rgba(255,248,241,0.82)] p-4">
+            <p className="text-sm font-semibold text-foreground">
+              Base te deja organizar hasta {access.maxActiveDebts} deudas activas.
+            </p>
+            <p className="mt-2 text-sm text-muted">
+              Si necesitas ver el panorama completo, pasa a Premium.
+            </p>
+            <Button
+              className="mt-3 w-full"
+              variant="secondary"
+              onClick={() => router.push(upgradeHref as never)}
+            >
+              Desbloquear más deudas
+            </Button>
+          </div>
+        ) : null}
+      </section>
+
+      <div className="hidden lg:block">
+        <ExecutiveSummaryStrip items={debtSummaryItems} />
+      </div>
+
+      <div className="hidden lg:block">
+        <PrimaryActionCard
+          eyebrow="Lo que más te conviene hoy"
+          title={
+            priorityDebt
+              ? `Tu deuda más sensible hoy es ${priorityDebt.name}.`
+              : "Registra tu primera deuda para activar una prioridad real."
+          }
+          description={
+            priorityDebt
+              ? priorityDebt.status === "LATE"
+                ? "Ya viene atrasada. Si la atiendes primero, reduces presión y evitas que la mora siga ganando terreno."
+                : priorityDebt.nextDueDate
+                  ? "Es la que más conviene proteger ahora por vencimiento, interés o presión sobre el flujo."
+                  : "Hoy es la que más conviene revisar antes de repartir dinero entre varias cuentas."
+              : "Con una sola deuda ya podemos mostrarte costo mensual, riesgo y qué conviene atacar primero."
+          }
+          badgeLabel={priorityDebt?.status === "LATE" ? "Urgente" : "Siguiente mejor paso"}
+          badgeVariant={priorityDebt?.status === "LATE" ? "danger" : "default"}
+          primaryAction={{
+            label: priorityDebt ? "Registrar deuda / editar prioridad" : "Registrar deuda",
+            onClick: () => form.setFocus(priorityDebt ? "name" : "name"),
+          }}
+          secondaryAction={
+            activeDebts.length
+              ? {
+                  label: "Ir a pagos",
+                  onClick: () => router.push("/pagos"),
+                  variant: "secondary",
+                }
+              : undefined
+          }
+          notes={
+            priorityDebt
+              ? [
+                  `Saldo visible: ${formatCurrency(priorityDebt.effectiveBalance)}.`,
+                  `Pago mínimo: ${formatCurrency(priorityDebt.minimumPayment)}.`,
+                ]
+              : [
+                  "Empieza por saldo, pago mínimo y vencimiento.",
+                  "Luego la app te ayuda con prioridad y alertas.",
+                ]
+          }
+          tone={priorityDebt?.status === "LATE" ? "warning" : "default"}
+        />
+      </div>
 
       <section className="grid gap-5 sm:gap-6 xl:grid-cols-[1.08fr_0.92fr]">
-        <Card className="order-2 -mx-1 min-w-0 p-4 sm:mx-0 sm:p-6 xl:order-2">
+        <Card id="debt-form-card" className="order-2 -mx-1 min-w-0 p-4 sm:mx-0 sm:p-6 xl:order-2">
           <CardHeader>
             <CardTitle>{selectedDebt ? "Editar deuda" : "Registrar deuda"}</CardTitle>
             <CardDescription>
-              Captura saldo real, tasa, pagos mínimos, mora y fechas clave para que el sistema pueda priorizar bien.
+              Registra saldo, pago mínimo y fecha clave para priorizar bien.
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-4">
@@ -780,8 +898,8 @@ export function DebtManager({
                   </p>
                   <p className="mt-2 text-sm text-muted">
                     {selectedDebt
-                      ? "Estás editando una deuda existente. Si quieres registrar otra distinta, limpia el formulario o usa un preset."
-                      : "Usa un preset para reducir pasos. Luego ajusta saldo, pago mínimo y vencimiento."}
+                      ? "Estás editando una deuda existente."
+                      : "Usa un preset y luego ajusta saldo, pago mínimo y vencimiento."}
                   </p>
                 </div>
 
@@ -804,7 +922,7 @@ export function DebtManager({
                 </div>
               </div>
 
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <div className="mt-4 hidden gap-3 md:grid-cols-3 lg:grid">
                 {debtQuickPresets.map((preset) => (
                   <div key={preset.key} className="min-w-0 rounded-3xl border border-white/70 bg-white/80 p-4">
                     <p className="break-words text-sm font-semibold text-foreground">{preset.label}</p>
@@ -872,7 +990,7 @@ export function DebtManager({
               </div>
             ) : null}
 
-            <div className="mb-6 grid gap-4 md:grid-cols-3">
+            <div className="mb-6 hidden gap-4 md:grid-cols-3 lg:grid">
               <div className="min-w-0 rounded-3xl border border-border bg-secondary/60 p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted">Deuda real estimada</p>
                 <p className="value-stable mt-2 text-[clamp(1rem,2.7vw,1.35rem)] font-semibold leading-tight text-foreground">
@@ -1153,7 +1271,7 @@ export function DebtManager({
           <CardHeader>
             <CardTitle>Tus deudas</CardTitle>
             <CardDescription>
-              Primero mira cuál presiona más. Luego edita, archiva o registra la siguiente acción.
+              Revisa la que más presiona y actúa.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-4">
@@ -1162,10 +1280,10 @@ export function DebtManager({
                 <Input
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Busca por nombre, acreedor o nota"
+                  placeholder="Busca una deuda"
                 />
 
-                <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
                   {[
                     { value: "ALL" as const, label: `Todas (${debts.length})` },
                     { value: "CURRENT" as const, label: `Al día (${debts.filter((debt) => debt.status === "CURRENT").length})` },
@@ -1188,103 +1306,220 @@ export function DebtManager({
 
             {filteredDebts.length ? (
               filteredDebts.map((debt) => (
-                <div
-                  key={debt.id}
-                  className="min-w-0 rounded-[1.65rem] border border-border bg-secondary/50 p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:rounded-[1.9rem] sm:p-6"
-                >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex min-w-0 flex-wrap items-center gap-3">
-                        <p className="min-w-0 break-words text-lg font-semibold text-foreground">{debt.name}</p>
-                        <Badge
-                          variant={
-                            debt.status === "LATE"
-                              ? "danger"
-                              : debt.status === "PAID"
-                                ? "success"
-                                : "default"
-                          }
-                        >
-                          {debtStatusLabels[debt.status as DebtFormValues["status"]] ?? debt.status}
-                        </Badge>
-                        <Badge variant="default">{debtTypeLabels[debt.type as DebtFormValues["type"]] ?? debt.type}</Badge>
-                        {priorityDebt?.id === debt.id ? (
-                          <Badge variant="warning">Más presión hoy</Badge>
-                        ) : null}
-                      </div>
-                      <p className="mt-2 break-words text-sm text-muted">{debt.creditorName}</p>
-                      {debt.notes ? (
-                        <p className="mt-3 break-words text-sm leading-6 text-muted">
-                          {debt.notes}
+                <div key={debt.id}>
+                  <div className="rounded-[1.65rem] border border-border bg-secondary/45 p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] lg:hidden">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="break-words text-base font-semibold text-foreground">
+                          {debt.name}
                         </p>
-                      ) : null}
+                        <p className="mt-1 break-words text-sm text-muted">
+                          {debt.creditorName}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={getDebtPriorityVariant(debt, {
+                          isPriority: priorityDebt?.id === debt.id,
+                        })}
+                      >
+                        {getDebtPriorityLabel(debt, {
+                          isPriority: priorityDebt?.id === debt.id,
+                        })}
+                      </Badge>
                     </div>
 
-                    <div className="grid w-full grid-cols-2 gap-2 lg:flex lg:w-auto lg:flex-wrap">
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      <div className="rounded-[1.15rem] border border-white/70 bg-white/88 p-3">
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
+                          Balance actual
+                        </p>
+                        <p className="value-stable mt-1 text-base font-semibold text-foreground">
+                          {formatCurrency(debt.effectiveBalance)}
+                        </p>
+                      </div>
+                      <div className="rounded-[1.15rem] border border-white/70 bg-white/88 p-3">
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
+                          {debt.nextDueDate ? "Próximo pago" : "Estado"}
+                        </p>
+                        <p className="mt-1 text-sm font-semibold leading-5 text-foreground">
+                          {debt.nextDueDate
+                            ? formatDate(debt.nextDueDate)
+                            : debtStatusLabels[debt.status as DebtFormValues["status"]] ?? debt.status}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <Badge
+                        variant={
+                          debt.status === "LATE"
+                            ? "danger"
+                            : debt.status === "PAID"
+                              ? "success"
+                              : "default"
+                        }
+                      >
+                        {debtStatusLabels[debt.status as DebtFormValues["status"]] ?? debt.status}
+                      </Badge>
+                      <span className="text-xs font-medium text-muted">
+                        {debtTypeLabels[debt.type as DebtFormValues["type"]] ?? debt.type}
+                      </span>
+                    </div>
+
+                    {expandedDebtId === debt.id ? (
+                      <div className="mt-4 rounded-[1.2rem] border border-border/80 bg-white/90 p-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
+                              Pago mínimo
+                            </p>
+                            <p className="value-stable mt-1 text-sm font-semibold text-foreground">
+                              {formatCurrency(debt.minimumPayment)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
+                              Interés estimado
+                            </p>
+                            <p className="value-stable mt-1 text-sm font-semibold text-foreground">
+                              {formatCurrency(debt.monthlyInterestEstimate)}
+                            </p>
+                          </div>
+                        </div>
+                        {debt.notes ? (
+                          <p className="mt-3 text-sm leading-6 text-muted">{debt.notes}</p>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="min-h-11 w-full justify-center"
+                        onClick={() =>
+                          setExpandedDebtId((current) =>
+                            current === debt.id ? null : debt.id,
+                          )
+                        }
+                      >
+                        Ver detalle
+                      </Button>
                       <Button
                         variant="secondary"
                         size="sm"
                         className="min-h-11 w-full justify-center"
                         onClick={() => router.push(`/pagos?debtId=${debt.id}`)}
                       >
-                        Ir a pagos
+                        Registrar pago
                       </Button>
                       <Button
-                        variant="secondary"
+                        variant="ghost"
                         size="sm"
-                        className="min-h-11 w-full justify-center"
+                        className="col-span-2 min-h-11 w-full justify-center"
                         onClick={() => startEditingDebt(debt)}
                       >
                         <Pencil className="mr-2 size-4" />
                         Editar
                       </Button>
-                      {debt.status !== "ARCHIVED" ? (
+                    </div>
+                  </div>
+
+                  <div className="hidden min-w-0 rounded-[1.65rem] border border-border bg-secondary/50 p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:rounded-[1.9rem] sm:p-6 lg:block">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-center gap-3">
+                          <p className="min-w-0 break-words text-lg font-semibold text-foreground">{debt.name}</p>
+                          <Badge
+                            variant={
+                              debt.status === "LATE"
+                                ? "danger"
+                                : debt.status === "PAID"
+                                  ? "success"
+                                  : "default"
+                            }
+                          >
+                            {debtStatusLabels[debt.status as DebtFormValues["status"]] ?? debt.status}
+                          </Badge>
+                          <Badge variant="default">{debtTypeLabels[debt.type as DebtFormValues["type"]] ?? debt.type}</Badge>
+                          {priorityDebt?.id === debt.id ? (
+                            <Badge variant="warning">Más presión hoy</Badge>
+                          ) : null}
+                        </div>
+                        <p className="mt-2 break-words text-sm text-muted">{debt.creditorName}</p>
+                        {debt.notes ? (
+                          <p className="mt-3 break-words text-sm leading-6 text-muted">
+                            {debt.notes}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <div className="grid w-full grid-cols-2 gap-2 lg:flex lg:w-auto lg:flex-wrap">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="min-h-11 w-full justify-center"
+                          onClick={() => router.push(`/pagos?debtId=${debt.id}`)}
+                        >
+                          Ir a pagos
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="min-h-11 w-full justify-center"
+                          onClick={() => startEditingDebt(debt)}
+                        >
+                          <Pencil className="mr-2 size-4" />
+                          Editar
+                        </Button>
+                        {debt.status !== "ARCHIVED" ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="min-h-11 w-full justify-center"
+                            onClick={() => handleArchive(debt)}
+                          >
+                            <Archive className="mr-2 size-4" />
+                            Archivar
+                          </Button>
+                        ) : null}
                         <Button
                           variant="ghost"
                           size="sm"
                           className="min-h-11 w-full justify-center"
-                          onClick={() => handleArchive(debt)}
+                          onClick={() => handleDelete(debt.id)}
                         >
-                          <Archive className="mr-2 size-4" />
-                          Archivar
+                          <Trash2 className="mr-2 size-4" />
+                          Eliminar
                         </Button>
-                      ) : null}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="min-h-11 w-full justify-center"
-                        onClick={() => handleDelete(debt.id)}
-                      >
-                        <Trash2 className="mr-2 size-4" />
-                        Eliminar
-                      </Button>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="mt-5 grid gap-4 md:grid-cols-2">
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.18em] text-muted">Saldo real</p>
-                      <p className="value-stable mt-1 font-semibold text-foreground">
-                        {formatCurrency(debt.effectiveBalance)}
-                      </p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.18em] text-muted">Pago mínimo</p>
-                      <p className="value-stable mt-1 font-semibold text-foreground">
-                        {formatCurrency(debt.minimumPayment)}
-                      </p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.18em] text-muted">Interés estimado</p>
-                      <p className="value-stable mt-1 font-semibold text-foreground">
-                        {formatCurrency(debt.monthlyInterestEstimate)}
-                      </p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.18em] text-muted">Próximo vencimiento</p>
-                      <p className="date-stable mt-1 font-semibold text-foreground">
-                        {debt.nextDueDate ? formatDate(debt.nextDueDate) : "Sin fecha"}
-                      </p>
+                    <div className="mt-5 grid gap-4 md:grid-cols-2">
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-[0.18em] text-muted">Saldo real</p>
+                        <p className="value-stable mt-1 font-semibold text-foreground">
+                          {formatCurrency(debt.effectiveBalance)}
+                        </p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-[0.18em] text-muted">Pago mínimo</p>
+                        <p className="value-stable mt-1 font-semibold text-foreground">
+                          {formatCurrency(debt.minimumPayment)}
+                        </p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-[0.18em] text-muted">Interés estimado</p>
+                        <p className="value-stable mt-1 font-semibold text-foreground">
+                          {formatCurrency(debt.monthlyInterestEstimate)}
+                        </p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-[0.18em] text-muted">Próximo vencimiento</p>
+                        <p className="date-stable mt-1 font-semibold text-foreground">
+                          {debt.nextDueDate ? formatDate(debt.nextDueDate) : "Sin fecha"}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -36,15 +36,15 @@ export default async function LoginPage({
         "Plan recomendado si eres Premium",
       ]}
       asideItems={[
-        "Dashboard con deuda total, pagos minimos y vencimientos cercanos.",
-        "Recomendacion automatica de la deuda mas urgente.",
-        "Alertas de mora, intereses y riesgos por pagar solo minimos.",
+        "Dashboard con deuda total, pagos mínimos y vencimientos cercanos.",
+        "Recomendación automática de la deuda más urgente.",
+        "Alertas de mora, intereses y riesgos por pagar solo mínimos.",
       ]}
     >
       <div className="space-y-2">
         <h2 className="font-display text-3xl font-semibold text-foreground">Iniciar sesión</h2>
         <p className="text-sm leading-7 text-muted">
-          Tus sesiones estan protegidas y los accesos relevantes quedan auditados.
+          Tus sesiones están protegidas y los accesos relevantes quedan auditados.
         </p>
       </div>
       <LoginForm initialError={initialError} csrfToken={csrfToken} />

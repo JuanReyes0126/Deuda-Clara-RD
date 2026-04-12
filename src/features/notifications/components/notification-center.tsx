@@ -16,9 +16,11 @@ import {
 import { ExecutiveSummaryStrip } from "@/components/shared/executive-summary-strip";
 import { ModuleSectionHeader } from "@/components/shared/module-section-header";
 import { PrimaryActionCard } from "@/components/shared/primary-action-card";
+import { MEMBERSHIP_COMMERCIAL_COPY } from "@/config/membership-commercial-copy";
 import { fetchWithCsrf } from "@/lib/http/fetch-with-csrf";
 import { readJsonPayload } from "@/lib/http/read-json-payload";
 import { resolveFeatureAccess } from "@/lib/feature-access";
+import { useSessionUpgradePrompt } from "@/lib/membership/use-session-upgrade-prompt";
 import type {
   MembershipBillingStatus,
   MembershipPlanId,
@@ -228,6 +230,19 @@ export function NotificationCenter({
 
     return counts;
   }, [notifications]);
+  const showNotificationsPremiumPrompt = useSessionUpgradePrompt({
+    id: "notifications:premium",
+    active:
+      (shouldShowPremiumUpsell && bucketCounts.URGENT > 0) ||
+      (shouldShowPremiumUpsell && actionableCount > 1),
+  });
+  const showNotificationsProPrompt = useSessionUpgradePrompt({
+    id: "notifications:pro",
+    active:
+      !showNotificationsPremiumPrompt &&
+      shouldShowProUpsell &&
+      (warningCount > 0 || actionableCount > 0),
+  });
   const filteredNotifications = useMemo(() => {
     if (activeFilter === "ALL") {
       return notifications;
@@ -504,7 +519,7 @@ export function NotificationCenter({
         />
       ) : null}
 
-      {shouldShowPremiumUpsell ? (
+      {showNotificationsPremiumPrompt ? (
         <div className="border-primary/15 rounded-[1.75rem] border bg-[rgba(255,248,241,0.82)] px-5 py-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0 max-w-2xl">
@@ -512,15 +527,15 @@ export function NotificationCenter({
                 Seguimiento premium disponible
               </p>
               <p className="text-foreground mt-3 break-words text-xl font-semibold">
-                No te quedes solo leyendo alertas. Úsalas para actuar mejor.
+                No te quedes solo leyendo alertas. Úsalas para perder menos dinero.
               </p>
               <p className="text-muted mt-2 text-sm leading-7">
-                Tienes {bucketCounts.URGENT} alerta{bucketCounts.URGENT === 1 ? "" : "s"} urgente{bucketCounts.URGENT === 1 ? "" : "s"} y {actionableCount} acción{actionableCount === 1 ? "" : "es"} directa{actionableCount === 1 ? "" : "s"}. Premium las conecta con una prioridad semanal más clara.
+                Tienes {bucketCounts.URGENT} alerta{bucketCounts.URGENT === 1 ? "" : "s"} urgente{bucketCounts.URGENT === 1 ? "" : "s"} y {actionableCount} acción{actionableCount === 1 ? "" : "es"} directa{actionableCount === 1 ? "" : "s"}. Premium las convierte en una prioridad semanal clara para que no sigas reaccionando tarde.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
               <Button onClick={() => router.push(premiumPlanHref)}>
-                Optimizar con Premium
+                {MEMBERSHIP_COMMERCIAL_COPY.contextualCta.notificationsPremium}
               </Button>
               <Button
                 variant="secondary"
@@ -558,7 +573,7 @@ export function NotificationCenter({
         </div>
       ) : null}
 
-      {shouldShowProUpsell ? (
+      {showNotificationsProPrompt ? (
         <div className="rounded-[1.75rem] border border-primary/12 bg-[rgba(255,248,241,0.82)] px-5 py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0 max-w-2xl">
@@ -566,15 +581,15 @@ export function NotificationCenter({
                 Seguimiento extendido disponible
               </p>
               <p className="text-foreground mt-3 break-words text-xl font-semibold">
-                Premium ya ordena tus alertas. Pro guarda más contexto y más historial.
+                Premium ya ordena tus alertas. Pro mantiene el seguimiento vivo por más tiempo.
               </p>
               <p className="text-muted mt-2 text-sm leading-7">
-                Ahora mismo ves las {access.notificationHistoryLimit} alertas más recientes. Pro extiende ese seguimiento para que no pierdas contexto cuando el flujo se vuelve más largo.
+                Ahora mismo ves las {access.notificationHistoryLimit} alertas más recientes. Pro extiende ese seguimiento para que no pierdas contexto cuando el flujo se alarga o cambia.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
               <Button onClick={() => router.push(proPlanHref)}>
-                Activar seguimiento más profundo
+                {MEMBERSHIP_COMMERCIAL_COPY.contextualCta.notificationsPro}
               </Button>
             </div>
           </div>

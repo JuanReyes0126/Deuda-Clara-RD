@@ -129,7 +129,7 @@ export function RegisterForm({
     >
       <input type="hidden" name="csrfToken" value={csrfToken} />
       <div className="rounded-[1.5rem] border border-primary/12 bg-[linear-gradient(135deg,rgba(15,118,110,0.08),rgba(240,138,93,0.1))] p-4">
-        <p className="text-sm font-semibold text-foreground">Que pasa despues de crear tu cuenta</p>
+        <p className="text-sm font-semibold text-foreground">Qué pasa después de crear tu cuenta</p>
         <div className="mt-3 grid gap-3 md:grid-cols-3">
           {[
             "Defines tu presupuesto mensual y estrategia inicial.",
@@ -203,7 +203,7 @@ export function RegisterForm({
       </div>
 
       <div className="rounded-2xl border border-border bg-secondary/45 px-4 py-4 text-sm leading-7 text-muted">
-        Tu contraseña debe tener al menos 8 caracteres, incluir una mayuscula, una minuscula y un numero.
+        Tu contraseña debe tener al menos 8 caracteres, incluir una mayúscula, una minúscula y un número.
       </div>
 
       <div className="space-y-2 rounded-2xl border border-border bg-white/85 px-4 py-4">

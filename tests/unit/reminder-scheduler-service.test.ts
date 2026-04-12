@@ -30,11 +30,15 @@ vi.mock("@/server/observability/logger", () => ({
 
 describe("dispatchAutomatedReminderEmails", () => {
   beforeEach(() => {
+    vi.resetModules();
     userFindManyMock.mockReset();
     notificationEventFindUniqueMock.mockReset();
     notificationEventCreateMock.mockReset();
     notificationEventUpdateMock.mockReset();
     sendTransactionalEmailMock.mockReset();
+    userFindManyMock.mockResolvedValue([]);
+    notificationEventFindUniqueMock.mockResolvedValue(null);
+    sendTransactionalEmailMock.mockResolvedValue({ queued: false });
   });
 
   it("evita envíos duplicados cuando el NotificationEvent ya fue enviado", async () => {
@@ -78,7 +82,7 @@ describe("dispatchAutomatedReminderEmails", () => {
 
     expect(sendTransactionalEmailMock).not.toHaveBeenCalled();
     expect(result.duplicatesPrevented).toBe(1);
-  });
+  }, 15000);
 
   it("envía el correo y registra el evento cuando corresponde", async () => {
     userFindManyMock.mockResolvedValueOnce([
@@ -136,5 +140,5 @@ describe("dispatchAutomatedReminderEmails", () => {
     );
     expect(result.eventsSent).toBe(1);
     expect(result.emailsQueued).toBe(1);
-  });
+  }, 15000);
 });

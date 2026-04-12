@@ -59,3 +59,33 @@ export const prisma =
 if (process.env.NODE_ENV !== "production") {
   global.__prisma = prisma;
 }
+
+const closedConnectionPatterns = [
+  /Error in PostgreSQL connection: Error \{ kind: Closed/i,
+  /connection.+closed/i,
+  /server has closed the connection/i,
+  /terminating connection/i,
+];
+
+export function isPrismaClosedConnectionError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return closedConnectionPatterns.some((pattern) => pattern.test(error.message));
+}
+
+export async function runWithPrismaReconnect<T>(operation: () => Promise<T>) {
+  try {
+    return await operation();
+  } catch (error) {
+    if (!isPrismaClosedConnectionError(error)) {
+      throw error;
+    }
+
+    await prisma.$disconnect().catch(() => undefined);
+    await prisma.$connect();
+
+    return operation();
+  }
+}

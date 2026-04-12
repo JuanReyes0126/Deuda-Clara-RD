@@ -7,7 +7,7 @@ import type {
   ServerUserSettingsContextDto,
   SessionUserContextDto,
 } from "@/lib/auth/session-context";
-import { prisma } from "@/lib/db/prisma";
+import { prisma, runWithPrismaReconnect } from "@/lib/db/prisma";
 import {
   clearDemoSession,
   getDemoServerUser,
@@ -96,13 +96,15 @@ export async function clearSessionCookie() {
 export async function createUserSession(userId: string, rawToken: string) {
   const expires = buildSessionExpiration();
 
-  await prisma.session.create({
-    data: {
-      userId,
-      sessionToken: hashOpaqueToken(rawToken),
-      expires,
-    },
-  });
+  await runWithPrismaReconnect(() =>
+    prisma.session.create({
+      data: {
+        userId,
+        sessionToken: hashOpaqueToken(rawToken),
+        expires,
+      },
+    }),
+  );
 
   await setSessionCookie(rawToken, expires);
   await refreshRecentAuth(userId);
@@ -123,16 +125,18 @@ export async function revokeOtherSessions(userId: string) {
   const rawToken = store.get(SESSION_COOKIE_NAME)?.value;
 
   try {
-    await prisma.session.deleteMany({
-      where: rawToken
-        ? {
-            userId,
-            sessionToken: {
-              not: hashOpaqueToken(rawToken),
-            },
-          }
-        : { userId },
-    });
+    await runWithPrismaReconnect(() =>
+      prisma.session.deleteMany({
+        where: rawToken
+          ? {
+              userId,
+              sessionToken: {
+                not: hashOpaqueToken(rawToken),
+              },
+            }
+          : { userId },
+      }),
+    );
   } catch (error) {
     if (!isInfrastructureUnavailableError(error) || !isDemoModeEnabled()) {
       throw error;
@@ -160,21 +164,25 @@ export async function rotateCurrentSession(userId: string) {
 
   try {
     if (rawToken) {
-      await prisma.session.deleteMany({
-        where: {
-          userId,
-          sessionToken: hashOpaqueToken(rawToken),
-        },
-      });
+      await runWithPrismaReconnect(() =>
+        prisma.session.deleteMany({
+          where: {
+            userId,
+            sessionToken: hashOpaqueToken(rawToken),
+          },
+        }),
+      );
     }
 
-    await prisma.session.create({
-      data: {
-        userId,
-        sessionToken: hashOpaqueToken(nextRawToken),
-        expires,
-      },
-    });
+    await runWithPrismaReconnect(() =>
+      prisma.session.create({
+        data: {
+          userId,
+          sessionToken: hashOpaqueToken(nextRawToken),
+          expires,
+        },
+      }),
+    );
   } catch (error) {
     if (!isInfrastructureUnavailableError(error) || !isDemoModeEnabled()) {
       throw error;
@@ -303,11 +311,13 @@ export async function destroyCurrentSession() {
 
   if (rawToken) {
     try {
-      await prisma.session.deleteMany({
-        where: {
-          sessionToken: hashOpaqueToken(rawToken),
-        },
-      });
+      await runWithPrismaReconnect(() =>
+        prisma.session.deleteMany({
+          where: {
+            sessionToken: hashOpaqueToken(rawToken),
+          },
+        }),
+      );
     } catch (error) {
       if (!isInfrastructureUnavailableError(error) || !isDemoModeEnabled()) {
         throw error;
@@ -342,19 +352,21 @@ export async function getCurrentSession(): Promise<CurrentSessionDto | null> {
   }
 
   try {
-    const session = await prisma.session.findUnique({
-      where: {
-        sessionToken: hashOpaqueToken(rawToken),
-      },
-      select: {
-        id: true,
-        userId: true,
-        expires: true,
-        user: {
-          select: sessionUserSelect,
+    const session = await runWithPrismaReconnect(() =>
+      prisma.session.findUnique({
+        where: {
+          sessionToken: hashOpaqueToken(rawToken),
         },
-      },
-    });
+        select: {
+          id: true,
+          userId: true,
+          expires: true,
+          user: {
+            select: sessionUserSelect,
+          },
+        },
+      }),
+    );
 
     if (!session || session.expires < new Date() || session.user.status !== "ACTIVE") {
       await clearSessionCookie();
@@ -392,12 +404,14 @@ export async function requireUser(): Promise<ServerUserContextDto> {
 
   const sessionUser = await requireSessionUser();
 
-  const user = await prisma.user.findUnique({
-    where: {
-      id: sessionUser.id,
-    },
-    select: serverUserContextSelect,
-  });
+  const user = await runWithPrismaReconnect(() =>
+    prisma.user.findUnique({
+      where: {
+        id: sessionUser.id,
+      },
+      select: serverUserContextSelect,
+    }),
+  );
 
   if (!user || user.status !== "ACTIVE") {
     await clearSessionCookie();
