@@ -17,6 +17,7 @@ import type { OnboardingPreviewDto } from "@/lib/types/app";
 import type { OnboardingInput } from "@/lib/validations/settings";
 import { createAuditLog } from "@/server/audit/audit-service";
 import { buildDashboardPlanComparison } from "@/server/dashboard/plan-optimization";
+import { ServiceError } from "@/server/services/service-error";
 import { captureBalanceSnapshot } from "@/server/snapshots/balance-snapshot-service";
 
 type ResolvedOnboardingDebt = {
@@ -115,7 +116,7 @@ export async function completeUserOnboarding(
     });
 
     if (!user) {
-      throw new Error("Usuario no encontrado.");
+      throw new ServiceError("USER_NOT_FOUND", 404, "No se encontró la cuenta.");
     }
 
     if (user.onboardingCompleted) {

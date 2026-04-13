@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getBillingPaymentReturnAction,
   getBillingProviderEventProcessingDecision,
   isBillableMembershipTier,
 } from "@/server/billing/billing-service";
@@ -52,5 +53,21 @@ describe("billing-service", () => {
         now,
       }),
     ).toEqual({ shouldProcess: false, reason: "processing" });
+  });
+
+  it("conserva pagos aprobados si llega un retorno negativo tardío", () => {
+    expect(
+      getBillingPaymentReturnAction({
+        currentStatus: "APPROVED",
+        outcome: "declined",
+      }),
+    ).toBe("IGNORE_ALREADY_APPROVED");
+
+    expect(
+      getBillingPaymentReturnAction({
+        currentStatus: "APPROVED",
+        outcome: "cancelled",
+      }),
+    ).toBe("IGNORE_ALREADY_APPROVED");
   });
 });

@@ -4,11 +4,9 @@ import { assertSameOrigin } from "@/lib/security/origin";
 import { getRequestMeta } from "@/lib/security/request-meta";
 import { assertRateLimit, buildRateLimitKey } from "@/lib/security/rate-limit";
 import { resetPasswordSchema } from "@/lib/validations/auth";
-import { apiRateLimited } from "@/server/api/api-response";
+import { apiBadRequest, apiRateLimited, handleApiError } from "@/server/api/api-response";
 import { resetPassword } from "@/server/auth/auth-service";
-import { logSecurityEvent, logServerError } from "@/server/observability/logger";
-import { isInfrastructureUnavailableError } from "@/server/services/infrastructure-error";
-import { isServiceError } from "@/server/services/service-error";
+import { logSecurityEvent } from "@/server/observability/logger";
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,10 +16,7 @@ export async function POST(request: NextRequest) {
     const parsed = resetPasswordSchema.safeParse(await request.json());
 
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? "Datos inválidos." },
-        { status: 400 },
-      );
+      return apiBadRequest(parsed.error.issues[0]?.message ?? "Datos inválidos.");
     }
 
     const rateLimit = await assertRateLimit({
@@ -44,23 +39,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    if (isServiceError(error)) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
-
-    if (isInfrastructureUnavailableError(error)) {
-      return NextResponse.json(
-        {
-          error: "El restablecimiento no está disponible ahora mismo. Intenta de nuevo en unos minutos.",
-        },
-        { status: 503 },
-      );
-    }
-
-    logServerError("Reset password route failed", { error });
-    return NextResponse.json(
-      { error: "No se pudo restablecer la contraseña." },
-      { status: 500 },
-    );
+    return handleApiError(error, "No se pudo restablecer la contraseña.");
   }
 }

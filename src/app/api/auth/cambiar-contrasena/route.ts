@@ -6,11 +6,9 @@ import { getRequestMeta } from "@/lib/security/request-meta";
 import { assertRecentAuth } from "@/lib/security/recent-auth";
 import { assertRateLimit, buildRateLimitKey } from "@/lib/security/rate-limit";
 import { changePasswordSchema } from "@/lib/validations/auth";
-import { apiRateLimited } from "@/server/api/api-response";
+import { apiBadRequest, apiRateLimited, handleApiError } from "@/server/api/api-response";
 import { changePassword } from "@/server/auth/auth-service";
-import { logSecurityEvent, logServerError } from "@/server/observability/logger";
-import { isInfrastructureUnavailableError } from "@/server/services/infrastructure-error";
-import { isServiceError } from "@/server/services/service-error";
+import { logSecurityEvent } from "@/server/observability/logger";
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,7 +18,7 @@ export async function POST(request: NextRequest) {
     const session = await getCurrentSession();
 
     if (!session) {
-      return NextResponse.json({ error: "No autenticado." }, { status: 401 });
+      return apiBadRequest("No autenticado.", 401);
     }
 
     await assertRecentAuth(session.user.id);
@@ -28,10 +26,7 @@ export async function POST(request: NextRequest) {
     const parsed = changePasswordSchema.safeParse(await request.json());
 
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? "Datos inválidos." },
-        { status: 400 },
-      );
+      return apiBadRequest(parsed.error.issues[0]?.message ?? "Datos inválidos.");
     }
 
     const rateLimit = await assertRateLimit({
@@ -55,29 +50,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    if (isServiceError(error)) {
-      return NextResponse.json(
-        {
-          error: error.message,
-          ...(error.code === "REAUTH_REQUIRED" ? { reauthRequired: true } : {}),
-        },
-        { status: error.status },
-      );
-    }
-
-    if (isInfrastructureUnavailableError(error)) {
-      return NextResponse.json(
-        {
-          error: "El cambio de contraseña no está disponible ahora mismo. Intenta de nuevo más tarde.",
-        },
-        { status: 503 },
-      );
-    }
-
-    logServerError("Change password route failed", { error });
-    return NextResponse.json(
-      { error: "No se pudo cambiar la contraseña." },
-      { status: 500 },
-    );
+    return handleApiError(error, "No se pudo cambiar la contraseña.");
   }
 }
