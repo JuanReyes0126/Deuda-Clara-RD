@@ -10,8 +10,10 @@ export type DebtItemDto = {
   effectiveBalance: number;
   interestRate: number;
   interestRateType: string;
+  interestRateMode: "FIXED" | "VARIABLE";
   monthlyInterestEstimate: number;
   minimumPayment: number;
+  paymentAmountType: "FIXED" | "VARIABLE";
   statementDay: number | null;
   dueDay: number | null;
   nextDueDate: string | null;

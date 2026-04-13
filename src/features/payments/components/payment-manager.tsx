@@ -620,7 +620,10 @@ export function PaymentManager({
           secondaryAction={
             selectedDebt
               ? {
-                  label: "Pagar mínimo",
+                  label:
+                    selectedDebt.paymentAmountType === "VARIABLE"
+                      ? "Usar pago referencia"
+                      : "Pagar mínimo",
                   onClick: () => applyQuickAmount(selectedDebt.minimumPayment),
                   variant: "secondary",
                 }
@@ -630,7 +633,7 @@ export function PaymentManager({
             selectedDebt
               ? [
                   `Saldo actual: ${formatCurrency(selectedDebt.effectiveBalance)}.`,
-                  `Pago mínimo: ${formatCurrency(selectedDebt.minimumPayment)}.`,
+                  `${selectedDebt.paymentAmountType === "VARIABLE" ? "Pago referencia" : "Pago mínimo"}: ${formatCurrency(selectedDebt.minimumPayment)}.`,
                 ]
               : [
                   "La app estima el reparto si no conoces todo el desglose.",
@@ -687,7 +690,10 @@ export function PaymentManager({
                     <div className="mt-4 grid grid-cols-2 gap-2">
                       {[
                         {
-                          label: "Pagar mínimo",
+                          label:
+                            selectedDebt.paymentAmountType === "VARIABLE"
+                              ? "Usar referencia"
+                              : "Pagar mínimo",
                           value: selectedDebt.minimumPayment,
                         },
                         {
@@ -745,7 +751,10 @@ export function PaymentManager({
                       <div className="mt-5 grid grid-cols-2 gap-2 lg:flex lg:flex-wrap">
                         {[
                           {
-                            label: "Pagar mínimo",
+                            label:
+                              selectedDebt.paymentAmountType === "VARIABLE"
+                                ? "Usar referencia"
+                                : "Pagar mínimo",
                             value: selectedDebt.minimumPayment,
                           },
                           {
@@ -786,9 +795,15 @@ export function PaymentManager({
                       support: "Incluye mora y cargos acumulados.",
                     },
                     {
-                      label: "Pago mínimo",
+                      label:
+                        selectedDebt.paymentAmountType === "VARIABLE"
+                          ? "Pago referencia"
+                          : "Pago mínimo",
                       value: formatCurrency(selectedDebt.minimumPayment),
-                      support: "Lo mínimo para mantenerte al día.",
+                      support:
+                        selectedDebt.paymentAmountType === "VARIABLE"
+                          ? "La referencia más reciente que hoy conviene cubrir."
+                          : "Lo mínimo para mantenerte al día.",
                     },
                     {
                       label: "Próximo vencimiento",

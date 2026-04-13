@@ -45,6 +45,16 @@ enum InterestRateType {
   MONTHLY
 }
 
+enum InterestRateMode {
+  FIXED
+  VARIABLE
+}
+
+enum PaymentAmountType {
+  FIXED
+  VARIABLE
+}
+
 enum StrategyMethod {
   SNOWBALL
   AVALANCHE
@@ -321,7 +331,9 @@ model Debt {
   creditLimit           Decimal?         @db.Decimal(14, 2)
   interestRate          Decimal          @db.Decimal(7, 4)
   interestRateType      InterestRateType @default(ANNUAL)
+  interestRateMode      InterestRateMode @default(FIXED)
   minimumPayment        Decimal          @db.Decimal(14, 2)
+  paymentAmountType     PaymentAmountType @default(FIXED)
   statementDay          Int?
   dueDay                Int?
   nextDueDate           DateTime?
