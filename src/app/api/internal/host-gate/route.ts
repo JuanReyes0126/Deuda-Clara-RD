@@ -4,6 +4,7 @@ import { z } from "zod";
 import { HOST_PANEL_ROUTE } from "@/lib/host/panel";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { assertRateLimit, buildRateLimitKey } from "@/lib/security/rate-limit";
+import { apiBadRequest, apiRateLimited, handleApiError } from "@/server/api/api-response";
 import { logSecurityEvent, logServerWarn } from "@/server/observability/logger";
 import {
   assertHostPanelApiAccess,
@@ -41,10 +42,7 @@ export async function POST(request: NextRequest) {
     const parsed = hostGateSchema.safeParse(await request.json());
 
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? "Datos inválidos." },
-        { status: 400 },
-      );
+      return apiBadRequest(parsed.error.issues[0]?.message ?? "Datos inválidos.");
     }
 
     const rateLimit = await assertRateLimit({
@@ -57,9 +55,9 @@ export async function POST(request: NextRequest) {
       logSecurityEvent("rate_limit_host_gate", {
         userId: decision.user.id,
       });
-      return NextResponse.json(
-        { error: "Demasiados intentos. Intenta más tarde." },
-        { status: 429 },
+      return apiRateLimited(
+        "Demasiados intentos. Intenta más tarde.",
+        rateLimit.resetAt,
       );
     }
 
@@ -78,10 +76,7 @@ export async function POST(request: NextRequest) {
     await setHostPanelGateCookie();
 
     return NextResponse.json({ ok: true, redirectTo: HOST_PANEL_ROUTE });
-  } catch {
-    return NextResponse.json(
-      { error: "No se pudo desbloquear el panel interno." },
-      { status: 500 },
-    );
+  } catch (error) {
+    return handleApiError(error, "No se pudo desbloquear el panel interno.");
   }
 }
