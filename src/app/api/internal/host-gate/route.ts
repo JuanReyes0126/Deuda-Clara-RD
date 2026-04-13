@@ -25,18 +25,15 @@ export async function POST(request: NextRequest) {
     });
 
     if (decision.outcome === "LOGIN") {
-      return NextResponse.json({ error: "No autenticado." }, { status: 401 });
+      return apiBadRequest("No autenticado.", 401);
     }
 
     if (decision.outcome === "NOT_FOUND") {
-      return NextResponse.json({ error: "No encontrado." }, { status: 404 });
+      return apiBadRequest("No encontrado.", 404);
     }
 
     if (decision.outcome === "MFA_SETUP_REQUIRED") {
-      return NextResponse.json(
-        { error: "Activa MFA en Configuración antes de usar el panel interno." },
-        { status: 403 },
-      );
+      return apiBadRequest("Activa MFA en Configuración antes de usar el panel interno.", 403);
     }
 
     const parsed = hostGateSchema.safeParse(await request.json());
@@ -67,10 +64,7 @@ export async function POST(request: NextRequest) {
       logServerWarn("Host secondary password rejected", {
         email: decision.user.email,
       });
-      return NextResponse.json(
-        { error: "La clave secundaria no coincide." },
-        { status: 401 },
-      );
+      return apiBadRequest("La clave secundaria no coincide.", 401);
     }
 
     await setHostPanelGateCookie();

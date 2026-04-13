@@ -9,6 +9,7 @@ import { assertSameOrigin } from "@/lib/security/origin";
 import { getRequestMeta } from "@/lib/security/request-meta";
 import { assertRateLimit, buildRateLimitKey } from "@/lib/security/rate-limit";
 import { loginSchema } from "@/lib/validations/auth";
+import { apiBadRequest, apiRateLimited } from "@/server/api/api-response";
 import { authenticateUser } from "@/server/auth/auth-service";
 import { isDatabaseReachable, markDatabaseUnavailable } from "@/server/services/database-availability";
 import { isInfrastructureUnavailableError } from "@/server/services/infrastructure-error";
@@ -24,6 +25,16 @@ function redirectWithError(request: NextRequest, message: string) {
 
 function redirectWithSuccess(request: NextRequest, pathname: string) {
   return NextResponse.redirect(buildRedirectUrl(request, pathname), 303);
+}
+
+function jsonAuthResponse(body: Record<string, unknown>, status: number) {
+  const headers = new Headers();
+
+  if (status >= 400 || status === 401 || status === 403) {
+    headers.set("cache-control", "no-store, max-age=0");
+  }
+
+  return NextResponse.json(body, { status, headers });
 }
 
 export async function POST(request: NextRequest) {
@@ -46,10 +57,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? "Datos inválidos." },
-        { status: 400 },
-      );
+      return apiBadRequest(parsed.error.issues[0]?.message ?? "Datos inválidos.");
     }
     parsedInput = parsed.data;
 
@@ -72,10 +80,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return NextResponse.json(
-        { error: "Demasiados intentos. Intenta más tarde." },
-        { status: 429 },
-      );
+      return apiRateLimited("Demasiados intentos. Intenta más tarde.", rateLimit.resetAt);
     }
 
     if (isDemoModeEnabled() && !(await isDatabaseReachable())) {
@@ -88,7 +93,7 @@ export async function POST(request: NextRequest) {
           return redirectWithError(request, message);
         }
 
-        return NextResponse.json({ error: message }, { status: 401 });
+        return jsonAuthResponse({ error: message }, 401);
       }
 
       await createDemoSession(demoProfile);
@@ -132,7 +137,7 @@ export async function POST(request: NextRequest) {
         return redirectWithError(request, error.message);
       }
 
-      return NextResponse.json(payload, { status: error.status });
+      return jsonAuthResponse(payload, error.status);
     }
 
     if (isInfrastructureUnavailableError(error)) {
@@ -161,7 +166,7 @@ export async function POST(request: NextRequest) {
           return redirectWithError(request, message);
         }
 
-        return NextResponse.json({ error: message }, { status: 401 });
+        return jsonAuthResponse({ error: message }, 401);
       }
 
       if (wantsRedirect) {
@@ -171,9 +176,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return NextResponse.json(
+      return jsonAuthResponse(
         { error: "El acceso no está disponible ahora mismo. Intenta de nuevo en unos minutos." },
-        { status: 503 },
+        503,
       );
     }
 
@@ -183,9 +188,6 @@ export async function POST(request: NextRequest) {
       return redirectWithError(request, "No se pudo iniciar sesión.");
     }
 
-    return NextResponse.json(
-      { error: "No se pudo iniciar sesión." },
-      { status: 500 },
-    );
+    return jsonAuthResponse({ error: "No se pudo iniciar sesión." }, 500);
   }
 }

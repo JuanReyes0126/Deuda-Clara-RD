@@ -170,6 +170,7 @@ describe("api/internal/host", () => {
 
     expect(response.status).toBe(401);
     expect(body.error).toBe("La clave secundaria no coincide.");
+    expect(response.headers.get("cache-control")).toBe("no-store, max-age=0");
   });
 
   it("desbloquea el panel cuando la clave es valida", async () => {

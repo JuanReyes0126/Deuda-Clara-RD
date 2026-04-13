@@ -9,6 +9,7 @@ import { assertSameOrigin } from "@/lib/security/origin";
 import { getRequestMeta } from "@/lib/security/request-meta";
 import { assertRateLimit, buildRateLimitKey } from "@/lib/security/rate-limit";
 import { registerSchema } from "@/lib/validations/auth";
+import { apiBadRequest, apiRateLimited } from "@/server/api/api-response";
 import { registerUser } from "@/server/auth/auth-service";
 import { isDatabaseReachable, markDatabaseUnavailable } from "@/server/services/database-availability";
 import { isInfrastructureUnavailableError } from "@/server/services/infrastructure-error";
@@ -24,6 +25,16 @@ function redirectWithError(request: NextRequest, message: string) {
 
 function redirectWithSuccess(request: NextRequest, pathname: string) {
   return NextResponse.redirect(buildRedirectUrl(request, pathname), 303);
+}
+
+function jsonRegisterResponse(body: Record<string, unknown>, status: number) {
+  const headers = new Headers();
+
+  if (status >= 400 || status === 401 || status === 403) {
+    headers.set("cache-control", "no-store, max-age=0");
+  }
+
+  return NextResponse.json(body, { status, headers });
 }
 
 export async function POST(request: NextRequest) {
@@ -63,10 +74,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return NextResponse.json(
-        { error: "Demasiados intentos. Intenta de nuevo más tarde." },
-        { status: 429 },
-      );
+      return apiRateLimited("Demasiados intentos. Intenta de nuevo más tarde.", rateLimit.resetAt);
     }
 
     const parsed = registerSchema.safeParse(requestBody);
@@ -79,10 +87,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? "Datos inválidos." },
-        { status: 400 },
-      );
+      return apiBadRequest(parsed.error.issues[0]?.message ?? "Datos inválidos.");
     }
     parsedInput = parsed.data;
 
@@ -119,7 +124,7 @@ export async function POST(request: NextRequest) {
         return redirectWithError(request, error.message);
       }
 
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return jsonRegisterResponse({ error: error.message }, error.status);
     }
 
     if (isInfrastructureUnavailableError(error)) {
@@ -142,13 +147,10 @@ export async function POST(request: NextRequest) {
         } catch (demoError) {
           if (isServiceError(demoError)) {
             if (wantsRedirect) {
-              return redirectWithError(request, demoError.message);
-            }
+            return redirectWithError(request, demoError.message);
+          }
 
-            return NextResponse.json(
-              { error: demoError.message },
-              { status: demoError.status },
-            );
+            return jsonRegisterResponse({ error: demoError.message }, demoError.status);
           }
 
           throw demoError;
@@ -162,9 +164,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return NextResponse.json(
+      return jsonRegisterResponse(
         { error: "El registro no está disponible ahora mismo. Intenta de nuevo en unos minutos." },
-        { status: 503 },
+        503,
       );
     }
 
@@ -174,9 +176,6 @@ export async function POST(request: NextRequest) {
       return redirectWithError(request, "No fue posible completar el registro.");
     }
 
-    return NextResponse.json(
-      { error: "No fue posible completar el registro." },
-      { status: 500 },
-    );
+    return jsonRegisterResponse({ error: "No fue posible completar el registro." }, 500);
   }
 }
