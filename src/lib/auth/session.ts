@@ -14,6 +14,7 @@ import {
   getDemoSession,
   isDemoModeEnabled,
 } from "@/lib/demo/session";
+import { buildMonthlyCashflowSnapshot } from "@/lib/finance/monthly-cashflow";
 import {
   isDatabaseReachable,
   markDatabaseUnavailable,
@@ -48,6 +49,11 @@ const serverUserSettingsSelect = {
   hybridRateWeight: true,
   hybridBalanceWeight: true,
   monthlyIncome: true,
+  monthlyHousingCost: true,
+  monthlyGroceriesCost: true,
+  monthlyUtilitiesCost: true,
+  monthlyTransportCost: true,
+  monthlyOtherEssentialExpenses: true,
   monthlyDebtBudget: true,
   notifyDueSoon: true,
   notifyOverdue: true,
@@ -223,6 +229,11 @@ function toServerUserContext(user: {
         hybridRateWeight: number;
         hybridBalanceWeight: number;
         monthlyIncome: unknown;
+        monthlyHousingCost: unknown;
+        monthlyGroceriesCost: unknown;
+        monthlyUtilitiesCost: unknown;
+        monthlyTransportCost: unknown;
+        monthlyOtherEssentialExpenses: unknown;
         monthlyDebtBudget: unknown;
         notifyDueSoon: boolean;
         notifyOverdue: boolean;
@@ -239,6 +250,40 @@ function toServerUserContext(user: {
       }
     | null;
 }): ServerUserContextDto {
+  const cashflow = user.settings
+    ? buildMonthlyCashflowSnapshot({
+        monthlyIncome:
+          user.settings.monthlyIncome === null ||
+          user.settings.monthlyIncome === undefined
+            ? null
+            : Number(user.settings.monthlyIncome),
+        monthlyHousingCost:
+          user.settings.monthlyHousingCost === null ||
+          user.settings.monthlyHousingCost === undefined
+            ? null
+            : Number(user.settings.monthlyHousingCost),
+        monthlyGroceriesCost:
+          user.settings.monthlyGroceriesCost === null ||
+          user.settings.monthlyGroceriesCost === undefined
+            ? null
+            : Number(user.settings.monthlyGroceriesCost),
+        monthlyUtilitiesCost:
+          user.settings.monthlyUtilitiesCost === null ||
+          user.settings.monthlyUtilitiesCost === undefined
+            ? null
+            : Number(user.settings.monthlyUtilitiesCost),
+        monthlyTransportCost:
+          user.settings.monthlyTransportCost === null ||
+          user.settings.monthlyTransportCost === undefined
+            ? null
+            : Number(user.settings.monthlyTransportCost),
+        monthlyOtherEssentialExpenses:
+          user.settings.monthlyOtherEssentialExpenses === null ||
+          user.settings.monthlyOtherEssentialExpenses === undefined
+            ? null
+            : Number(user.settings.monthlyOtherEssentialExpenses),
+      })
+    : null;
   const settings: ServerUserSettingsContextDto | null = user.settings
     ? {
         defaultCurrency: user.settings.defaultCurrency,
@@ -251,11 +296,16 @@ function toServerUserContext(user: {
           user.settings.membershipCancelAtPeriodEnd,
         hybridRateWeight: user.settings.hybridRateWeight,
         hybridBalanceWeight: user.settings.hybridBalanceWeight,
-        monthlyIncome:
-          user.settings.monthlyIncome === null ||
-          user.settings.monthlyIncome === undefined
-            ? null
-            : Number(user.settings.monthlyIncome),
+        monthlyIncome: cashflow?.monthlyIncome ?? null,
+        monthlyHousingCost: cashflow?.monthlyHousingCost ?? null,
+        monthlyGroceriesCost: cashflow?.monthlyGroceriesCost ?? null,
+        monthlyUtilitiesCost: cashflow?.monthlyUtilitiesCost ?? null,
+        monthlyTransportCost: cashflow?.monthlyTransportCost ?? null,
+        monthlyOtherEssentialExpenses:
+          cashflow?.monthlyOtherEssentialExpenses ?? null,
+        monthlyEssentialExpensesTotal:
+          cashflow?.monthlyEssentialExpensesTotal ?? null,
+        monthlyDebtCapacity: cashflow?.monthlyDebtCapacity ?? null,
         monthlyDebtBudget:
           user.settings.monthlyDebtBudget === null ||
           user.settings.monthlyDebtBudget === undefined

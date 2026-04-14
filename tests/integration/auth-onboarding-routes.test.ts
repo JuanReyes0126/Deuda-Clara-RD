@@ -29,6 +29,8 @@ describe("api/auth onboarding", () => {
     vi.mocked(buildOnboardingPreview).mockReturnValueOnce({
       estimatedDebtFreeDate: "2027-01-01T00:00:00.000Z",
       potentialSavings: 3141,
+      monthlyEssentialExpensesTotal: 17_000,
+      monthlyDebtCapacity: 18_000,
       recommendedStrategy: "AVALANCHE",
       recommendedStrategyLabel: "Avalancha",
       priorityDebtName: "Tarjeta Gold",
@@ -40,6 +42,11 @@ describe("api/auth onboarding", () => {
     const response = await onboardingPreviewPost(
       buildJsonRequest("http://localhost/api/auth/onboarding/preview", {
         monthlyIncome: 35_000,
+        monthlyHousingCost: 8_000,
+        monthlyGroceriesCost: 4_500,
+        monthlyUtilitiesCost: 2_000,
+        monthlyTransportCost: 1_500,
+        monthlyOtherEssentialExpenses: 1_000,
         monthlyDebtBudget: 18_000,
         debts: [
           {
@@ -72,6 +79,8 @@ describe("api/auth onboarding", () => {
     vi.mocked(completeUserOnboarding).mockResolvedValueOnce({
       estimatedDebtFreeDate: "2027-01-01T00:00:00.000Z",
       potentialSavings: 3141,
+      monthlyEssentialExpensesTotal: 17_000,
+      monthlyDebtCapacity: 18_000,
       recommendedStrategy: "AVALANCHE",
       recommendedStrategyLabel: "Avalancha",
       priorityDebtName: "Tarjeta Gold",
@@ -83,6 +92,11 @@ describe("api/auth onboarding", () => {
     const response = await completeOnboardingPost(
       buildJsonRequest("http://localhost/api/auth/onboarding", {
         monthlyIncome: 35_000,
+        monthlyHousingCost: 8_000,
+        monthlyGroceriesCost: 4_500,
+        monthlyUtilitiesCost: 2_000,
+        monthlyTransportCost: 1_500,
+        monthlyOtherEssentialExpenses: 1_000,
         monthlyDebtBudget: 18_000,
         debts: [
           {
@@ -120,6 +134,11 @@ describe("api/auth onboarding", () => {
     const response = await onboardingPreviewPost(
       buildJsonRequest("http://localhost/api/auth/onboarding/preview", {
         monthlyIncome: 35_000,
+        monthlyHousingCost: 8_000,
+        monthlyGroceriesCost: 4_500,
+        monthlyUtilitiesCost: 2_000,
+        monthlyTransportCost: 1_500,
+        monthlyOtherEssentialExpenses: 1_000,
         monthlyDebtBudget: 18_000,
         debts: [
           {
@@ -152,6 +171,11 @@ describe("api/auth onboarding", () => {
     const response = await completeOnboardingPost(
       buildJsonRequest("http://localhost/api/auth/onboarding", {
         monthlyIncome: 35_000,
+        monthlyHousingCost: 8_000,
+        monthlyGroceriesCost: 4_500,
+        monthlyUtilitiesCost: 2_000,
+        monthlyTransportCost: 1_500,
+        monthlyOtherEssentialExpenses: 1_000,
         monthlyDebtBudget: 18_000,
         debts: [
           {

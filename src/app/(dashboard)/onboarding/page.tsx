@@ -14,6 +14,13 @@ export default async function OnboardingPage() {
     <OnboardingWizard
       defaultValues={{
         monthlyIncome: Number(user.settings?.monthlyIncome ?? 0),
+        monthlyHousingCost: Number(user.settings?.monthlyHousingCost ?? 0),
+        monthlyGroceriesCost: Number(user.settings?.monthlyGroceriesCost ?? 0),
+        monthlyUtilitiesCost: Number(user.settings?.monthlyUtilitiesCost ?? 0),
+        monthlyTransportCost: Number(user.settings?.monthlyTransportCost ?? 0),
+        monthlyOtherEssentialExpenses: Number(
+          user.settings?.monthlyOtherEssentialExpenses ?? 0,
+        ),
         monthlyDebtBudget: Number(user.settings?.monthlyDebtBudget ?? 0),
         debts: [],
       }}

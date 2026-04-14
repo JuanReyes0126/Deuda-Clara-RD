@@ -2,6 +2,7 @@ import { addMonths, addWeeks, format, startOfWeek, subDays } from "date-fns";
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import { buildMonthlyCashflowSnapshot } from "@/lib/finance/monthly-cashflow";
 import { resolveFeatureAccess } from "@/lib/feature-access";
 import { getMembershipPlan } from "@/lib/membership/plans";
 import type {
@@ -29,6 +30,12 @@ type MembershipSnapshotInput = {
   >;
   preferredStrategy?: "AVALANCHE" | "SNOWBALL" | "HYBRID" | null;
   monthlyDebtBudget?: number | null;
+  monthlyIncome?: number | null;
+  monthlyHousingCost?: number | null;
+  monthlyGroceriesCost?: number | null;
+  monthlyUtilitiesCost?: number | null;
+  monthlyTransportCost?: number | null;
+  monthlyOtherEssentialExpenses?: number | null;
   hybridRateWeight?: number | null;
   hybridBalanceWeight?: number | null;
 };
@@ -77,6 +84,9 @@ function buildEmptyMembershipConversionSnapshot(): MembershipConversionSnapshotD
     hasDebts: false,
     totalDebt: 0,
     estimatedMonthlyInterest: 0,
+    monthlyIncome: null,
+    monthlyEssentialExpensesTotal: null,
+    monthlyDebtCapacity: null,
     currentMonthlyBudget: 0,
     suggestedMonthlyBudget: 0,
     inferredExtraPayment: 0,
@@ -224,6 +234,14 @@ export function buildDashboardHabitSignals(input: {
 }
 
 export function buildMembershipConversionSnapshot(input: MembershipSnapshotInput): MembershipConversionSnapshotDto {
+  const cashflow = buildMonthlyCashflowSnapshot({
+    monthlyIncome: input.monthlyIncome ?? null,
+    monthlyHousingCost: input.monthlyHousingCost ?? null,
+    monthlyGroceriesCost: input.monthlyGroceriesCost ?? null,
+    monthlyUtilitiesCost: input.monthlyUtilitiesCost ?? null,
+    monthlyTransportCost: input.monthlyTransportCost ?? null,
+    monthlyOtherEssentialExpenses: input.monthlyOtherEssentialExpenses ?? null,
+  });
   const activeDebts = input.debts.filter(
     (debt) => debt.status !== "PAID" && debt.status !== "ARCHIVED",
   );
@@ -270,6 +288,9 @@ export function buildMembershipConversionSnapshot(input: MembershipSnapshotInput
     hasDebts: true,
     totalDebt: strategy.totalBalance,
     estimatedMonthlyInterest: strategy.totalEstimatedMonthlyInterest,
+    monthlyIncome: cashflow.monthlyIncome,
+    monthlyEssentialExpensesTotal: cashflow.monthlyEssentialExpensesTotal,
+    monthlyDebtCapacity: cashflow.monthlyDebtCapacity,
     currentMonthlyBudget: strategy.selectedMonthlyBudget,
     suggestedMonthlyBudget: planComparison.suggestedMonthlyBudget,
     inferredExtraPayment: planComparison.inferredExtraPayment,
@@ -288,6 +309,37 @@ export function buildMembershipConversionSnapshot(input: MembershipSnapshotInput
 }
 
 function buildDashboardDataFromUser(user: DashboardSourceUser): DashboardDto {
+  const cashflow = buildMonthlyCashflowSnapshot({
+    monthlyIncome:
+      user.settings?.monthlyIncome !== null && user.settings?.monthlyIncome !== undefined
+        ? toMoneyNumber(user.settings.monthlyIncome)
+        : null,
+    monthlyHousingCost:
+      user.settings?.monthlyHousingCost !== null &&
+      user.settings?.monthlyHousingCost !== undefined
+        ? toMoneyNumber(user.settings.monthlyHousingCost)
+        : null,
+    monthlyGroceriesCost:
+      user.settings?.monthlyGroceriesCost !== null &&
+      user.settings?.monthlyGroceriesCost !== undefined
+        ? toMoneyNumber(user.settings.monthlyGroceriesCost)
+        : null,
+    monthlyUtilitiesCost:
+      user.settings?.monthlyUtilitiesCost !== null &&
+      user.settings?.monthlyUtilitiesCost !== undefined
+        ? toMoneyNumber(user.settings.monthlyUtilitiesCost)
+        : null,
+    monthlyTransportCost:
+      user.settings?.monthlyTransportCost !== null &&
+      user.settings?.monthlyTransportCost !== undefined
+        ? toMoneyNumber(user.settings.monthlyTransportCost)
+        : null,
+    monthlyOtherEssentialExpenses:
+      user.settings?.monthlyOtherEssentialExpenses !== null &&
+      user.settings?.monthlyOtherEssentialExpenses !== undefined
+        ? toMoneyNumber(user.settings.monthlyOtherEssentialExpenses)
+        : null,
+  });
   const activeDebts = user.debts.filter((debt) => debt.status !== "PAID" && debt.status !== "ARCHIVED");
   const membershipPlan = getMembershipPlan(user.settings?.membershipTier);
   const membershipBillingStatus = user.settings?.membershipBillingStatus ?? "FREE";
@@ -441,6 +493,9 @@ function buildDashboardDataFromUser(user: DashboardSourceUser): DashboardDto {
       totalDebt,
       totalMinimumPayment,
       currentMonthlyBudget: strategy.selectedMonthlyBudget,
+      monthlyIncome: cashflow.monthlyIncome,
+      monthlyEssentialExpensesTotal: cashflow.monthlyEssentialExpensesTotal,
+      monthlyDebtCapacity: cashflow.monthlyDebtCapacity,
       estimatedMonthlyInterest: totalEstimatedMonthlyInterest,
       paidVsPendingPercentage,
       projectedDebtFreeDate,
@@ -516,6 +571,35 @@ export async function getDashboardPageData(userId: string): Promise<{
       user.settings?.monthlyDebtBudget !== undefined
         ? toMoneyNumber(user.settings.monthlyDebtBudget)
         : null,
+    monthlyIncome:
+      user.settings?.monthlyIncome !== null && user.settings?.monthlyIncome !== undefined
+        ? toMoneyNumber(user.settings.monthlyIncome)
+        : null,
+    monthlyHousingCost:
+      user.settings?.monthlyHousingCost !== null &&
+      user.settings?.monthlyHousingCost !== undefined
+        ? toMoneyNumber(user.settings.monthlyHousingCost)
+        : null,
+    monthlyGroceriesCost:
+      user.settings?.monthlyGroceriesCost !== null &&
+      user.settings?.monthlyGroceriesCost !== undefined
+        ? toMoneyNumber(user.settings.monthlyGroceriesCost)
+        : null,
+    monthlyUtilitiesCost:
+      user.settings?.monthlyUtilitiesCost !== null &&
+      user.settings?.monthlyUtilitiesCost !== undefined
+        ? toMoneyNumber(user.settings.monthlyUtilitiesCost)
+        : null,
+    monthlyTransportCost:
+      user.settings?.monthlyTransportCost !== null &&
+      user.settings?.monthlyTransportCost !== undefined
+        ? toMoneyNumber(user.settings.monthlyTransportCost)
+        : null,
+    monthlyOtherEssentialExpenses:
+      user.settings?.monthlyOtherEssentialExpenses !== null &&
+      user.settings?.monthlyOtherEssentialExpenses !== undefined
+        ? toMoneyNumber(user.settings.monthlyOtherEssentialExpenses)
+        : null,
     hybridRateWeight: user.settings?.hybridRateWeight ?? 70,
     hybridBalanceWeight: user.settings?.hybridBalanceWeight ?? 30,
   });
@@ -552,6 +636,35 @@ export async function getMembershipConversionSnapshot(
       user.settings?.monthlyDebtBudget !== null &&
       user.settings?.monthlyDebtBudget !== undefined
         ? toMoneyNumber(user.settings.monthlyDebtBudget)
+        : null,
+    monthlyIncome:
+      user.settings?.monthlyIncome !== null && user.settings?.monthlyIncome !== undefined
+        ? toMoneyNumber(user.settings.monthlyIncome)
+        : null,
+    monthlyHousingCost:
+      user.settings?.monthlyHousingCost !== null &&
+      user.settings?.monthlyHousingCost !== undefined
+        ? toMoneyNumber(user.settings.monthlyHousingCost)
+        : null,
+    monthlyGroceriesCost:
+      user.settings?.monthlyGroceriesCost !== null &&
+      user.settings?.monthlyGroceriesCost !== undefined
+        ? toMoneyNumber(user.settings.monthlyGroceriesCost)
+        : null,
+    monthlyUtilitiesCost:
+      user.settings?.monthlyUtilitiesCost !== null &&
+      user.settings?.monthlyUtilitiesCost !== undefined
+        ? toMoneyNumber(user.settings.monthlyUtilitiesCost)
+        : null,
+    monthlyTransportCost:
+      user.settings?.monthlyTransportCost !== null &&
+      user.settings?.monthlyTransportCost !== undefined
+        ? toMoneyNumber(user.settings.monthlyTransportCost)
+        : null,
+    monthlyOtherEssentialExpenses:
+      user.settings?.monthlyOtherEssentialExpenses !== null &&
+      user.settings?.monthlyOtherEssentialExpenses !== undefined
+        ? toMoneyNumber(user.settings.monthlyOtherEssentialExpenses)
         : null,
     hybridRateWeight: user.settings?.hybridRateWeight ?? 70,
     hybridBalanceWeight: user.settings?.hybridBalanceWeight ?? 30,

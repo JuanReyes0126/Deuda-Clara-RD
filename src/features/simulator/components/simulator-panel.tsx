@@ -519,7 +519,6 @@ export function SimulatorPanel({
   billingStatus: MembershipBillingStatus;
 }) {
   const { navigate } = useAppNavigation();
-  void _conversionSnapshot;
   const initialDebt = debts[0] ?? null;
   const [selectedDebtId, setSelectedDebtId] = useState(initialDebt?.id ?? "");
   const [selectedScenarioId, setSelectedScenarioId] =
@@ -604,6 +603,10 @@ export function SimulatorPanel({
     id: "simulator:pro",
     active: hasProUpsellInsight,
   });
+  const hasFinancialContext =
+    _conversionSnapshot?.monthlyIncome !== null ||
+    _conversionSnapshot?.monthlyEssentialExpensesTotal !== null ||
+    _conversionSnapshot?.monthlyDebtCapacity !== null;
 
   const fieldErrors = getFieldErrors(form.formState.errors);
   const scenarioSummary = useMemo(
@@ -756,6 +759,52 @@ export function SimulatorPanel({
           </Button>
         }
       />
+
+      {hasFinancialContext ? (
+        <section className="-mx-1 sm:mx-0">
+          <div className="rounded-[1.6rem] border border-primary/12 bg-[rgba(240,248,245,0.9)] p-4 sm:p-5">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-[1.2rem] border border-white/80 bg-white/88 p-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
+                  Ingreso mensual
+                </p>
+                <p className="mt-1 text-sm font-semibold text-foreground">
+                  {formatRoundedCurrency(_conversionSnapshot?.monthlyIncome ?? 0)}
+                </p>
+              </div>
+              <div className="rounded-[1.2rem] border border-white/80 bg-white/88 p-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
+                  Gastos base
+                </p>
+                <p className="mt-1 text-sm font-semibold text-foreground">
+                  {formatRoundedCurrency(
+                    _conversionSnapshot?.monthlyEssentialExpensesTotal ?? 0,
+                  )}
+                </p>
+              </div>
+              <div className="rounded-[1.2rem] border border-white/80 bg-white/88 p-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
+                  Capacidad para deudas
+                </p>
+                <p className="mt-1 text-sm font-semibold text-foreground">
+                  {formatRoundedCurrency(_conversionSnapshot?.monthlyDebtCapacity ?? 0)}
+                </p>
+              </div>
+              <div className="rounded-[1.2rem] border border-white/80 bg-white/88 p-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
+                  Presupuesto registrado
+                </p>
+                <p className="mt-1 text-sm font-semibold text-foreground">
+                  {formatRoundedCurrency(_conversionSnapshot?.currentMonthlyBudget ?? 0)}
+                </p>
+              </div>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-muted">
+              Este contexto sale de tu ingreso y tus gastos base registrados, para que la recomendación no parta a ciegas.
+            </p>
+          </div>
+        </section>
+      ) : null}
 
       <section className="-mx-1 grid gap-3 lg:hidden">
         <div className="rounded-[1.5rem] border border-border bg-white/92 p-4 shadow-soft">

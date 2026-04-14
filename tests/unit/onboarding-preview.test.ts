@@ -6,6 +6,11 @@ describe("buildOnboardingPreview", () => {
   it("calcula una recomendación inicial usando el planner del servidor", () => {
     const result = buildOnboardingPreview({
       monthlyIncome: 42_000,
+      monthlyHousingCost: 11_000,
+      monthlyGroceriesCost: 6_500,
+      monthlyUtilitiesCost: 2_500,
+      monthlyTransportCost: 3_000,
+      monthlyOtherEssentialExpenses: 1_500,
       monthlyDebtBudget: 18_000,
       debts: [
         {
@@ -31,5 +36,7 @@ describe("buildOnboardingPreview", () => {
     expect(result.immediateAction).toContain("Ataca primero");
     expect(result.monthsToDebtFree === null || result.monthsToDebtFree > 0).toBe(true);
     expect(result.potentialSavings).toBeGreaterThanOrEqual(0);
+    expect(result.monthlyEssentialExpensesTotal).toBe(24_500);
+    expect(result.monthlyDebtCapacity).toBe(17_500);
   });
 });

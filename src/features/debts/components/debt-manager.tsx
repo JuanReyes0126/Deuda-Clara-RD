@@ -293,6 +293,13 @@ function getDebtStructureSummary(input: Pick<DebtItemDto, "interestRateMode" | "
   return `${debtRateModeLabels[input.interestRateMode]} · ${debtPaymentTypeLabels[input.paymentAmountType]}`;
 }
 
+function formatDebtMoney(
+  value: number | string,
+  currency: DebtItemDto["currency"] | DebtFormValues["currency"],
+) {
+  return formatCurrency(value, currency);
+}
+
 function buildRequiredTextValidation(maxLength: number) {
   return {
     validate: {
@@ -614,6 +621,8 @@ export function DebtManager({
     useWatch({ control: form.control, name: "interestRateMode" }) ?? "FIXED";
   const watchedPaymentAmountType =
     useWatch({ control: form.control, name: "paymentAmountType" }) ?? "FIXED";
+  const watchedCurrency =
+    useWatch({ control: form.control, name: "currency" }) ?? "DOP";
   const watchedNextDueDate = useWatch({ control: form.control, name: "nextDueDate" }) ?? "";
   const watchedStartedAt = useWatch({ control: form.control, name: "startedAt" }) ?? "";
   const watchedEstimatedEndAt =
@@ -1070,8 +1079,8 @@ export function DebtManager({
           notes={
             priorityDebt
               ? [
-                  `Saldo visible: ${formatCurrency(priorityDebt.effectiveBalance)}.`,
-                  `${priorityDebt.paymentAmountType === "VARIABLE" ? "Pago de referencia" : "Pago mínimo"}: ${formatCurrency(priorityDebt.minimumPayment)}.`,
+                  `Saldo visible: ${formatDebtMoney(priorityDebt.effectiveBalance, priorityDebt.currency)}.`,
+                  `${priorityDebt.paymentAmountType === "VARIABLE" ? "Pago de referencia" : "Pago mínimo"}: ${formatDebtMoney(priorityDebt.minimumPayment, priorityDebt.currency)}.`,
                 ]
               : [
                   "Empieza por saldo, pago base y vencimiento.",
@@ -1198,7 +1207,7 @@ export function DebtManager({
               <div className="min-w-0 rounded-3xl border border-border bg-secondary/60 p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted">Deuda real estimada</p>
                 <p className="value-stable mt-2 text-[clamp(1rem,2.7vw,1.35rem)] font-semibold leading-tight text-foreground">
-                  {formatCurrency(livePreview.effectiveBalance)}
+                  {formatDebtMoney(livePreview.effectiveBalance, watchedCurrency)}
                 </p>
                 <p className="mt-2 text-sm text-muted">
                   Incluye saldo, mora y cargos extra registrados.
@@ -1207,7 +1216,7 @@ export function DebtManager({
               <div className="min-w-0 rounded-3xl border border-border bg-secondary/60 p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted">Interés estimado del mes</p>
                 <p className="value-stable mt-2 text-[clamp(1rem,2.7vw,1.35rem)] font-semibold leading-tight text-foreground">
-                  {formatCurrency(livePreview.monthlyInterestEstimate)}
+                  {formatDebtMoney(livePreview.monthlyInterestEstimate, watchedCurrency)}
                 </p>
                 <p className="mt-2 text-sm text-muted">
                   Calculado con la tasa y el saldo actual que has escrito.
@@ -1741,7 +1750,7 @@ export function DebtManager({
                           Balance actual
                         </p>
                         <p className="value-stable mt-1 text-base font-semibold text-foreground">
-                          {formatCurrency(debt.effectiveBalance)}
+                          {formatDebtMoney(debt.effectiveBalance, debt.currency)}
                         </p>
                       </div>
                       <div className="rounded-[1.15rem] border border-white/70 bg-white/88 p-3">
@@ -1781,7 +1790,7 @@ export function DebtManager({
                               {debt.paymentAmountType === "VARIABLE" ? "Pago referencia" : "Pago mínimo"}
                             </p>
                             <p className="value-stable mt-1 text-sm font-semibold text-foreground">
-                              {formatCurrency(debt.minimumPayment)}
+                              {formatDebtMoney(debt.minimumPayment, debt.currency)}
                             </p>
                           </div>
                           <div>
@@ -1789,7 +1798,7 @@ export function DebtManager({
                               Interés estimado
                             </p>
                             <p className="value-stable mt-1 text-sm font-semibold text-foreground">
-                              {formatCurrency(debt.monthlyInterestEstimate)}
+                              {formatDebtMoney(debt.monthlyInterestEstimate, debt.currency)}
                             </p>
                           </div>
                         </div>
@@ -1909,7 +1918,7 @@ export function DebtManager({
                       <div className="min-w-0">
                         <p className="text-xs uppercase tracking-[0.18em] text-muted">Saldo real</p>
                         <p className="value-stable mt-1 font-semibold text-foreground">
-                          {formatCurrency(debt.effectiveBalance)}
+                          {formatDebtMoney(debt.effectiveBalance, debt.currency)}
                         </p>
                       </div>
                       <div className="min-w-0">
@@ -1917,7 +1926,7 @@ export function DebtManager({
                           {debt.paymentAmountType === "VARIABLE" ? "Pago referencia" : "Pago mínimo"}
                         </p>
                         <p className="value-stable mt-1 font-semibold text-foreground">
-                          {formatCurrency(debt.minimumPayment)}
+                          {formatDebtMoney(debt.minimumPayment, debt.currency)}
                         </p>
                       </div>
                       <div className="min-w-0">
@@ -1925,7 +1934,7 @@ export function DebtManager({
                           {debt.interestRateMode === "VARIABLE" ? "Interés ref. mes" : "Interés estimado"}
                         </p>
                         <p className="value-stable mt-1 font-semibold text-foreground">
-                          {formatCurrency(debt.monthlyInterestEstimate)}
+                          {formatDebtMoney(debt.monthlyInterestEstimate, debt.currency)}
                         </p>
                       </div>
                       <div className="min-w-0">

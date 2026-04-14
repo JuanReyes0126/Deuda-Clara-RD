@@ -85,6 +85,13 @@ export type UserSettingsPublicDto = {
   hybridRateWeight: number;
   hybridBalanceWeight: number;
   monthlyIncome: number | null;
+  monthlyHousingCost: number | null;
+  monthlyGroceriesCost: number | null;
+  monthlyUtilitiesCost: number | null;
+  monthlyTransportCost: number | null;
+  monthlyOtherEssentialExpenses: number | null;
+  monthlyEssentialExpensesTotal: number | null;
+  monthlyDebtCapacity: number | null;
   monthlyDebtBudget: number | null;
   notifyDueSoon: boolean;
   notifyOverdue: boolean;
@@ -157,6 +164,9 @@ export type DashboardSummaryDto = {
   totalDebt: number;
   totalMinimumPayment: number;
   currentMonthlyBudget: number;
+  monthlyIncome: number | null;
+  monthlyEssentialExpensesTotal: number | null;
+  monthlyDebtCapacity: number | null;
   estimatedMonthlyInterest: number;
   paidVsPendingPercentage: number;
   projectedDebtFreeDate: string | null;
@@ -184,6 +194,9 @@ export type MembershipConversionSnapshotDto = {
   hasDebts: boolean;
   totalDebt: number;
   estimatedMonthlyInterest: number;
+  monthlyIncome: number | null;
+  monthlyEssentialExpensesTotal: number | null;
+  monthlyDebtCapacity: number | null;
   currentMonthlyBudget: number;
   suggestedMonthlyBudget: number;
   inferredExtraPayment: number;
@@ -279,6 +292,8 @@ export type DashboardDto = {
 export type OnboardingPreviewDto = {
   estimatedDebtFreeDate: string | null;
   potentialSavings: number;
+  monthlyEssentialExpensesTotal: number;
+  monthlyDebtCapacity: number;
   recommendedStrategy: "SNOWBALL" | "AVALANCHE" | "HYBRID";
   recommendedStrategyLabel: string;
   priorityDebtName: string | null;
