@@ -98,26 +98,37 @@ const paymentFrequencyOptions = new Set<SimulatorFormValues["paymentFrequency"]>
   "WEEKLY",
 ]);
 
-const currencyFormatter = new Intl.NumberFormat("es-DO", {
-  style: "currency",
-  currency: "DOP",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+const simulatorCurrencyFormatters = new Map<string, Intl.NumberFormat>();
 
-function formatSimulatorCurrency(value: number) {
-  return currencyFormatter.format(Number.isFinite(value) ? value : 0);
+function formatSimulatorCurrency(
+  value: number,
+  currency: DebtItemDto["currency"] = "DOP",
+  fractionDigits = 2,
+) {
+  const formatterKey = `${currency}:${fractionDigits}`;
+
+  if (!simulatorCurrencyFormatters.has(formatterKey)) {
+    simulatorCurrencyFormatters.set(
+      formatterKey,
+      new Intl.NumberFormat("es-DO", {
+        style: "currency",
+        currency,
+        minimumFractionDigits: fractionDigits,
+        maximumFractionDigits: fractionDigits,
+      }),
+    );
+  }
+
+  return simulatorCurrencyFormatters
+    .get(formatterKey)!
+    .format(Number.isFinite(value) ? value : 0);
 }
 
-const roundedCurrencyFormatter = new Intl.NumberFormat("es-DO", {
-  style: "currency",
-  currency: "DOP",
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-});
-
-function formatRoundedCurrency(value: number) {
-  return roundedCurrencyFormatter.format(Number.isFinite(value) ? value : 0);
+function formatRoundedCurrency(
+  value: number,
+  currency: DebtItemDto["currency"] = "DOP",
+) {
+  return formatSimulatorCurrency(value, currency, 0);
 }
 
 function formatMonthsValue(value: number | null) {
@@ -133,13 +144,16 @@ function formatMonthsValue(value: number | null) {
   return `${rounded} ${value === 1 ? "mes" : "meses"}`;
 }
 
-function formatLockedSavingsPreview(value: number) {
+function formatLockedSavingsPreview(
+  value: number,
+  currency: DebtItemDto["currency"] = "DOP",
+) {
   if (!Number.isFinite(value) || value <= 0) {
-    return "Hasta RD$4,000";
+    return `Hasta ${formatRoundedCurrency(4000, currency)}`;
   }
 
   const rounded = Math.max(1000, Math.round(value / 1000) * 1000);
-  return `Hasta ${formatRoundedCurrency(rounded)}`;
+  return `Hasta ${formatRoundedCurrency(rounded, currency)}`;
 }
 
 function formatLockedMonthsPreview(value: number | null) {
@@ -396,7 +410,10 @@ function getScenarioDelta(base: DebtSimulatorScenario, scenario: DebtSimulatorSc
   };
 }
 
-function getResultHeadline(result: DebtSimulationResult) {
+function getResultHeadline(
+  result: DebtSimulationResult,
+  currency: DebtItemDto["currency"] = "DOP",
+) {
   if (!result.scenarios.base.feasible) {
     return {
       title: "Con ese pago todavía no hay salida sostenible.",
@@ -415,6 +432,7 @@ function getResultHeadline(result: DebtSimulationResult) {
       )}.`,
       description: `Además evitarías ${formatSimulatorCurrency(
         result.savingsWithExtraPayment.interestSaved,
+        currency,
       )} en intereses frente a tu pago actual.`,
     };
   }
@@ -423,6 +441,7 @@ function getResultHeadline(result: DebtSimulationResult) {
     title: `Con tu pago actual saldrías en ${formatMonthsValue(result.monthsToPayoff)}.`,
     description: `Mantener ese ritmo te llevaría a pagar ${formatSimulatorCurrency(
       result.totalInterest,
+      currency,
     )} en intereses.`,
   };
 }
@@ -543,6 +562,11 @@ export function SimulatorPanel({
     () => debts.find((debt) => debt.id === selectedDebtId) ?? null,
     [debts, selectedDebtId],
   );
+  const selectedCurrency = selectedDebt?.currency ?? "DOP";
+  const currencyBadgeLabel =
+    selectedCurrency === "USD" ? "Formato USD" : "Formato RD$";
+  const formatSimulationAmount = (value: number) =>
+    formatSimulatorCurrency(value, selectedCurrency);
 
   const watchedValues = useWatch({
     control: form.control,
@@ -621,7 +645,9 @@ export function SimulatorPanel({
     simulation,
     effectiveSelectedScenarioId,
   );
-  const resultHeadline = simulation ? getResultHeadline(simulation) : null;
+  const resultHeadline = simulation
+    ? getResultHeadline(simulation, selectedCurrency)
+    : null;
   const comparisonRows = simulation
     ? [
         {
@@ -659,8 +685,11 @@ export function SimulatorPanel({
     })[0]?.scenario.id;
   const extraPaymentValue = watchedValues.extraPayment ?? 0;
   const lockedSavingsPreview = simulation
-    ? formatLockedSavingsPreview(simulation.savingsWithExtraPayment.interestSaved)
-    : "Hasta RD$4,000";
+    ? formatLockedSavingsPreview(
+        simulation.savingsWithExtraPayment.interestSaved,
+        selectedCurrency,
+      )
+    : formatLockedSavingsPreview(0, selectedCurrency);
   const lockedMonthsPreview = simulation
     ? formatLockedMonthsPreview(simulation.savingsWithExtraPayment.monthsSaved)
     : "Menos tiempo";
@@ -669,7 +698,7 @@ export function SimulatorPanel({
     : !isPremiumUnlocked
       ? "Estás pagando más de lo necesario"
     : simulation.savingsWithExtraPayment.interestSaved > 0
-      ? `Si subes el pago, podrías ahorrar ${formatSimulatorCurrency(
+      ? `Si subes el pago, podrías ahorrar ${formatSimulationAmount(
           simulation.savingsWithExtraPayment.interestSaved,
         )}.`
       : simulation.scenarios.base.feasible
@@ -852,7 +881,7 @@ export function SimulatorPanel({
                   Intereses
                 </p>
                 <p className="value-stable mt-1 text-base font-semibold text-foreground">
-                  {formatSimulatorCurrency(simulation.totalInterest)}
+                  {formatSimulationAmount(simulation.totalInterest)}
                 </p>
               </div>
             </div>
@@ -877,7 +906,7 @@ export function SimulatorPanel({
           <CardHeader className="gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <Badge variant="success">Se actualiza al instante</Badge>
-              <Badge variant="default">Formato RD$</Badge>
+              <Badge variant="default">{currencyBadgeLabel}</Badge>
             </div>
             <CardTitle className="text-balance">Simulador rápido de deuda</CardTitle>
             <CardDescription className="hidden max-w-2xl text-pretty lg:block">
@@ -1188,7 +1217,7 @@ export function SimulatorPanel({
                           Intereses
                         </p>
                         <p className="value-stable mt-1 text-base font-semibold text-foreground">
-                          {formatSimulatorCurrency(simulation.totalInterest)}
+                          {formatSimulationAmount(simulation.totalInterest)}
                         </p>
                       </div>
                     </div>
@@ -1201,7 +1230,7 @@ export function SimulatorPanel({
                         {!isPremiumUnlocked
                           ? "Desbloquear la comparación completa"
                           : simulation.savingsWithExtraPayment.interestSaved > 0
-                            ? `Subir el pago y ahorrar ${formatSimulatorCurrency(simulation.savingsWithExtraPayment.interestSaved)}`
+                            ? `Subir el pago y ahorrar ${formatSimulationAmount(simulation.savingsWithExtraPayment.interestSaved)}`
                             : "Probar un pago más alto"}
                       </p>
                     </div>
@@ -1237,12 +1266,12 @@ export function SimulatorPanel({
                       items={[
                         {
                           label: "Total pagado",
-                          value: formatSimulatorCurrency(simulation.totalPaid),
+                          value: formatSimulationAmount(simulation.totalPaid),
                           support: "Capital más costo financiero durante todo el período.",
                         },
                         {
                           label: "Estás pagando en intereses",
-                          value: formatSimulatorCurrency(simulation.totalInterest),
+                          value: formatSimulationAmount(simulation.totalInterest),
                           support: "Esto es lo que se iría solo en financiar la deuda si no cambias la estrategia.",
                         },
                         {
@@ -1250,7 +1279,7 @@ export function SimulatorPanel({
                           value:
                             access.canSeeOptimizedSavings &&
                             simulation.savingsWithExtraPayment.interestSaved > 0
-                              ? formatSimulatorCurrency(
+                              ? formatSimulationAmount(
                                   simulation.savingsWithExtraPayment.interestSaved,
                                 )
                               : "Bloqueado en Base",
@@ -1467,11 +1496,11 @@ export function SimulatorPanel({
               ? !isPremiumUnlocked
                 ? [
                     `Sales en ${formatMonthsValue(simulation.monthsToPayoff)}.`,
-                    `Pagas ${formatSimulatorCurrency(simulation.totalInterest)} en intereses.`,
-                    `Pago ${frequencyLabels[watchedValues.paymentFrequency ?? "MONTHLY"].toLowerCase()}: ${formatSimulatorCurrency(simulation.scenarios.base.paymentAmount)}.`,
+                    `Pagas ${formatSimulationAmount(simulation.totalInterest)} en intereses.`,
+                    `Pago ${frequencyLabels[watchedValues.paymentFrequency ?? "MONTHLY"].toLowerCase()}: ${formatSimulationAmount(simulation.scenarios.base.paymentAmount)}.`,
                   ]
                 : [
-                    `Intereses visibles: ${formatSimulatorCurrency(simulation.totalInterest)}.`,
+                    `Intereses visibles: ${formatSimulationAmount(simulation.totalInterest)}.`,
                     selectedScenario?.payoffDate
                       ? `Salida cerca de ${formatDate(selectedScenario.payoffDate, "MMM yyyy")}.`
                       : "Todavía no hay fecha clara de salida.",
@@ -1531,7 +1560,7 @@ export function SimulatorPanel({
                         ) : null}
                       </div>
                       <p className="mt-3 text-sm font-semibold text-foreground">
-                        {formatMonthsValue(scenario.monthsToPayoff)} · {formatSimulatorCurrency(scenario.totalInterest)} en intereses
+                        {formatMonthsValue(scenario.monthsToPayoff)} · {formatSimulationAmount(scenario.totalInterest)} en intereses
                       </p>
                       {scenario.id !== "BASE" ? (
                         <p className="mt-2 text-sm text-muted">
@@ -1540,7 +1569,7 @@ export function SimulatorPanel({
                             : "Sin recorte de tiempo visible"}
                           {" · "}
                           {delta.interestSaved > 0
-                            ? `${formatSimulatorCurrency(delta.interestSaved)} menos en intereses`
+                            ? `${formatSimulationAmount(delta.interestSaved)} menos en intereses`
                             : "Sin ahorro visible"}
                         </p>
                       ) : null}
@@ -1597,7 +1626,7 @@ export function SimulatorPanel({
                             {formatMonthsValue(scenario.monthsToPayoff)}
                           </p>
                           <p className="mt-2 text-sm leading-7 text-muted">
-                            Pago por período: {formatSimulatorCurrency(scenario.paymentAmount)}
+                            Pago por período: {formatSimulationAmount(scenario.paymentAmount)}
                           </p>
                           <p className="mt-2 text-sm leading-6 text-muted">
                             {getScenarioSupportCopy(scenario.id, extraPaymentValue)}
@@ -1608,7 +1637,7 @@ export function SimulatorPanel({
                                 Intereses
                               </p>
                               <p className="value-stable mt-2 text-sm font-semibold text-foreground">
-                                {formatSimulatorCurrency(scenario.totalInterest)}
+                                {formatSimulationAmount(scenario.totalInterest)}
                               </p>
                             </div>
                             <div className="rounded-[1.2rem] border border-border/70 bg-secondary/35 px-4 py-3 transition-colors duration-200 ease-out">
@@ -1616,7 +1645,7 @@ export function SimulatorPanel({
                                 Total pagado
                               </p>
                               <p className="value-stable mt-2 text-sm font-semibold text-foreground">
-                                {formatSimulatorCurrency(scenario.totalPaid)}
+                                {formatSimulationAmount(scenario.totalPaid)}
                               </p>
                             </div>
                             {scenario.id !== "BASE" ? (
@@ -1628,7 +1657,7 @@ export function SimulatorPanel({
                                 </p>
                                 <p className="text-foreground mt-2 text-sm font-semibold">
                                   {delta.interestSaved > 0
-                                    ? `${formatSimulatorCurrency(delta.interestSaved)} menos en intereses`
+                                    ? `${formatSimulationAmount(delta.interestSaved)} menos en intereses`
                                     : "Sin ahorro de intereses visible"}
                                 </p>
                               </div>
@@ -1653,7 +1682,7 @@ export function SimulatorPanel({
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <p className="font-semibold text-foreground">{scenario.label}</p>
                           <p className="text-sm text-muted sm:text-right">
-                            {formatMonthsValue(scenario.monthsToPayoff)} · {formatSimulatorCurrency(scenario.totalInterest)} en intereses
+                            {formatMonthsValue(scenario.monthsToPayoff)} · {formatSimulationAmount(scenario.totalInterest)} en intereses
                           </p>
                         </div>
                         <div className="h-3 overflow-hidden rounded-full bg-secondary/60">
@@ -1680,7 +1709,7 @@ export function SimulatorPanel({
                               El pago extra ya tiene impacto real.
                             </p>
                             <p className="mt-2 text-sm leading-7 text-muted">
-                              Con ese extra podrías ahorrar {formatSimulatorCurrency(simulation.savingsWithExtraPayment.interestSaved)}
+                              Con ese extra podrías ahorrar {formatSimulationAmount(simulation.savingsWithExtraPayment.interestSaved)}
                               {" "}y salir {formatMonthsValue(simulation.savingsWithExtraPayment.monthsSaved)} antes.
                             </p>
                           </div>
@@ -1953,8 +1982,8 @@ export function SimulatorPanel({
                         {selectedScenario.amortizationSchedule.slice(0, 8).map((row) => (
                           <tr key={`${selectedScenario.id}-${row.period}`} className="border-b border-border/60">
                             <td className="px-3 py-2 text-foreground">{row.period}</td>
-                            <td className="value-stable px-3 py-2 text-foreground">{formatSimulatorCurrency(row.payment)}</td>
-                            <td className="value-stable px-3 py-2 text-foreground">{formatSimulatorCurrency(row.remainingBalance)}</td>
+                            <td className="value-stable px-3 py-2 text-foreground">{formatSimulationAmount(row.payment)}</td>
+                            <td className="value-stable px-3 py-2 text-foreground">{formatSimulationAmount(row.remainingBalance)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -2010,10 +2039,10 @@ export function SimulatorPanel({
                               <tr key={`${selectedScenario.id}-${row.period}`} className="border-b border-border/60">
                                 <td className="px-3 py-2 text-foreground">{row.period}</td>
                                 <td className="date-stable px-3 py-2 text-muted">{formatDate(row.date)}</td>
-                                <td className="value-stable px-3 py-2 text-foreground">{formatSimulatorCurrency(row.payment)}</td>
-                                <td className="value-stable px-3 py-2 text-foreground">{formatSimulatorCurrency(row.principalPaid)}</td>
-                                <td className="value-stable px-3 py-2 text-muted">{formatSimulatorCurrency(row.interestPaid)}</td>
-                                <td className="value-stable px-3 py-2 text-foreground">{formatSimulatorCurrency(row.remainingBalance)}</td>
+                                <td className="value-stable px-3 py-2 text-foreground">{formatSimulationAmount(row.payment)}</td>
+                                <td className="value-stable px-3 py-2 text-foreground">{formatSimulationAmount(row.principalPaid)}</td>
+                                <td className="value-stable px-3 py-2 text-muted">{formatSimulationAmount(row.interestPaid)}</td>
+                                <td className="value-stable px-3 py-2 text-foreground">{formatSimulationAmount(row.remainingBalance)}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -2045,7 +2074,7 @@ export function SimulatorPanel({
               <div className="grid gap-3">
                 <FeaturePreview
                   title="Resultado actual"
-                  description={`Sales en ${simulation ? formatMonthsValue(simulation.monthsToPayoff) : "tu ritmo actual"} y pagas ${simulation ? formatSimulatorCurrency(simulation.totalInterest) : "intereses visibles"}.`}
+                  description={`Sales en ${simulation ? formatMonthsValue(simulation.monthsToPayoff) : "tu ritmo actual"} y pagas ${simulation ? formatSimulationAmount(simulation.totalInterest) : "intereses visibles"}.`}
                 />
                 <BlurredInsight
                   title="Podrías salir antes"
@@ -2083,7 +2112,7 @@ export function SimulatorPanel({
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <FeaturePreview
                   title="Resultado actual"
-                  description={`Sales en ${simulation ? formatMonthsValue(simulation.monthsToPayoff) : "tu ritmo actual"}, pagas ${simulation ? formatSimulatorCurrency(simulation.totalInterest) : "intereses visibles"} y sostienes ${simulation ? formatSimulatorCurrency(simulation.scenarios.base.paymentAmount) : "tu pago actual"}.`}
+                  description={`Sales en ${simulation ? formatMonthsValue(simulation.monthsToPayoff) : "tu ritmo actual"}, pagas ${simulation ? formatSimulationAmount(simulation.totalInterest) : "intereses visibles"} y sostienes ${simulation ? formatSimulationAmount(simulation.scenarios.base.paymentAmount) : "tu pago actual"}.`}
                 />
                 <BlurredInsight
                   title="Podrías salir antes"
@@ -2115,7 +2144,7 @@ export function SimulatorPanel({
                 title="Ya viste el costo actual. Falta ver la salida que más te conviene"
                 description={
                   extraPaymentValue > 0
-                    ? `Ya tienes un extra cargado de ${formatSimulatorCurrency(extraPaymentValue)}. Premium lo compara contra tu pago actual y una ruta mejorada para mostrar cuánto dinero y tiempo sigues perdiendo.`
+                    ? `Ya tienes un extra cargado de ${formatSimulationAmount(extraPaymentValue)}. Premium lo compara contra tu pago actual y una ruta mejorada para mostrar cuánto dinero y tiempo sigues perdiendo.`
                     : "Premium te enseña cuánto podrías dejar de perder en tiempo e intereses si ajustas la estrategia."
                 }
                 requiredPlan="Premium"
