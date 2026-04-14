@@ -300,6 +300,39 @@ function formatDebtMoney(
   return formatCurrency(value, currency);
 }
 
+function buildCurrencyBreakdown(debts: DebtItemDto[]) {
+  const totals = debts.reduce<
+    Record<
+      DebtItemDto["currency"],
+      {
+        balance: number;
+        minimumPayment: number;
+      }
+    >
+  >(
+    (acc, debt) => {
+      acc[debt.currency].balance += debt.effectiveBalance;
+      acc[debt.currency].minimumPayment += debt.minimumPayment;
+      return acc;
+    },
+    {
+      DOP: { balance: 0, minimumPayment: 0 },
+      USD: { balance: 0, minimumPayment: 0 },
+    },
+  );
+
+  return (["DOP", "USD"] as const)
+    .filter(
+      (currency) =>
+        totals[currency].balance > 0 || totals[currency].minimumPayment > 0,
+    )
+    .map((currency) => ({
+      currency,
+      balance: totals[currency].balance,
+      minimumPayment: totals[currency].minimumPayment,
+    }));
+}
+
 function buildRequiredTextValidation(maxLength: number) {
   return {
     validate: {
@@ -685,16 +718,35 @@ export function DebtManager({
   const hasVariablePaymentDebt = activeDebts.some(
     (debt) => debt.paymentAmountType === "VARIABLE",
   );
+  const currencyBreakdown = useMemo(
+    () => buildCurrencyBreakdown(activeDebts),
+    [activeDebts],
+  );
+  const hasMixedCurrencies = currencyBreakdown.length > 1;
+  const totalBalanceDisplay = hasMixedCurrencies
+    ? currencyBreakdown
+        .map((item) => formatDebtMoney(item.balance, item.currency))
+        .join(" · ")
+    : formatCurrency(summary.totalBalance);
+  const totalMinimumPaymentDisplay = hasMixedCurrencies
+    ? currencyBreakdown
+        .map((item) => formatDebtMoney(item.minimumPayment, item.currency))
+        .join(" · ")
+    : formatCurrency(summary.totalMinimumPayment);
+  const mixedCurrencySupport = hasMixedCurrencies
+    ? "Separado por moneda para que RD$ y USD no se mezclen en un mismo total."
+    : null;
   const debtSummaryItems: ExecutiveSummaryItem[] = [
     {
-      label: "Saldo total",
-      value: formatCurrency(summary.totalBalance),
+      label: hasMixedCurrencies ? "Saldo visible por moneda" : "Saldo total",
+      value: totalBalanceDisplay,
       support: activeDebts.length
-        ? "Lo que hoy necesitas ordenar para recuperar control."
+        ? mixedCurrencySupport ?? "Lo que hoy necesitas ordenar para recuperar control."
         : "Aquí aparecerá tu panorama apenas registres la primera deuda.",
       badgeLabel: activeDebts.length ? "Panorama real" : "Empieza aquí",
       badgeVariant: activeDebts.length ? ("success" as const) : ("default" as const),
       featured: true,
+      valueKind: hasMixedCurrencies ? ("text" as const) : undefined,
     },
     {
       label: "Deudas activas",
@@ -705,11 +757,16 @@ export function DebtManager({
       valueKind: "text" as const,
     },
     {
-      label: hasVariablePaymentDebt ? "Pago base total" : "Pago mínimo total",
-      value: formatCurrency(summary.totalMinimumPayment),
+      label:
+        hasVariablePaymentDebt || hasMixedCurrencies
+          ? "Pago base visible"
+          : "Pago mínimo total",
+      value: totalMinimumPaymentDisplay,
       support: hasVariablePaymentDebt
-        ? "Incluye mínimos fijos y montos de referencia para deudas variables."
-        : "Lo mínimo para sostenerte al día este mes.",
+        ? mixedCurrencySupport ??
+          "Incluye mínimos fijos y montos de referencia para deudas variables."
+        : mixedCurrencySupport ?? "Lo mínimo para sostenerte al día este mes.",
+      valueKind: hasMixedCurrencies ? ("text" as const) : undefined,
     },
     {
       label: "Más presión hoy",
@@ -981,8 +1038,11 @@ export function DebtManager({
                 Saldo visible
               </p>
               <p className="value-stable mt-1 text-lg font-semibold text-foreground">
-                {formatCurrency(summary.totalBalance)}
+                {totalBalanceDisplay}
               </p>
+              {mixedCurrencySupport ? (
+                <p className="mt-1 text-xs leading-5 text-muted">{mixedCurrencySupport}</p>
+              ) : null}
             </div>
             <div className="min-w-0 rounded-[1.2rem] border border-border/70 bg-secondary/45 p-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
