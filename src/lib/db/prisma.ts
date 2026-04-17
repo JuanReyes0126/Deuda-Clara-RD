@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 declare global {
   var __prisma: PrismaClient | undefined;
@@ -67,6 +67,13 @@ const closedConnectionPatterns = [
   /terminating connection/i,
 ];
 
+const transientReconnectCodes = new Set([
+  "P1001",
+  "P1002",
+  "P1008",
+  "P1017",
+]);
+
 export function isPrismaClosedConnectionError(error: unknown) {
   if (!(error instanceof Error)) {
     return false;
@@ -75,11 +82,34 @@ export function isPrismaClosedConnectionError(error: unknown) {
   return closedConnectionPatterns.some((pattern) => pattern.test(error.message));
 }
 
+export function isPrismaReconnectableError(error: unknown) {
+  if (isPrismaClosedConnectionError(error)) {
+    return true;
+  }
+
+  if (error instanceof Prisma.PrismaClientInitializationError) {
+    return true;
+  }
+
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    transientReconnectCodes.has(error.code)
+  ) {
+    return true;
+  }
+
+  if (error instanceof Prisma.PrismaClientUnknownRequestError) {
+    return isPrismaClosedConnectionError(error);
+  }
+
+  return false;
+}
+
 export async function runWithPrismaReconnect<T>(operation: () => Promise<T>) {
   try {
     return await operation();
   } catch (error) {
-    if (!isPrismaClosedConnectionError(error)) {
+    if (!isPrismaReconnectableError(error)) {
       throw error;
     }
 
