@@ -239,6 +239,26 @@ export const dashboardData: DashboardDto = {
   recentPayments: demoPayments,
   dueSoonDebts: demoDebts,
   urgentDebt: demoDebts[0] ?? null,
+  assistantCoach: {
+    title: "Tu siguiente mejor paso es proteger la tarjeta principal.",
+    description:
+      "Hoy conviene cubrir primero la deuda que más presión genera. Así reduces intereses y mantienes el mes bajo control.",
+    badgeLabel: "Asistencia activa",
+    badgeVariant: "warning",
+    tone: "warning",
+    primaryAction: {
+      label: "Registrar pago ahora",
+      href: "/pagos?debtId=demo-card-1&from=assistant",
+    },
+    secondaryAction: {
+      label: "Abrir simulador",
+      href: "/simulador?from=assistant",
+    },
+    notes: [
+      "Prioridad actual: Tarjeta Visa principal.",
+      "El sistema ya detecta ahorro posible si mantienes el foco.",
+    ],
+  },
   recommendedOrder: [
     {
       id: "demo-card-1",

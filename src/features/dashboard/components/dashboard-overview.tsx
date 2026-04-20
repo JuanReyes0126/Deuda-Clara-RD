@@ -1067,6 +1067,15 @@ export function DashboardOverview({
       : isPremiumUnlocked
         ? "premium"
         : "default";
+  const assistantCoachIcon =
+    data.assistantCoach.tone === "warning" ? AlertTriangle : Sparkles;
+  const assistantSecondaryAction = data.assistantCoach.secondaryAction
+    ? {
+        label: data.assistantCoach.secondaryAction.label,
+        onClick: () => navigateTo(data.assistantCoach.secondaryAction?.href ?? "/dashboard"),
+        variant: "secondary" as const,
+      }
+    : undefined;
   const dailyFocusIcon =
     data.summary.totalDebt <= 0
       ? CreditCard
@@ -1380,6 +1389,22 @@ export function DashboardOverview({
             notes={dailyFocus.notes}
             tone={dailyFocusTone}
             icon={dailyFocusIcon}
+          />
+
+          <PrimaryActionCard
+            eyebrow="Asistente Clara"
+            title={data.assistantCoach.title}
+            description={data.assistantCoach.description}
+            badgeLabel={data.assistantCoach.badgeLabel}
+            badgeVariant={data.assistantCoach.badgeVariant}
+            primaryAction={{
+              label: data.assistantCoach.primaryAction.label,
+              onClick: () => navigateTo(data.assistantCoach.primaryAction.href),
+            }}
+            secondaryAction={assistantSecondaryAction}
+            notes={data.assistantCoach.notes}
+            tone={data.assistantCoach.tone}
+            icon={assistantCoachIcon}
           />
 
           <TrustInlineNote

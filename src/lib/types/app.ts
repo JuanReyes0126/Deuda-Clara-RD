@@ -241,6 +241,23 @@ export type DashboardPlanComparisonDto = {
   optimizedPlan: DashboardPlanSnapshotDto;
 };
 
+export type DashboardCoachDto = {
+  title: string;
+  description: string;
+  badgeLabel: string;
+  badgeVariant: "default" | "warning" | "danger" | "success";
+  tone: "default" | "warning";
+  primaryAction: {
+    label: string;
+    href: string;
+  };
+  secondaryAction: {
+    label: string;
+    href: string;
+  } | null;
+  notes: string[];
+};
+
 export type DashboardDto = {
   summary: DashboardSummaryDto;
   membership: MembershipInfoDto;
@@ -276,6 +293,7 @@ export type DashboardDto = {
   recentPayments: PaymentItemDto[];
   dueSoonDebts: DebtItemDto[];
   urgentDebt: DebtItemDto | null;
+  assistantCoach: DashboardCoachDto;
   recommendedOrder: Array<{
     id: string;
     name: string;

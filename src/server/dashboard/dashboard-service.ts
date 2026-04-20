@@ -20,6 +20,7 @@ import {
 } from "@/server/finance/debt-helpers";
 import { calculateDebtStrategy } from "@/server/planner/strategy-engine";
 import { isBillingConfigured } from "@/server/billing/billing-service";
+import { buildDashboardFinancialCoach } from "@/server/dashboard/financial-coach";
 import { buildDashboardPlanComparison } from "@/server/dashboard/plan-optimization";
 import { buildUpcomingReminderTimeline } from "@/server/reminders/reminder-engine";
 
@@ -487,6 +488,34 @@ function buildDashboardDataFromUser(user: DashboardSourceUser): DashboardDto {
     ...upcomingTimeline,
     items: upcomingTimeline.items.slice(0, access.upcomingTimelineLimit),
   };
+  const recentPayments = user.payments
+    .slice(0, access.recentPaymentsLimit)
+    .map(mapPaymentToDto);
+  const dueSoonDebtDtos = dueSoonDebts;
+  const urgentDebtDto = urgentDebt ? mapDebtToDto(urgentDebt) : null;
+  const assistantCoach = buildDashboardFinancialCoach({
+    analysisScope: {
+      hiddenDebtCount,
+      partialAnalysis: hiddenDebtCount > 0,
+    },
+    summary: {
+      totalDebt,
+      totalMinimumPayment,
+      monthlyIncome: cashflow.monthlyIncome,
+      monthlyEssentialExpensesTotal: cashflow.monthlyEssentialExpensesTotal,
+      monthlyDebtCapacity: cashflow.monthlyDebtCapacity,
+      estimatedMonthlyInterest: totalEstimatedMonthlyInterest,
+      recommendedDebtName: recommendedDebt?.name ?? null,
+      recommendedDebtId: recommendedDebt?.id ?? null,
+      interestSavings: recommendationUnlocked ? planComparison.interestSavings : null,
+    },
+    planComparison: access.canSeeFullPlanComparison ? planComparison : null,
+    habitSignals,
+    dueSoonDebts: dueSoonDebtDtos,
+    urgentDebt: urgentDebtDto,
+    riskAlerts,
+    recentPayments,
+  });
 
   return {
     summary: {
@@ -538,9 +567,10 @@ function buildDashboardDataFromUser(user: DashboardSourceUser): DashboardDto {
       label: format(snapshot.capturedAt, "MMM yy"),
       totalBalance: toMoneyNumber(snapshot.totalBalance),
     })),
-    recentPayments: user.payments.slice(0, access.recentPaymentsLimit).map(mapPaymentToDto),
-    dueSoonDebts,
-    urgentDebt: urgentDebt ? mapDebtToDto(urgentDebt) : null,
+    recentPayments,
+    dueSoonDebts: dueSoonDebtDtos,
+    urgentDebt: urgentDebtDto,
+    assistantCoach,
     recommendedOrder: access.canAccessPremiumOptimization
       ? optimizedResult.recommendedOrder
       : [],
