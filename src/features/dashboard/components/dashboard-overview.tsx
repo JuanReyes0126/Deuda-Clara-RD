@@ -1376,22 +1376,6 @@ export function DashboardOverview({
           <ExecutiveSummaryStrip items={dashboardSummaryItems} />
 
           <PrimaryActionCard
-            eyebrow="Tu siguiente mejor paso"
-            title={dailyFocus.title}
-            description={dailyFocus.description}
-            badgeLabel={dailyFocus.badgeLabel}
-            badgeVariant={dailyFocus.badgeVariant}
-            primaryAction={{
-              label: dailyFocus.primaryLabel,
-              onClick: () => navigateTo(dailyFocus.primaryHref),
-            }}
-            secondaryAction={dashboardSecondaryAction}
-            notes={dailyFocus.notes}
-            tone={dailyFocusTone}
-            icon={dailyFocusIcon}
-          />
-
-          <PrimaryActionCard
             eyebrow="Asistente Clara"
             title={data.assistantCoach.title}
             description={data.assistantCoach.description}
@@ -1405,6 +1389,22 @@ export function DashboardOverview({
             notes={data.assistantCoach.notes}
             tone={data.assistantCoach.tone}
             icon={assistantCoachIcon}
+          />
+
+          <PrimaryActionCard
+            eyebrow="Tu siguiente mejor paso"
+            title={dailyFocus.title}
+            description={dailyFocus.description}
+            badgeLabel={dailyFocus.badgeLabel}
+            badgeVariant={dailyFocus.badgeVariant}
+            primaryAction={{
+              label: dailyFocus.primaryLabel,
+              onClick: () => navigateTo(dailyFocus.primaryHref),
+            }}
+            secondaryAction={dashboardSecondaryAction}
+            notes={dailyFocus.notes}
+            tone={dailyFocusTone}
+            icon={dailyFocusIcon}
           />
 
           <TrustInlineNote
