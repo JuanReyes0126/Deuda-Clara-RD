@@ -356,147 +356,6 @@ function getLockedUpgradeContext({
   };
 }
 
-function getDailyFocus({
-  data,
-  isPremiumUnlocked,
-  upgradePlanHref,
-  paymentHref,
-}: {
-  data: DashboardDto;
-  isPremiumUnlocked: boolean;
-  upgradePlanHref: string;
-  paymentHref: string;
-}) {
-  if (data.summary.totalDebt <= 0) {
-    return {
-      eyebrow: "Siguiente mejor acción",
-      title: "Registra tu primera deuda para activar una prioridad real.",
-      description:
-        "Con una sola deuda ya podemos medir urgencia, costo mensual e identificar el siguiente paso más útil.",
-      primaryLabel: "Ir a deudas",
-      primaryHref: "/deudas",
-      badgeVariant: "default" as const,
-      badgeLabel: "Activación inicial",
-      notes: [
-        "Te toma menos de dos minutos.",
-        "Activa alertas y cálculo de salida.",
-      ],
-    };
-  }
-
-  if (data.urgentDebt?.status === "LATE") {
-    return {
-      eyebrow: "Siguiente mejor acción",
-      title: `Cubrir al menos ${formatCurrency(data.urgentDebt.minimumPayment)} de ${data.urgentDebt.name}.`,
-      description:
-        "Esa deuda ya está atrasada. Moverla primero reduce mora, evita más presión y te devuelve control más rápido.",
-      primaryLabel: "Registrar pago",
-      primaryHref: paymentHref,
-      badgeVariant: "danger" as const,
-      badgeLabel: "Urgente hoy",
-      notes: [
-        `Saldo presionando: ${formatCurrency(data.urgentDebt.effectiveBalance)}`,
-        "Evitas que se sigan acumulando cargos.",
-      ],
-    };
-  }
-
-  const nextDueDebt = data.dueSoonDebts[0];
-
-  if (nextDueDebt) {
-    return {
-      eyebrow: "Siguiente mejor acción",
-      title: `Protege el vencimiento de ${nextDueDebt.name}.`,
-      description: nextDueDebt.nextDueDate
-        ? `Si cubres al menos ${formatCurrency(nextDueDebt.minimumPayment)} antes de ${formatRelativeDistance(nextDueDebt.nextDueDate)}, mantienes el plan respirando sin abrir otro frente.`
-        : `Cubre al menos ${formatCurrency(nextDueDebt.minimumPayment)} para evitar que el siguiente vencimiento te agarre sin espacio.`,
-      primaryLabel: "Registrar pago",
-      primaryHref: paymentHref,
-      badgeVariant: "warning" as const,
-      badgeLabel: "Vence pronto",
-      notes: [
-        `Mínimo sugerido: ${formatCurrency(nextDueDebt.minimumPayment)}`,
-        data.dueSoonDebts.length > 1
-          ? `${data.dueSoonDebts.length} vencimientos compiten esta semana.`
-          : "Conviene resolverlo antes de mover excedente.",
-      ],
-    };
-  }
-
-  if (isPremiumUnlocked && data.summary.recommendedDebtName) {
-    return {
-      eyebrow: "Siguiente mejor acción",
-      title: `Enviar el excedente a ${data.summary.recommendedDebtName}.`,
-      description:
-        data.planComparison?.immediateAction ??
-        "Tu plan ya detectó una prioridad. Sostenerla hoy mejora la velocidad de salida.",
-      primaryLabel: "Registrar pago a prioridad 1",
-      primaryHref: paymentHref,
-      badgeVariant: "success" as const,
-      badgeLabel: "Acción del día",
-      notes: [
-        data.planComparison?.monthsSaved
-          ? `${data.planComparison.monthsSaved} meses recortables si sostienes la prioridad.`
-          : "La prioridad ya está definida.",
-        data.planComparison?.interestSavings
-          ? `${formatCurrency(data.planComparison.interestSavings)} en intereses evitables.`
-          : "Cada pago extra aquí rinde mejor.",
-      ],
-    };
-  }
-
-  if (data.riskAlerts.length > 0) {
-      return {
-      eyebrow: "Siguiente mejor acción",
-      title: "Revisar el riesgo de seguir pagando solo mínimos.",
-      description:
-        "Hay señales de que parte del flujo se está yendo en intereses sin mover suficiente capital. Una revisión hoy puede corregir eso rápido.",
-      primaryLabel: "Abrir simulador",
-      primaryHref: "/simulador",
-      badgeVariant: "warning" as const,
-      badgeLabel: "Riesgo visible",
-      notes: [
-        `${data.riskAlerts.length} alerta${data.riskAlerts.length === 1 ? "" : "s"} activa${data.riskAlerts.length === 1 ? "" : "s"}.`,
-        "Conviene concentrar mejor el flujo del mes.",
-      ],
-    };
-  }
-
-  if (data.recentPayments.length === 0) {
-    return {
-      eyebrow: "Siguiente mejor acción",
-      title: "Registrar tu primer pago para medir avance real.",
-      description:
-        "Sin un pago registrado todavía no podemos confirmar si el plan está bajando capital o solo manteniendo deudas vivas.",
-      primaryLabel: "Ir a pagos",
-      primaryHref: paymentHref,
-      badgeVariant: "default" as const,
-      badgeLabel: "Primer avance",
-      notes: [
-        "Activa reportes y comparaciones reales.",
-        "Te ayuda a construir habito semanal.",
-      ],
-    };
-  }
-
-  return {
-    eyebrow: "Siguiente mejor acción",
-    title: "Revisar tu plan y sostener el ritmo de esta semana.",
-    description:
-      "Tu panel ya tiene suficiente contexto. El mayor valor ahora está en mantener foco, revisar alertas y no repartir el excedente sin criterio.",
-    primaryLabel: isPremiumUnlocked ? "Revisar plan" : "Ver Premium",
-    primaryHref: isPremiumUnlocked
-      ? "/dashboard?focus=optimization"
-      : upgradePlanHref,
-    badgeVariant: "success" as const,
-    badgeLabel: "Ritmo activo",
-    notes: [
-      `${formatCurrency(data.summary.currentMonthlyBudget)} de presupuesto mensual registrado.`,
-      "Una revisión semanal suele ser suficiente para no perder tracción.",
-    ],
-  };
-}
-
 function getMomentumSummary({
   data,
   isPremiumUnlocked,
@@ -654,12 +513,6 @@ export function DashboardOverview({
   const paymentPriorityHref = preferredActionDebtId
     ? `/pagos?debtId=${preferredActionDebtId}&from=dashboard`
     : "/pagos?from=dashboard";
-  const dailyFocus = getDailyFocus({
-    data,
-    isPremiumUnlocked,
-    upgradePlanHref,
-    paymentHref: paymentPriorityHref,
-  });
   const momentumSummary = getMomentumSummary({
     data,
     isPremiumUnlocked,
@@ -1061,12 +914,6 @@ export function DashboardOverview({
 
     return formatCurrency(rawValue);
   };
-  const dailyFocusTone =
-    dailyFocus.badgeVariant === "danger" || dailyFocus.badgeVariant === "warning"
-      ? "warning"
-      : isPremiumUnlocked
-        ? "premium"
-        : "default";
   const assistantCoachIcon =
     data.assistantCoach.tone === "warning" ? AlertTriangle : Sparkles;
   const assistantSecondaryAction = data.assistantCoach.secondaryAction
@@ -1076,14 +923,6 @@ export function DashboardOverview({
         variant: "secondary" as const,
       }
     : undefined;
-  const dailyFocusIcon =
-    data.summary.totalDebt <= 0
-      ? CreditCard
-      : data.urgentDebt?.status === "LATE"
-        ? AlertTriangle
-        : isPremiumUnlocked
-          ? Sparkles
-          : Wallet;
   const dashboardSummaryItems: ExecutiveSummaryItem[] = [
     {
       label: "Deuda total",
@@ -1146,25 +985,6 @@ export function DashboardOverview({
       valueKind: "text" as const,
     },
   ];
-  const firstSecondaryQuickAction = secondaryQuickActions[0] ?? null;
-  const dashboardSecondaryAction = firstSecondaryQuickAction
-    ? {
-        label: firstSecondaryQuickAction.actionLabel,
-        onClick: () => navigateTo(firstSecondaryQuickAction.href),
-        variant: "secondary" as const,
-      }
-    : isPremiumUnlocked
-      ? {
-          label: "Revisar mi plan",
-          onClick: revealOptimization,
-          variant: "secondary" as const,
-        }
-      : {
-          label: "Ver planes",
-          onClick: () => navigateTo(upgradePlanHref),
-          variant: "secondary" as const,
-        };
-
   return (
     <div className="flex flex-col gap-5 sm:gap-6">
       <section className="-mx-1 grid gap-3 lg:hidden">
@@ -1389,22 +1209,6 @@ export function DashboardOverview({
             notes={data.assistantCoach.notes}
             tone={data.assistantCoach.tone}
             icon={assistantCoachIcon}
-          />
-
-          <PrimaryActionCard
-            eyebrow="Tu siguiente mejor paso"
-            title={dailyFocus.title}
-            description={dailyFocus.description}
-            badgeLabel={dailyFocus.badgeLabel}
-            badgeVariant={dailyFocus.badgeVariant}
-            primaryAction={{
-              label: dailyFocus.primaryLabel,
-              onClick: () => navigateTo(dailyFocus.primaryHref),
-            }}
-            secondaryAction={dashboardSecondaryAction}
-            notes={dailyFocus.notes}
-            tone={dailyFocusTone}
-            icon={dailyFocusIcon}
           />
 
           <TrustInlineNote
