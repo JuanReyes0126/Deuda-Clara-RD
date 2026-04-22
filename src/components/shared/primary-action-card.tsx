@@ -37,7 +37,7 @@ const toneClassName: Record<
 };
 
 export function PrimaryActionCard({
-  eyebrow = "Tu siguiente mejor paso",
+  eyebrow = "Asistente Clara",
   title,
   description,
   badgeLabel,

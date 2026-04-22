@@ -1171,8 +1171,8 @@ export function DashboardOverview({
 
           <ModuleSectionHeader
             kicker="Dashboard"
-            title="Tu tablero ya no solo informa: te dice qué conviene hacer ahora."
-            description="Primero ves tu panorama real. Luego una sola recomendación clara para mover el plan sin abrir demasiados frentes."
+            title="Asistente Clara te dice qué conviene hacer ahora."
+            description="Primero ves tu panorama real. Luego Clara te muestra una recomendación simple para avanzar sin abrir demasiados frentes."
             action={
               <Button
                 onClick={() => {
