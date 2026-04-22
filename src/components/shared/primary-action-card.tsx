@@ -37,7 +37,7 @@ const toneClassName: Record<
 };
 
 export function PrimaryActionCard({
-  eyebrow = "Asistente Clara",
+  eyebrow = "Mini IA Clara",
   title,
   description,
   badgeLabel,

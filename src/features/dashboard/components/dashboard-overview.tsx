@@ -1169,10 +1169,52 @@ export function DashboardOverview({
             </Card>
           ) : null}
 
+          <section className="rounded-[2rem] border border-primary/18 bg-[linear-gradient(135deg,rgba(240,248,245,0.98),rgba(255,248,241,0.94))] p-4 shadow-[0_22px_48px_rgba(15,88,74,0.12)] sm:p-6">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="grid size-11 place-items-center rounded-2xl bg-primary text-white shadow-[0_14px_28px_rgba(15,88,74,0.18)]">
+                    <Sparkles className="size-5" />
+                  </span>
+                  <div>
+                    <p className="section-kicker">Mini IA Clara activada</p>
+                    <p className="text-foreground mt-1 text-xl font-semibold leading-tight sm:text-2xl">
+                      {data.assistantCoach.title}
+                    </p>
+                  </div>
+                  <Badge variant={data.assistantCoach.badgeVariant}>
+                    {data.assistantCoach.badgeLabel}
+                  </Badge>
+                </div>
+                <p className="section-summary mt-4 max-w-4xl text-sm leading-6 sm:text-base sm:leading-7">
+                  {data.assistantCoach.description}
+                </p>
+              </div>
+              <div className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto lg:flex-col xl:flex-row">
+                <Button
+                  className="min-h-12 w-full text-base sm:w-auto"
+                  onClick={() => navigateTo(data.assistantCoach.primaryAction.href)}
+                >
+                  {data.assistantCoach.primaryAction.label}
+                  <ArrowRight className="size-4" />
+                </Button>
+                {data.assistantCoach.secondaryAction ? (
+                  <Button
+                    className="min-h-12 w-full text-base sm:w-auto"
+                    variant="secondary"
+                    onClick={() => navigateTo(data.assistantCoach.secondaryAction?.href ?? "/dashboard")}
+                  >
+                    {data.assistantCoach.secondaryAction.label}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          </section>
+
           <ModuleSectionHeader
             kicker="Dashboard"
-            title="Asistente Clara te dice qué conviene hacer ahora."
-            description="Primero ves tu panorama real. Luego Clara te muestra una recomendación simple para avanzar sin abrir demasiados frentes."
+            title="Mini IA Clara te dice qué conviene hacer ahora."
+            description="Clara lee tu panorama, detecta lo más urgente y te muestra una recomendación simple para avanzar sin abrir demasiados frentes."
             action={
               <Button
                 onClick={() => {
@@ -1196,7 +1238,7 @@ export function DashboardOverview({
           <ExecutiveSummaryStrip items={dashboardSummaryItems} />
 
           <PrimaryActionCard
-            eyebrow="Asistente Clara"
+            eyebrow="Mini IA financiera"
             title={data.assistantCoach.title}
             description={data.assistantCoach.description}
             badgeLabel={data.assistantCoach.badgeLabel}
