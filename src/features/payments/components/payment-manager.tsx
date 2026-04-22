@@ -126,10 +126,13 @@ const notesValidation = {
   setValueAs: optionalNotesValue,
 } as const;
 
-function emptyPaymentValues(defaultDebtId?: string): PaymentFormValues {
+function emptyPaymentValues(
+  defaultDebtId?: string,
+  defaultAmount = 0,
+): PaymentFormValues {
   return {
     debtId: defaultDebtId ?? "",
-    amount: 0,
+    amount: defaultAmount,
     principalAmount: undefined,
     interestAmount: undefined,
     lateFeeAmount: undefined,
@@ -188,11 +191,13 @@ export function PaymentManager({
   payments,
   entryFlow = null,
   defaultDebtId,
+  defaultAmount = 0,
 }: {
   debts: DebtItemDto[];
   payments: PaymentItemDto[];
   entryFlow?: "onboarding" | null;
   defaultDebtId?: string;
+  defaultAmount?: number;
 }) {
   const router = useRouter();
   const [selectedPayment, setSelectedPayment] = useState<PaymentItemDto | null>(
@@ -202,13 +207,19 @@ export function PaymentManager({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [historyDebtFilter, setHistoryDebtFilter] = useState<string>("ALL");
+  const [hasAppliedDefaultAmount, setHasAppliedDefaultAmount] = useState(
+    defaultAmount <= 0,
+  );
   const debtOptions = useMemo(
     () => debts.filter((debt) => debt.status !== "ARCHIVED"),
     [debts],
   );
   const isOnboardingFlow = entryFlow === "onboarding";
   const form = useForm<PaymentFormValues>({
-    defaultValues: emptyPaymentValues(defaultDebtId ?? debtOptions[0]?.id),
+    defaultValues: emptyPaymentValues(
+      defaultDebtId ?? debtOptions[0]?.id,
+      defaultAmount,
+    ),
   });
   const watchedDebtId =
     useWatch({ control: form.control, name: "debtId" }) ?? "";
@@ -271,6 +282,24 @@ export function PaymentManager({
       form.setValue("debtId", debtOptions[0].id);
     }
   }, [defaultDebtId, debtOptions, form, selectedPayment]);
+
+  useEffect(() => {
+    if (selectedPayment || defaultAmount <= 0 || hasAppliedDefaultAmount) {
+      return;
+    }
+
+    if (form.getValues("amount") > 0) {
+      setHasAppliedDefaultAmount(true);
+      return;
+    }
+
+    form.setValue("amount", Number(defaultAmount.toFixed(2)), {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+    setHasAppliedDefaultAmount(true);
+  }, [defaultAmount, form, hasAppliedDefaultAmount, selectedPayment]);
 
   const resetForm = () => {
     setSelectedPayment(null);

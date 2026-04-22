@@ -16,6 +16,14 @@ export default async function PaymentsPage({
     typeof resolvedSearchParams.debtId === "string"
       ? resolvedSearchParams.debtId
       : undefined;
+  const rawDefaultAmount =
+    typeof resolvedSearchParams.amount === "string"
+      ? Number(resolvedSearchParams.amount)
+      : undefined;
+  const defaultAmount =
+    rawDefaultAmount && Number.isFinite(rawDefaultAmount) && rawDefaultAmount > 0
+      ? rawDefaultAmount
+      : undefined;
 
   const [debts, payments] = await Promise.all([
     listUserDebts(user.id, false),
@@ -28,6 +36,7 @@ export default async function PaymentsPage({
       payments={payments}
       entryFlow={entryFlow}
       {...(defaultDebtId ? { defaultDebtId } : {})}
+      {...(defaultAmount ? { defaultAmount } : {})}
     />
   );
 }
