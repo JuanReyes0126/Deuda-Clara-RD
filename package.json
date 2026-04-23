@@ -41,6 +41,7 @@
     "@simplewebauthn/server": "^13.3.0",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.37.0",
+    "ai": "^6.0.168",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",

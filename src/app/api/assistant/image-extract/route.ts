@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { generateText } from "ai";
 
 import { getCurrentSession } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
@@ -41,6 +42,62 @@ type OpenAiResponsePayload = {
 const maxImageDataUrlLength = 7_000_000;
 const imageDataUrlPattern = /^data:image\/(png|jpeg|jpg|webp);base64,/i;
 
+function buildVisionPrompt(prompt?: string) {
+  return `Extrae datos financieros de esta imagen para una app de deudas personales en República Dominicana.
+
+Devuelve solamente JSON válido con esta forma:
+{
+  "debts": [
+    {
+      "name": "nombre corto de la deuda o tarjeta",
+      "creditorName": "banco, cooperativa o institución",
+      "currentBalance": número o null,
+      "minimumPayment": número o null,
+      "paymentAmount": número o null,
+      "interestRate": número o null,
+      "interestRateType": "ANNUAL", "MONTHLY" o null,
+      "productType": "CREDIT_CARD", "LOAN", "INFORMAL" o "UNKNOWN",
+      "currency": "DOP", "USD" o null,
+      "dueDateText": "fecha visible o null",
+      "detectedAction": "payment", "statement" o "unknown",
+      "confidence": "low", "medium" o "high"
+    }
+  ],
+  "summary": "resumen corto en español",
+  "missingFields": ["campos que no se ven claros"]
+}
+
+Si la imagen muestra varios pagos realizados, devuelve un item por cada pago y usa paymentAmount.
+Si la imagen muestra estados de cuenta, usa currentBalance y minimumPayment.
+Si aparece tasa de interés, extrae interestRate e interestRateType.
+Si es una tarjeta de crédito y no ves la tasa, no inventes la tasa: marca interestRate como null para que Clara pida confirmación.
+No inventes datos. Si un monto no está claro, usa null. ${
+    prompt ? `Contexto del usuario: ${prompt}` : ""
+  }`;
+}
+
+function parseImageDataUrl(imageDataUrl: string) {
+  const match = imageDataUrl.match(
+    /^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/i,
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  const mediaType = match[1];
+  const base64 = match[2];
+
+  if (!mediaType || !base64) {
+    return null;
+  }
+
+  return {
+    mediaType: mediaType.toLowerCase().replace("image/jpg", "image/jpeg"),
+    base64,
+  };
+}
+
 function extractOutputText(payload: OpenAiResponsePayload) {
   if (payload.output_text) {
     return payload.output_text;
@@ -49,15 +106,18 @@ function extractOutputText(payload: OpenAiResponsePayload) {
   return (
     payload.output
       ?.flatMap((item) => item.content ?? [])
-      .find((content) => content.type === "output_text" && content.text)?.text ??
-    null
+      .find((content) => content.type === "output_text" && content.text)
+      ?.text ?? null
   );
 }
 
 function parseVisionJson(text: string): VisionExtractionResult {
   const trimmedText = text.trim();
   const jsonText = trimmedText.startsWith("```")
-    ? trimmedText.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim()
+    ? trimmedText
+        .replace(/^```(?:json)?/i, "")
+        .replace(/```$/i, "")
+        .trim()
     : trimmedText;
   const parsed = JSON.parse(jsonText) as Partial<VisionExtractionResult>;
 
@@ -68,9 +128,110 @@ function parseVisionJson(text: string): VisionExtractionResult {
         ? parsed.summary
         : "Clara pudo leer la imagen, pero necesita confirmar los datos.",
     missingFields: Array.isArray(parsed.missingFields)
-      ? parsed.missingFields.filter((field): field is string => typeof field === "string")
+      ? parsed.missingFields.filter(
+          (field): field is string => typeof field === "string",
+        )
       : [],
   };
+}
+
+async function readImageWithOpenAi({
+  imageDataUrl,
+  prompt,
+}: {
+  imageDataUrl: string;
+  prompt: string | undefined;
+}) {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    return null;
+  }
+
+  const model = process.env.OPENAI_VISION_MODEL ?? "gpt-4.1-mini";
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      input: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: buildVisionPrompt(prompt),
+            },
+            {
+              type: "input_image",
+              image_url: imageDataUrl,
+            },
+          ],
+        },
+      ],
+    }),
+  });
+  const payload = (await response.json()) as OpenAiResponsePayload;
+
+  if (!response.ok) {
+    throw new Error(
+      payload.error?.message ??
+        "No pudimos leer la imagen ahora mismo. Inténtalo de nuevo.",
+    );
+  }
+
+  return extractOutputText(payload);
+}
+
+async function readImageWithGateway({
+  imageDataUrl,
+  prompt,
+}: {
+  imageDataUrl: string;
+  prompt: string | undefined;
+}) {
+  if (
+    !process.env.AI_GATEWAY_API_KEY &&
+    !process.env.VERCEL &&
+    !process.env.VERCEL_OIDC_TOKEN
+  ) {
+    return null;
+  }
+
+  const parsedImage = parseImageDataUrl(imageDataUrl);
+
+  if (!parsedImage) {
+    return null;
+  }
+
+  const gatewayModel =
+    process.env.AI_GATEWAY_VISION_MODEL ??
+    `openai/${process.env.OPENAI_VISION_MODEL ?? "gpt-4.1-mini"}`;
+  const result = await generateText({
+    model: gatewayModel,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: buildVisionPrompt(prompt),
+          },
+          {
+            type: "image",
+            image: parsedImage.base64,
+            mediaType: parsedImage.mediaType,
+          },
+        ],
+      },
+    ],
+    maxRetries: 1,
+  });
+
+  return result.text;
 }
 
 export async function POST(request: NextRequest) {
@@ -98,84 +259,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    const model = process.env.OPENAI_VISION_MODEL ?? "gpt-4.1-mini";
+    let outputText: string | null = null;
+    let gatewayErrorMessage: string | null = null;
 
-    if (!apiKey) {
+    try {
+      outputText = await readImageWithOpenAi({ imageDataUrl, prompt });
+    } catch (error) {
       return apiBadRequest(
-        "La lectura automática de imágenes todavía no está activada. Configura OPENAI_API_KEY en Vercel para usar visión.",
-        503,
+        error instanceof Error
+          ? error.message
+          : "No pudimos leer la imagen ahora mismo. Inténtalo de nuevo.",
+        502,
       );
     }
-
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        input: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "input_text",
-                text: `Extrae datos financieros de esta imagen para una app de deudas personales en República Dominicana.
-
-Devuelve solamente JSON válido con esta forma:
-{
-  "debts": [
-    {
-      "name": "nombre corto de la deuda o tarjeta",
-      "creditorName": "banco, cooperativa o institución",
-      "currentBalance": número o null,
-      "minimumPayment": número o null,
-      "paymentAmount": número o null,
-      "interestRate": número o null,
-      "interestRateType": "ANNUAL", "MONTHLY" o null,
-      "productType": "CREDIT_CARD", "LOAN", "INFORMAL" o "UNKNOWN",
-      "currency": "DOP", "USD" o null,
-      "dueDateText": "fecha visible o null",
-      "detectedAction": "payment", "statement" o "unknown",
-      "confidence": "low", "medium" o "high"
-    }
-  ],
-  "summary": "resumen corto en español",
-  "missingFields": ["campos que no se ven claros"]
-}
-
-Si la imagen muestra varios pagos realizados, devuelve un item por cada pago y usa paymentAmount.
-Si la imagen muestra estados de cuenta, usa currentBalance y minimumPayment.
-Si aparece tasa de interés, extrae interestRate e interestRateType.
-No inventes datos. Si un monto no está claro, usa null. ${
-                  prompt ? `Contexto del usuario: ${prompt}` : ""
-                }`,
-              },
-              {
-                type: "input_image",
-                image_url: imageDataUrl,
-              },
-            ],
-          },
-        ],
-      }),
-    });
-    const payload = (await response.json()) as OpenAiResponsePayload;
-
-    if (!response.ok) {
-      return apiBadRequest(
-        payload.error?.message ??
-          "No pudimos leer la imagen ahora mismo. Inténtalo de nuevo.",
-        response.status,
-      );
-    }
-
-    const outputText = extractOutputText(payload);
 
     if (!outputText) {
-      return apiBadRequest("No pudimos extraer texto útil de la imagen.");
+      try {
+        outputText = await readImageWithGateway({ imageDataUrl, prompt });
+      } catch (error) {
+        gatewayErrorMessage =
+          error instanceof Error ? error.message : "AI Gateway no respondió.";
+      }
+    }
+
+    if (!outputText) {
+      return apiBadRequest(
+        gatewayErrorMessage ??
+          "La lectura automática de imágenes todavía no está activada. Configura OPENAI_API_KEY o activa Vercel AI Gateway para usar visión.",
+        503,
+      );
     }
 
     return NextResponse.json({
