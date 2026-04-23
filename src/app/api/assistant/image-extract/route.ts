@@ -9,8 +9,13 @@ type VisionDebtExtraction = {
   creditorName: string | null;
   currentBalance: number | null;
   minimumPayment: number | null;
+  paymentAmount: number | null;
+  interestRate: number | null;
+  interestRateType: "ANNUAL" | "MONTHLY" | null;
+  productType: "CREDIT_CARD" | "LOAN" | "INFORMAL" | "UNKNOWN";
   currency: "DOP" | "USD" | null;
   dueDateText: string | null;
+  detectedAction: "payment" | "statement" | "unknown";
   confidence: "low" | "medium" | "high";
 };
 
@@ -127,8 +132,13 @@ Devuelve solamente JSON válido con esta forma:
       "creditorName": "banco, cooperativa o institución",
       "currentBalance": número o null,
       "minimumPayment": número o null,
+      "paymentAmount": número o null,
+      "interestRate": número o null,
+      "interestRateType": "ANNUAL", "MONTHLY" o null,
+      "productType": "CREDIT_CARD", "LOAN", "INFORMAL" o "UNKNOWN",
       "currency": "DOP", "USD" o null,
       "dueDateText": "fecha visible o null",
+      "detectedAction": "payment", "statement" o "unknown",
       "confidence": "low", "medium" o "high"
     }
   ],
@@ -136,6 +146,9 @@ Devuelve solamente JSON válido con esta forma:
   "missingFields": ["campos que no se ven claros"]
 }
 
+Si la imagen muestra varios pagos realizados, devuelve un item por cada pago y usa paymentAmount.
+Si la imagen muestra estados de cuenta, usa currentBalance y minimumPayment.
+Si aparece tasa de interés, extrae interestRate e interestRateType.
 No inventes datos. Si un monto no está claro, usa null. ${
                   prompt ? `Contexto del usuario: ${prompt}` : ""
                 }`,
