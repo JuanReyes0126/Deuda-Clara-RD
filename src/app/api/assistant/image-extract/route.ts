@@ -135,6 +135,31 @@ function parseVisionJson(text: string): VisionExtractionResult {
   };
 }
 
+function getFriendlyVisionSetupError(message: string | null) {
+  if (!message) {
+    return null;
+  }
+
+  const normalizedMessage = message.toLowerCase();
+
+  if (
+    normalizedMessage.includes("credit card") ||
+    normalizedMessage.includes("card on file") ||
+    normalizedMessage.includes("add a card")
+  ) {
+    return "Clara ya está conectada a visión, pero Vercel está bloqueando la lectura porque la cuenta necesita una tarjeta válida para usar AI Gateway. Agrega una tarjeta en Vercel o configura OPENAI_API_KEY para activar lectura de imágenes.";
+  }
+
+  if (
+    normalizedMessage.includes("ai gateway") ||
+    normalizedMessage.includes("gateway")
+  ) {
+    return "Clara intentó usar Vercel AI Gateway, pero el servicio no está listo para esta cuenta. Activa AI Gateway en Vercel o configura OPENAI_API_KEY para leer imágenes.";
+  }
+
+  return message;
+}
+
 async function readImageWithOpenAi({
   imageDataUrl,
   prompt,
@@ -277,8 +302,9 @@ export async function POST(request: NextRequest) {
       try {
         outputText = await readImageWithGateway({ imageDataUrl, prompt });
       } catch (error) {
-        gatewayErrorMessage =
+        const rawMessage =
           error instanceof Error ? error.message : "AI Gateway no respondió.";
+        gatewayErrorMessage = getFriendlyVisionSetupError(rawMessage);
       }
     }
 
