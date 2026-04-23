@@ -491,6 +491,7 @@ function buildDashboardDataFromUser(user: DashboardSourceUser): DashboardDto {
   const recentPayments = user.payments
     .slice(0, access.recentPaymentsLimit)
     .map(mapPaymentToDto);
+  const activeDebtDtos = activeDebts.map(mapDebtToDto);
   const dueSoonDebtDtos = dueSoonDebts;
   const urgentDebtDto = urgentDebt ? mapDebtToDto(urgentDebt) : null;
   const assistantCoach = buildDashboardFinancialCoach({
@@ -567,6 +568,7 @@ function buildDashboardDataFromUser(user: DashboardSourceUser): DashboardDto {
       label: format(snapshot.capturedAt, "MMM yy"),
       totalBalance: toMoneyNumber(snapshot.totalBalance),
     })),
+    activeDebts: activeDebtDtos,
     recentPayments,
     dueSoonDebts: dueSoonDebtDtos,
     urgentDebt: urgentDebtDto,

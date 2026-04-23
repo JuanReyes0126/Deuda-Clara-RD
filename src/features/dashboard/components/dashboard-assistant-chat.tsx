@@ -3,16 +3,24 @@
 import {
   ArrowRight,
   Bot,
+  CheckCircle2,
   CircleDollarSign,
+  ImageIcon,
+  Loader2,
   MessageCircle,
+  PencilLine,
   Send,
   Sparkles,
 } from "lucide-react";
-import { type FormEvent, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { type ChangeEvent, type FormEvent, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { fetchWithCsrf } from "@/lib/http/fetch-with-csrf";
+import { readJsonPayload } from "@/lib/http/read-json-payload";
 import { useAppNavigation } from "@/lib/navigation/use-app-navigation";
 import type { DashboardDto, DebtItemDto } from "@/lib/types/app";
 import { formatCurrency } from "@/lib/utils/currency";
@@ -29,8 +37,35 @@ type AssistantReply = {
   body: string;
   steps: string[];
   actions: AssistantAction[];
+  paymentDraft?: PaymentDraft;
   badgeLabel: string;
   badgeVariant: "default" | "warning" | "danger" | "success";
+};
+
+type PaymentDraft = {
+  debtId: string;
+  debtName: string;
+  creditorName: string;
+  amount: number;
+  currency: DebtItemDto["currency"];
+  sourcePrompt: string;
+  usedSuggestedAmount: boolean;
+};
+
+type VisionDebtExtraction = {
+  name: string | null;
+  creditorName: string | null;
+  currentBalance: number | null;
+  minimumPayment: number | null;
+  currency: DebtItemDto["currency"] | null;
+  dueDateText: string | null;
+  confidence: "low" | "medium" | "high";
+};
+
+type VisionExtractionResult = {
+  debts: VisionDebtExtraction[];
+  summary: string;
+  missingFields: string[];
 };
 
 type ChatMessage = {
@@ -46,6 +81,7 @@ type DashboardAssistantChatProps = {
 
 const quickPrompts = [
   "¿Qué pago primero?",
+  "Pagué este préstamo",
   "No me alcanza",
   "Estoy atrasado",
   "Quiero pagar más rápido",
@@ -73,21 +109,37 @@ function buildPaymentHref(debt: DebtItemDto | null, amount?: number | null) {
   return `/pagos?${params.toString()}`;
 }
 
+function getAssistantDebts(data: DashboardDto) {
+  const debtsById = new Map<string, DebtItemDto>();
+
+  for (const debt of [
+    ...data.activeDebts,
+    ...(data.urgentDebt ? [data.urgentDebt] : []),
+    ...data.dueSoonDebts,
+  ]) {
+    debtsById.set(debt.id, debt);
+  }
+
+  return Array.from(debtsById.values());
+}
+
 function getPriorityDebt(data: DashboardDto) {
   const priorityId =
     data.summary.recommendedDebtId ??
     data.urgentDebt?.id ??
     data.dueSoonDebts[0]?.id ??
     null;
+  const debts = getAssistantDebts(data);
 
   if (!priorityId) {
-    return data.urgentDebt ?? data.dueSoonDebts[0] ?? null;
+    return data.urgentDebt ?? data.dueSoonDebts[0] ?? debts[0] ?? null;
   }
 
   return (
-    data.urgentDebt?.id === priorityId
-      ? data.urgentDebt
-      : data.dueSoonDebts.find((debt) => debt.id === priorityId) ?? null
+    debts.find((debt) => debt.id === priorityId) ??
+    data.urgentDebt ??
+    data.dueSoonDebts[0] ??
+    null
   );
 }
 
@@ -122,6 +174,251 @@ function createPaymentAction(debt: DebtItemDto | null) {
   };
 }
 
+function parseMoneyNumber(rawValue: string) {
+  const compactValue = rawValue.replace(/\s/g, "");
+
+  if (compactValue.includes(".") && compactValue.includes(",")) {
+    return Number(compactValue.replace(/,/g, ""));
+  }
+
+  if (compactValue.includes(",")) {
+    const parts = compactValue.split(",");
+    const lastPart = parts.at(-1) ?? "";
+
+    if (lastPart.length === 3 && parts.length > 1) {
+      return Number(parts.join(""));
+    }
+
+    return Number(compactValue.replace(",", "."));
+  }
+
+  return Number(compactValue.replace(/,/g, ""));
+}
+
+function parsePaymentAmount(message: string) {
+  const numericMilMatch = normalizeText(message).match(
+    /\b(\d+(?:[.,]\d+)?)\s*(mil|k)\b/,
+  );
+
+  if (numericMilMatch?.[1]) {
+    const parsedAmount = parseMoneyNumber(numericMilMatch[1]) * 1000;
+    return Number.isFinite(parsedAmount) && parsedAmount > 0
+      ? parsedAmount
+      : null;
+  }
+
+  const currencyMatch = message.match(
+    /(?:rd\$|us\$|\$|dop|usd|pesos?|d[oó]lares?)\s*([0-9][0-9.,]*)|([0-9][0-9.,]*)\s*(?:rd\$|us\$|\$|dop|usd|pesos?|d[oó]lares?)/i,
+  );
+  const currencyValue = currencyMatch?.[1] ?? currencyMatch?.[2];
+
+  if (currencyValue) {
+    const parsedAmount = parseMoneyNumber(currencyValue);
+    return Number.isFinite(parsedAmount) && parsedAmount > 0
+      ? parsedAmount
+      : null;
+  }
+
+  const paymentVerbMatch = normalizeText(message).match(
+    /(?:pague|abone|abona|pagaron|registre|registrar|anota|guarda)\s+(?:rd\$|us\$|\$)?\s*([0-9][0-9.,]*)/,
+  );
+
+  if (paymentVerbMatch?.[1]) {
+    const parsedAmount = parseMoneyNumber(paymentVerbMatch[1]);
+    return Number.isFinite(parsedAmount) && parsedAmount > 0
+      ? parsedAmount
+      : null;
+  }
+
+  const fallbackMatch = normalizeText(message).match(/\b([0-9]{3,}[0-9.,]*)\b/);
+
+  if (!fallbackMatch?.[1]) {
+    return null;
+  }
+
+  const parsedAmount = parseMoneyNumber(fallbackMatch[1]);
+
+  return Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount : null;
+}
+
+function getDebtAliasScore(debt: DebtItemDto, normalizedMessage: string) {
+  let score = 0;
+  const normalizedName = normalizeText(debt.name);
+  const normalizedCreditor = normalizeText(debt.creditorName);
+  const nameTokens = normalizedName
+    .split(/\s+/)
+    .filter((token) => token.length >= 4);
+
+  if (normalizedMessage.includes(normalizedName)) {
+    score += 8;
+  }
+
+  if (normalizedCreditor && normalizedMessage.includes(normalizedCreditor)) {
+    score += 5;
+  }
+
+  score += nameTokens.filter((token) => normalizedMessage.includes(token)).length;
+
+  if (
+    /prestamo|cuota|financiamiento/.test(normalizedMessage) &&
+    debt.type.includes("LOAN")
+  ) {
+    score += 2;
+  }
+
+  if (/tarjeta|card|credito/.test(normalizedMessage) && debt.type === "CREDIT_CARD") {
+    score += 2;
+  }
+
+  if (/informal|familiar|amigo/.test(normalizedMessage) && debt.type === "INFORMAL") {
+    score += 2;
+  }
+
+  return score;
+}
+
+function findMentionedDebt(data: DashboardDto, message: string) {
+  const debts = getAssistantDebts(data);
+  const normalizedMessage = normalizeText(message);
+  const priorityDebt = getPriorityDebt(data);
+  const scoredDebts = debts
+    .map((debt) => ({
+      debt,
+      score:
+        getDebtAliasScore(debt, normalizedMessage) +
+        (debt.id === priorityDebt?.id ? 1.5 : 0),
+    }))
+    .sort((left, right) => right.score - left.score);
+  const bestMatch = scoredDebts[0];
+
+  if (bestMatch && bestMatch.score > 0) {
+    return bestMatch.debt;
+  }
+
+  return getPriorityDebt(data);
+}
+
+function isPaymentRegistrationIntent(message: string) {
+  return /pague|pago realizado|ya pague|lo pague|la pague|abone|abonado|registralo|registrarlo|registrame|anota|anotame|guarda|guardalo|marcalo|marcarlo/.test(
+    normalizeText(message),
+  );
+}
+
+function buildPaymentDraft(data: DashboardDto, message: string) {
+  if (!isPaymentRegistrationIntent(message)) {
+    return null;
+  }
+
+  const debt = findMentionedDebt(data, message);
+
+  if (!debt) {
+    return null;
+  }
+
+  const parsedAmount = parsePaymentAmount(message);
+  const suggestedAmount = getSuggestedPaymentAmount(debt);
+  const amount = parsedAmount ?? suggestedAmount;
+
+  if (!amount || amount <= 0) {
+    return null;
+  }
+
+  return {
+    debtId: debt.id,
+    debtName: debt.name,
+    creditorName: debt.creditorName,
+    amount,
+    currency: debt.currency,
+    sourcePrompt: message,
+    usedSuggestedAmount: !parsedAmount,
+  } satisfies PaymentDraft;
+}
+
+function buildImageAssistantReply(
+  data: DashboardDto,
+  extraction: VisionExtractionResult,
+  fileName: string,
+): AssistantReply {
+  const primaryDebt = extraction.debts[0] ?? null;
+
+  if (!primaryDebt) {
+    return {
+      title: "Recibí la imagen, pero no detecté una deuda clara.",
+      body:
+        "Intenta con una captura más recortada donde se vea saldo, pago mínimo, institución y fecha.",
+      steps: [
+        "Recorta la imagen alrededor del estado de cuenta.",
+        "Evita capturas borrosas o muy oscuras.",
+        "Si quieres, escribe el monto y Clara prepara el pago.",
+      ],
+      actions: [],
+      badgeLabel: "Imagen recibida",
+      badgeVariant: "warning",
+    };
+  }
+
+  const matchedDebt = findMentionedDebt(
+    data,
+    `${primaryDebt.name ?? ""} ${primaryDebt.creditorName ?? ""}`,
+  );
+  const currency = primaryDebt.currency ?? matchedDebt?.currency ?? "DOP";
+  const balanceLabel =
+    primaryDebt.currentBalance !== null
+      ? formatCurrency(primaryDebt.currentBalance, currency)
+      : "No visible";
+  const minimumPaymentLabel =
+    primaryDebt.minimumPayment !== null
+      ? formatCurrency(primaryDebt.minimumPayment, currency)
+      : "No visible";
+  const paymentDraft =
+    matchedDebt && primaryDebt.minimumPayment && primaryDebt.minimumPayment > 0
+      ? ({
+          debtId: matchedDebt.id,
+          debtName: matchedDebt.name,
+          creditorName: matchedDebt.creditorName,
+          amount: primaryDebt.minimumPayment,
+          currency: matchedDebt.currency,
+          sourcePrompt: `Imagen ${fileName}: ${extraction.summary}`,
+          usedSuggestedAmount: false,
+        } satisfies PaymentDraft)
+      : undefined;
+
+  return {
+    title: `Leí la imagen: ${primaryDebt.name ?? primaryDebt.creditorName ?? "deuda detectada"}.`,
+    body:
+      paymentDraft
+        ? "Encontré un pago mínimo y lo dejé listo para registrar en una deuda existente. Revísalo antes de confirmar."
+        : extraction.summary,
+    steps: [
+      `Institución: ${primaryDebt.creditorName ?? "No visible"}.`,
+      `Saldo: ${balanceLabel}.`,
+      `Pago mínimo: ${minimumPaymentLabel}.`,
+      primaryDebt.dueDateText
+        ? `Fecha visible: ${primaryDebt.dueDateText}.`
+        : "Fecha: no visible.",
+    ],
+    actions: paymentDraft
+      ? []
+      : [
+          { label: "Revisar deudas", href: "/deudas", variant: "primary" },
+          { label: "Registrar pago manual", href: "/pagos", variant: "secondary" },
+        ],
+    ...(paymentDraft ? { paymentDraft } : {}),
+    badgeLabel:
+      primaryDebt.confidence === "high"
+        ? "Lectura alta"
+        : primaryDebt.confidence === "medium"
+          ? "Revisar datos"
+          : "Baja confianza",
+    badgeVariant:
+      primaryDebt.confidence === "high"
+        ? "success"
+        : primaryDebt.confidence === "medium"
+          ? "warning"
+          : "danger",
+  };
+}
+
 function buildAssistantReply(data: DashboardDto, message: string): AssistantReply {
   const text = normalizeText(message);
   const priorityDebt = getPriorityDebt(data);
@@ -143,6 +440,7 @@ function buildAssistantReply(data: DashboardDto, message: string): AssistantRepl
   const isInterestIntent = /interes|ahorr|caro|cost|bajar|reduc/.test(text);
   const isPaymentIntent =
     /pago|pagar|primero|rapido|rapido|prioridad|saldar|cuota/.test(text);
+  const paymentDraft = buildPaymentDraft(data, message);
 
   if (!hasDebts) {
     return {
@@ -157,6 +455,44 @@ function buildAssistantReply(data: DashboardDto, message: string): AssistantRepl
       ],
       badgeLabel: "Primer paso",
       badgeVariant: "default",
+    };
+  }
+
+  if (isPaymentRegistrationIntent(message) && !paymentDraft) {
+    return {
+      title: "Puedo registrarlo por ti, pero necesito un poco más de detalle.",
+      body:
+        "Dime el monto y, si puedes, el nombre de la deuda. Por ejemplo: “Clara, pagué RD$5,000 al préstamo del Popular”.",
+      steps: [
+        "Incluye el monto pagado.",
+        "Menciona el préstamo, tarjeta o banco.",
+        "Yo preparo el registro y tú solo confirmas.",
+      ],
+      actions: [
+        { label: "Registrar manualmente", href: "/pagos", variant: "secondary" },
+      ],
+      badgeLabel: "Falta dato",
+      badgeVariant: "warning",
+    };
+  }
+
+  if (paymentDraft) {
+    const amountLabel = formatCurrency(paymentDraft.amount, paymentDraft.currency);
+
+    return {
+      title: `Listo, puedo registrar ${amountLabel} en ${paymentDraft.debtName}.`,
+      body: paymentDraft.usedSuggestedAmount
+        ? `No vi el monto exacto en tu mensaje, así que preparé el pago de referencia de ${amountLabel}. Confirma solo si ese fue el monto correcto.`
+        : `Detecté el pago y lo dejé listo para guardar. Al confirmar, Clara actualiza tu historial y el saldo de esa deuda.`,
+      steps: [
+        `Deuda: ${paymentDraft.debtName}.`,
+        `Monto: ${amountLabel}.`,
+        "Fecha: hoy.",
+      ],
+      actions: [],
+      paymentDraft,
+      badgeLabel: "Pago listo",
+      badgeVariant: "success",
     };
   }
 
@@ -286,7 +622,10 @@ function buildAssistantReply(data: DashboardDto, message: string): AssistantRepl
 
 export function DashboardAssistantChat({ data }: DashboardAssistantChatProps) {
   const { navigate } = useAppNavigation();
+  const router = useRouter();
   const [input, setInput] = useState("");
+  const [isRegisteringPayment, setIsRegisteringPayment] = useState(false);
+  const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const initialReply = useMemo(
     () => buildAssistantReply(data, "¿Qué hago ahora?"),
     [data],
@@ -337,6 +676,202 @@ export function DashboardAssistantChat({ data }: DashboardAssistantChatProps) {
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     sendPrompt(input);
+  };
+
+  const appendAssistantReply = (reply: AssistantReply, content: string) => {
+    setMessages((current) => {
+      const nextIndex = current.length;
+
+      return [
+        ...current,
+        {
+          id: `assistant-${nextIndex}`,
+          role: "assistant",
+          content,
+          reply,
+        },
+      ];
+    });
+  };
+
+  const appendUserMessage = (content: string) => {
+    setMessages((current) => {
+      const nextIndex = current.length;
+
+      return [
+        ...current,
+        {
+          id: `user-${nextIndex}`,
+          role: "user",
+          content,
+        },
+      ];
+    });
+  };
+
+  const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Sube una imagen válida.");
+      return;
+    }
+
+    if (file.size > 5_000_000) {
+      toast.error("La imagen pesa demasiado. Usa una captura más recortada.");
+      return;
+    }
+
+    const reader = new FileReader();
+    setIsAnalyzingImage(true);
+    appendUserMessage(`Subí una imagen para que Clara la lea: ${file.name}`);
+
+    reader.onload = async () => {
+      try {
+        const imageDataUrl = String(reader.result ?? "");
+        const response = await fetchWithCsrf("/api/assistant/image-extract", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            imageDataUrl,
+            prompt: input,
+          }),
+        });
+        const payload = await readJsonPayload<{
+          error?: string;
+          extraction?: VisionExtractionResult;
+        }>(response);
+
+        if (!response.ok || !payload.extraction) {
+          appendAssistantReply(
+            {
+              title: "Recibí la foto, pero la lectura automática no está activa.",
+              body:
+                payload.error ??
+                "Para leer fotos como ChatGPT necesitamos activar visión/OCR con una API key. Mientras tanto, escribe el saldo y pago mínimo y Clara prepara la acción.",
+              steps: [
+                "Puedes escribir: “Clara, pagué RD$5,000 al préstamo del Popular”.",
+                "También puedes escribir saldo, pago mínimo y banco.",
+                "Cuando visión esté activa, Clara extraerá esos datos desde la imagen.",
+              ],
+              actions: [],
+              badgeLabel: "Falta visión",
+              badgeVariant: "warning",
+            },
+            "No pude leer la imagen automáticamente.",
+          );
+          return;
+        }
+
+        appendAssistantReply(
+          buildImageAssistantReply(data, payload.extraction, file.name),
+          "Analicé la imagen.",
+        );
+      } catch (error) {
+        appendAssistantReply(
+          {
+            title: "No pude analizar la imagen.",
+            body:
+              error instanceof Error
+                ? error.message
+                : "Intenta de nuevo con una captura más clara.",
+            steps: [
+              "Usa una imagen donde se vea el saldo.",
+              "Incluye el pago mínimo si aparece.",
+              "Evita capturas muy grandes o borrosas.",
+            ],
+            actions: [],
+            badgeLabel: "Imagen",
+            badgeVariant: "warning",
+          },
+          "La imagen no se pudo procesar.",
+        );
+      } finally {
+        setIsAnalyzingImage(false);
+      }
+    };
+
+    reader.onerror = () => {
+      setIsAnalyzingImage(false);
+      toast.error("No pude cargar esa imagen.");
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  const registerPaymentDraft = async (draft: PaymentDraft) => {
+    if (isRegisteringPayment) {
+      return;
+    }
+
+    try {
+      setIsRegisteringPayment(true);
+
+      const response = await fetchWithCsrf("/api/payments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          debtId: draft.debtId,
+          amount: draft.amount,
+          source: "MANUAL",
+          paidAt: new Date().toISOString().slice(0, 10),
+          notes: `Registrado desde Clara: ${draft.sourcePrompt.slice(0, 220)}`,
+        }),
+      });
+      const payload = await readJsonPayload<{ error?: string }>(response);
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "No se pudo registrar el pago.");
+      }
+
+      toast.success("Clara registró el pago.");
+      setMessages((current) => {
+        const nextIndex = current.length;
+
+        return [
+          ...current,
+          {
+            id: `assistant-payment-${nextIndex}`,
+            role: "assistant",
+            content: "Pago registrado.",
+            reply: {
+              title: `${formatCurrency(draft.amount, draft.currency)} registrado en ${draft.debtName}.`,
+              body:
+                "Ya guardé el pago en tu historial. El dashboard se actualizará con el nuevo saldo y avance.",
+              steps: [
+                `Deuda actualizada: ${draft.debtName}.`,
+                "Historial de pagos actualizado.",
+                "Puedes revisar el detalle en Pagos.",
+              ],
+              actions: [
+                { label: "Ver pagos", href: "/pagos", variant: "primary" },
+                { label: "Ver deudas", href: "/deudas", variant: "secondary" },
+              ],
+              badgeLabel: "Registrado",
+              badgeVariant: "success",
+            },
+          },
+        ];
+      });
+      router.refresh();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo registrar el pago.",
+      );
+    } finally {
+      setIsRegisteringPayment(false);
+    }
   };
 
   return (
@@ -407,22 +942,76 @@ export function DashboardAssistantChat({ data }: DashboardAssistantChatProps) {
                   </div>
                 ))}
               </div>
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                {latestAssistantReply.actions.map((action) => (
-                  <Button
-                    key={`${action.href}:${action.label}`}
-                    type="button"
-                    variant={action.variant === "secondary" ? "secondary" : "primary"}
-                    className="min-h-11 w-full sm:w-auto"
-                    onClick={() => navigate(action.href)}
-                  >
-                    {action.label}
-                    {action.variant === "primary" ? (
-                      <ArrowRight className="size-4" />
-                    ) : null}
-                  </Button>
-                ))}
-              </div>
+
+              {latestAssistantReply.paymentDraft ? (
+                <div className="mt-4 rounded-[1.25rem] border border-primary/15 bg-primary/5 p-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">
+                        Clara puede guardarlo por ti.
+                      </p>
+                      <p className="mt-1 text-sm text-muted">
+                        Confirma si la deuda y el monto están correctos.
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Button
+                        type="button"
+                        className="min-h-11"
+                        disabled={isRegisteringPayment}
+                        onClick={() =>
+                          latestAssistantReply.paymentDraft
+                            ? registerPaymentDraft(latestAssistantReply.paymentDraft)
+                            : undefined
+                        }
+                      >
+                        {isRegisteringPayment ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="size-4" />
+                        )}
+                        Confirmar y registrar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="min-h-11"
+                        onClick={() =>
+                          latestAssistantReply.paymentDraft
+                            ? navigate(
+                                `/pagos?from=clara-chat&debtId=${latestAssistantReply.paymentDraft.debtId}&amount=${latestAssistantReply.paymentDraft.amount}`,
+                              )
+                            : undefined
+                        }
+                      >
+                        <PencilLine className="size-4" />
+                        Editar antes
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {latestAssistantReply.actions.length > 0 ? (
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  {latestAssistantReply.actions.map((action) => (
+                    <Button
+                      key={`${action.href}:${action.label}`}
+                      type="button"
+                      variant={
+                        action.variant === "secondary" ? "secondary" : "primary"
+                      }
+                      className="min-h-11 w-full sm:w-auto"
+                      onClick={() => navigate(action.href)}
+                    >
+                      {action.label}
+                      {action.variant === "primary" ? (
+                        <ArrowRight className="size-4" />
+                      ) : null}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -472,10 +1061,25 @@ export function DashboardAssistantChat({ data }: DashboardAssistantChatProps) {
           </div>
 
           <form className="mt-3 flex gap-2" onSubmit={handleSubmit}>
+            <label className="border-border text-primary hover:border-primary/30 hover:bg-primary/5 grid min-h-12 cursor-pointer place-items-center rounded-2xl border bg-white px-3 transition">
+              {isAnalyzingImage ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <ImageIcon className="size-4" />
+              )}
+              <span className="sr-only">Subir imagen para Clara</span>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="sr-only"
+                disabled={isAnalyzingImage}
+                onChange={handleImageUpload}
+              />
+            </label>
             <Input
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Ej. No me alcanza para todas..."
+              placeholder="Escribe o sube una foto..."
               aria-label="Mensaje para Clara"
               className="min-h-12 bg-white"
             />

@@ -290,6 +290,7 @@ export type DashboardDto = {
   };
   debtBreakdown: Array<{ label: string; value: number }>;
   balanceHistory: Array<{ label: string; totalBalance: number }>;
+  activeDebts: DebtItemDto[];
   recentPayments: PaymentItemDto[];
   dueSoonDebts: DebtItemDto[];
   urgentDebt: DebtItemDto | null;

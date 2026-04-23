@@ -236,6 +236,7 @@ export const dashboardData: DashboardDto = {
     { label: "Feb 26", totalBalance: 359000 },
     { label: "Mar 26", totalBalance: 346000 },
   ],
+  activeDebts: demoDebts,
   recentPayments: demoPayments,
   dueSoonDebts: demoDebts,
   urgentDebt: demoDebts[0] ?? null,
