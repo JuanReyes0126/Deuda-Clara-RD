@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
       key: buildRateLimitKey(request, "change-password", session.user.id),
       limit: 8,
       windowMs: 10 * 60 * 1000,
+      requireDistributedStore: true,
     });
 
     if (!rateLimit.success) {

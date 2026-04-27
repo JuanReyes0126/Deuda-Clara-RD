@@ -5,6 +5,8 @@ type FeatureAccessDefinition = {
   canUseAdvancedSimulation: boolean;
   canCompareScenarios: boolean;
   canSeeOptimizedSavings: boolean;
+  /** Escenario «refinanciar tasa» en simulador de cartera (solo Pro activo). */
+  canSeeRefinanceScenario: boolean;
   canSeeFullPlanComparison: boolean;
   canAccessPremiumOptimization: boolean;
   canSeeRecommendedStrategy: boolean;
@@ -67,6 +69,7 @@ const PLAN_FEATURES: Record<MembershipPlanId, FeatureAccessDefinition> = {
     canUseAdvancedSimulation: false,
     canCompareScenarios: false,
     canSeeOptimizedSavings: false,
+    canSeeRefinanceScenario: false,
     canSeeFullPlanComparison: false,
     canAccessPremiumOptimization: false,
     canSeeRecommendedStrategy: false,
@@ -99,6 +102,7 @@ const PLAN_FEATURES: Record<MembershipPlanId, FeatureAccessDefinition> = {
     canUseAdvancedSimulation: true,
     canCompareScenarios: true,
     canSeeOptimizedSavings: true,
+    canSeeRefinanceScenario: false,
     canSeeFullPlanComparison: true,
     canAccessPremiumOptimization: true,
     canSeeRecommendedStrategy: true,
@@ -131,6 +135,7 @@ const PLAN_FEATURES: Record<MembershipPlanId, FeatureAccessDefinition> = {
     canUseAdvancedSimulation: true,
     canCompareScenarios: true,
     canSeeOptimizedSavings: true,
+    canSeeRefinanceScenario: true,
     canSeeFullPlanComparison: true,
     canAccessPremiumOptimization: true,
     canSeeRecommendedStrategy: true,

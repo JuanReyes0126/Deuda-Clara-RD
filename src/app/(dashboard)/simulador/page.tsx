@@ -16,6 +16,7 @@ export default async function SimulatorPage() {
     return (
       <SimulatorPanel
         debts={debts}
+        preferredStrategy="AVALANCHE"
         conversionSnapshot={buildMembershipConversionSnapshot({
           debts,
           preferredStrategy: "AVALANCHE",
@@ -57,6 +58,7 @@ export default async function SimulatorPage() {
   return (
     <SimulatorPanel
       debts={debts}
+      preferredStrategy={settingsViewModel.settings?.preferredStrategy ?? "AVALANCHE"}
       conversionSnapshot={conversionSnapshot}
       membershipTier={(settingsViewModel.settings?.membershipTier ?? "FREE") as "FREE" | "NORMAL" | "PRO"}
       billingStatus={

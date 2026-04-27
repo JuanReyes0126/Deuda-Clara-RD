@@ -871,6 +871,14 @@ export async function updateUserMembershipPlan(
   },
   meta: { ipAddress?: string | undefined; userAgent?: string | undefined },
 ) {
+  if (input.membershipTier !== "FREE") {
+    throw new ServiceError(
+      "MEMBERSHIP_MANUAL_UPGRADE_BLOCKED",
+      403,
+      "Los planes pagos solo se activan por checkout seguro.",
+    );
+  }
+
   const settings = await prisma.userSettings.upsert({
     where: { userId },
     create: {

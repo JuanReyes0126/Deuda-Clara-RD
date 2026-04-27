@@ -3,9 +3,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { getRequestMeta } from "@/lib/security/request-meta";
+import {
+  assertRateLimit,
+  buildRateLimitKey,
+} from "@/lib/security/rate-limit";
 import { paymentSchema } from "@/lib/validations/payments";
 import { createPayment, listUserPayments } from "@/server/payments/payment-service";
-import { apiBadRequest, handleApiError } from "@/server/api/api-response";
+import {
+  apiBadRequest,
+  apiRateLimited,
+  handleApiError,
+} from "@/server/api/api-response";
 import { isInfrastructureUnavailableError } from "@/server/services/infrastructure-error";
 
 export async function GET() {
@@ -39,6 +47,19 @@ export async function POST(request: NextRequest) {
 
     if (!session) {
       return apiBadRequest("No autenticado.", 401);
+    }
+
+    const rateLimit = await assertRateLimit({
+      key: buildRateLimitKey(request, "payments:create", session.user.id),
+      limit: 40,
+      windowMs: 10 * 60 * 1000,
+    });
+
+    if (!rateLimit.success) {
+      return apiRateLimited(
+        "Demasiados registros de pago. Intenta más tarde.",
+        rateLimit.resetAt,
+      );
     }
 
     const parsed = paymentSchema.safeParse(await request.json());

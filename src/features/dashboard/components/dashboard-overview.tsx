@@ -135,6 +135,8 @@ type DashboardOverviewProps = {
   conversionSnapshot?: MembershipConversionSnapshotDto | null;
   premiumWelcome?: boolean;
   initialShowOptimization?: boolean;
+  /** Clave para persistir el chat de Clara en este dispositivo (p. ej. id de usuario). */
+  claraStorageKey?: string;
 };
 
 function formatMonthsLabel(months: number | null) {
@@ -482,6 +484,7 @@ export function DashboardOverview({
   conversionSnapshot = null,
   premiumWelcome = false,
   initialShowOptimization = false,
+  claraStorageKey = "local-clara",
 }: DashboardOverviewProps) {
   const { navigate } = useAppNavigation();
   const navigateTo = (path: string) => navigate(path);
@@ -1170,7 +1173,7 @@ export function DashboardOverview({
             </Card>
           ) : null}
 
-          <DashboardAssistantChat data={data} />
+          <DashboardAssistantChat data={data} storageKey={claraStorageKey} />
 
           <ModuleSectionHeader
             kicker="Dashboard"

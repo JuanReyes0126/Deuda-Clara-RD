@@ -4,6 +4,7 @@ import { generateText } from "ai";
 import { getCurrentSession } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { apiBadRequest, handleApiError } from "@/server/api/api-response";
+import { logServerError } from "@/server/observability/logger";
 
 type VisionDebtExtraction = {
   name: string | null;
@@ -290,10 +291,9 @@ export async function POST(request: NextRequest) {
     try {
       outputText = await readImageWithOpenAi({ imageDataUrl, prompt });
     } catch (error) {
+      logServerError("OpenAI vision request failed", { error });
       return apiBadRequest(
-        error instanceof Error
-          ? error.message
-          : "No pudimos leer la imagen ahora mismo. Inténtalo de nuevo.",
+        "No pudimos leer la imagen ahora mismo. Inténtalo de nuevo.",
         502,
       );
     }

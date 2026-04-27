@@ -64,6 +64,11 @@ async function completeOnboardingViaBrowser(
   page: import("@playwright/test").Page,
   input: {
     monthlyIncome: number;
+    monthlyHousingCost: number;
+    monthlyGroceriesCost: number;
+    monthlyUtilitiesCost: number;
+    monthlyTransportCost: number;
+    monthlyOtherEssentialExpenses: number;
     monthlyDebtBudget: number;
     debts: Array<{
       name: string;
@@ -106,7 +111,7 @@ test("registro de passkey y login posterior con WebAuthn", async ({ page }) => {
   const uniqueEmail = `qa-passkey-${Date.now()}@example.com`;
 
   try {
-    await page.goto("http://localhost:3000/registro");
+    await page.goto("/registro");
     await waitForCsrfCookie(page);
     const registration = await registerUserViaBrowser(page, {
       firstName: "Clara",
@@ -117,10 +122,15 @@ test("registro de passkey y login posterior con WebAuthn", async ({ page }) => {
 
     expect(registration.ok).toBe(true);
 
-    await page.goto("http://localhost:3000/onboarding");
+    await page.goto("/onboarding");
     await waitForCsrfCookie(page);
     const onboarding = await completeOnboardingViaBrowser(page, {
       monthlyIncome: 42_000,
+      monthlyHousingCost: 0,
+      monthlyGroceriesCost: 0,
+      monthlyUtilitiesCost: 0,
+      monthlyTransportCost: 0,
+      monthlyOtherEssentialExpenses: 0,
       monthlyDebtBudget: 18_000,
       debts: [
         {
@@ -135,7 +145,7 @@ test("registro de passkey y login posterior con WebAuthn", async ({ page }) => {
 
     expect(onboarding.ok).toBe(true);
 
-    await page.goto("http://localhost:3000/configuracion");
+    await page.goto("/configuracion");
     await expect(
       page.getByRole("heading", { name: "Passkeys" }),
     ).toBeVisible();

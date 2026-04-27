@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
       key: buildRateLimitKey(request, "passkey-login-verify", challenge.userId),
       limit: 15,
       windowMs: 10 * 60 * 1000,
+      requireDistributedStore: true,
     });
 
     if (!rateLimit.success) {

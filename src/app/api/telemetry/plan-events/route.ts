@@ -10,6 +10,7 @@ const telemetrySchema = z.object({
     "upgrade_click",
     "feature_blocked",
     "simulator_used",
+    "simulator_portfolio_run",
     "debt_limit_hit",
     "premium_preview_seen",
   ]),

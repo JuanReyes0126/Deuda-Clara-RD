@@ -39,6 +39,7 @@ describe("origin security", () => {
     vi.stubEnv("DATABASE_URL", "postgresql://user:pass@localhost:5432/app");
     vi.stubEnv("DATA_ENCRYPTION_KEY", "x".repeat(32));
     vi.stubEnv("DEMO_MODE_ENABLED", "false");
+    vi.stubEnv("VERCEL_ENV", "");
 
     const request = buildPostRequest({
       url: "https://app.deudaclara.test/api/billing/checkout",
@@ -87,6 +88,7 @@ describe("origin security", () => {
     vi.stubEnv("DATABASE_URL", "postgresql://user:pass@localhost:5432/app");
     vi.stubEnv("DATA_ENCRYPTION_KEY", "x".repeat(32));
     vi.stubEnv("DEMO_MODE_ENABLED", "false");
+    vi.stubEnv("VERCEL_ENV", "");
 
     const request = buildPostRequest({
       url: "https://app.deudaclara.test/api/auth/login",

@@ -21,7 +21,7 @@ Este corte marca la base de salida de Deuda Clara RD antes de abrir acceso ofici
 
 ## Checklist antes de producción
 
-- Completar [GO / NO-GO CHECKLIST](/Users/juankingss/Documents/Playground/deuda-clara-rd/docs/GO_NO_GO_CHECKLIST.md) con prioridades `P1`, `P2` y `P3`.
+- Completar [GO / NO-GO CHECKLIST](./GO_NO_GO_CHECKLIST.md) con prioridades `P1`, `P2` y `P3`.
 - Configurar credenciales reales o sandbox de AZUL.
 - Probar pago aprobado, declinado y cancelado.
 - Validar callbacks/retornos con `AuthHash`.

@@ -1,5 +1,6 @@
 "use client";
 
+import type { StrategyMethod } from "@prisma/client";
 import { AlertTriangle, Sparkles } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { type FieldErrors, useForm, useWatch } from "react-hook-form";
@@ -21,6 +22,7 @@ import { ContextMetricsGrid } from "@/components/shared/context-metrics-grid";
 import { ModuleSectionHeader } from "@/components/shared/module-section-header";
 import { PrimaryActionCard } from "@/components/shared/primary-action-card";
 import { TrustInlineNote } from "@/components/shared/trust-inline-note";
+import { SimulatorPortfolioProjection } from "@/features/simulator/components/simulator-portfolio-projection";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -528,26 +530,31 @@ function getBestVisibleScenario(result: DebtSimulationResult) {
 
 export function SimulatorPanel({
   debts,
+  preferredStrategy,
   conversionSnapshot: _conversionSnapshot = null,
   membershipTier,
   billingStatus,
 }: {
   debts: DebtItemDto[];
+  preferredStrategy: StrategyMethod;
   conversionSnapshot?: MembershipConversionSnapshotDto | null;
   membershipTier: MembershipPlanId;
   billingStatus: MembershipBillingStatus;
 }) {
   const { navigate } = useAppNavigation();
-  const initialDebt = debts[0] ?? null;
-  const [selectedDebtId, setSelectedDebtId] = useState(initialDebt?.id ?? "");
-  const [selectedScenarioId, setSelectedScenarioId] =
-    useState<DebtSimulatorScenarioId>("EXTRA");
   const highlightedPlanId: MembershipPlanId =
     membershipTier === "PRO" ? "PRO" : "NORMAL";
   const access = resolveFeatureAccess({
     membershipTier,
     membershipBillingStatus: billingStatus,
   });
+  const [simulatorViewMode, setSimulatorViewMode] = useState<"single" | "portfolio">(() =>
+    access.hasPaidAccess ? "portfolio" : "single",
+  );
+  const initialDebt = debts[0] ?? null;
+  const [selectedDebtId, setSelectedDebtId] = useState(initialDebt?.id ?? "");
+  const [selectedScenarioId, setSelectedScenarioId] =
+    useState<DebtSimulatorScenarioId>("EXTRA");
   const isPremiumUnlocked = access.canCompareScenarios;
   const isProUnlocked = access.canUseAutoStrategy || access.canSeeStepByStepPlan;
   const planUpgradeHref = `/planes?plan=${highlightedPlanId}&source=simulador`;
@@ -789,6 +796,45 @@ export function SimulatorPanel({
         }
       />
 
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="flex w-full max-w-md gap-1.5 rounded-[1.25rem] border border-border bg-secondary/40 p-1.5 sm:w-auto">
+          <Button
+            type="button"
+            size="sm"
+            variant={simulatorViewMode === "portfolio" ? "primary" : "ghost"}
+            className="rounded-xl"
+            onClick={() => setSimulatorViewMode("portfolio")}
+          >
+            Toda la cartera
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={simulatorViewMode === "single" ? "primary" : "ghost"}
+            className="rounded-xl"
+            onClick={() => setSimulatorViewMode("single")}
+          >
+            Una deuda
+          </Button>
+        </div>
+        <p className="text-sm leading-6 text-muted sm:max-w-xl">
+          {simulatorViewMode === "portfolio"
+            ? "Proyección con el motor del dashboard (estrategia + presupuesto mensual sobre todas las deudas)."
+            : "Calculadora rápida por deuda: útil para probar tasas, cuotas y frecuencia sin tocar el resto de la cartera."}
+        </p>
+      </div>
+
+      {simulatorViewMode === "portfolio" ? (
+        <SimulatorPortfolioProjection
+          debts={debts}
+          preferredStrategy={preferredStrategy}
+          conversionSnapshot={_conversionSnapshot ?? null}
+          access={access}
+          planUpgradeHref={planUpgradeHref}
+          onNavigate={navigate}
+        />
+      ) : (
+      <>
       {hasFinancialContext ? (
         <section className="-mx-1 sm:mx-0">
           <div className="rounded-[1.6rem] border border-primary/12 bg-[rgba(240,248,245,0.9)] p-4 sm:p-5">
@@ -2164,12 +2210,17 @@ export function SimulatorPanel({
         </>
       ) : null}
 
+      </>
+      )}
+
       <TrustInlineNote
         title="Control sin fricción"
         notes={[
-          "La simulación corre sin recargar.",
+          simulatorViewMode === "portfolio"
+            ? "La vista cartera llama al servidor con tus deudas reales; los números respetan tu plan de acceso (Base, Premium o Pro)."
+            : "La simulación de una deuda corre en tu navegador al instante.",
           "Tú decides qué datos probar y cuánto explorar.",
-          "Premium solo aparece cuando ya hay una mejora medible.",
+          "Premium desbloquea comparaciones más ricas también en la vista de una deuda.",
         ]}
       />
     </div>

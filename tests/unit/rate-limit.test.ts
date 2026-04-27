@@ -31,6 +31,7 @@ vi.mock("@/server/observability/logger", () => ({
 
 describe("rate limit fallback", () => {
   beforeEach(() => {
+    vi.stubEnv("VERCEL_ENV", "");
     vi.resetModules();
     limitMock.mockReset();
     ratelimitConstructor.mockClear();
@@ -69,6 +70,21 @@ describe("rate limit fallback", () => {
     );
   });
 
+  it("bloquea si la ruta exige store distribuido y Upstash falla", async () => {
+    limitMock.mockRejectedValueOnce(new Error("upstash down"));
+
+    const { assertRateLimit } = await import("@/lib/security/rate-limit");
+    const result = await assertRateLimit({
+      key: "login:test@example.com",
+      limit: 5,
+      windowMs: 60_000,
+      requireDistributedStore: true,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.remaining).toBe(0);
+  });
+
   it("usa fallback en memoria si Upstash falla al inicializar", async () => {
     redisConstructor.mockImplementationOnce(() => {
       throw new Error("invalid upstash config");
@@ -85,6 +101,31 @@ describe("rate limit fallback", () => {
     expect(result.remaining).toBe(4);
     expect(logServerErrorMock).toHaveBeenCalledWith(
       "Upstash rate limit initialization failed, falling back to memory store",
+      expect.objectContaining({
+        rateLimitKey: "login:admin@deudaclarard.com",
+      }),
+    );
+  });
+
+  it("bloquea si la ruta exige store distribuido y Upstash no esta configurado", async () => {
+    getServerEnvMock.mockReturnValueOnce({
+      NODE_ENV: "production",
+      UPSTASH_REDIS_REST_URL: undefined,
+      UPSTASH_REDIS_REST_TOKEN: undefined,
+    });
+
+    const { assertRateLimit } = await import("@/lib/security/rate-limit");
+    const result = await assertRateLimit({
+      key: "login:admin@deudaclarard.com",
+      limit: 5,
+      windowMs: 60_000,
+      requireDistributedStore: true,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.remaining).toBe(0);
+    expect(logServerErrorMock).toHaveBeenCalledWith(
+      "Distributed rate limit store unavailable for strict route",
       expect.objectContaining({
         rateLimitKey: "login:admin@deudaclarard.com",
       }),

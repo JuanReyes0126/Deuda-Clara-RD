@@ -11,6 +11,7 @@ type RateLimitInput = {
   key: string;
   limit: number;
   windowMs: number;
+  requireDistributedStore?: boolean;
 };
 
 const memoryStore = new Map<string, { count: number; resetAt: number }>();
@@ -43,6 +44,9 @@ function getUpstashLimiter(input: RateLimitInput, env = getServerEnv()) {
 
 export async function assertRateLimit(input: RateLimitInput) {
   const env = getServerEnv();
+  const isPreviewEnvironment = process.env.VERCEL_ENV === "preview";
+  const shouldEnforceStrictDistributedStore =
+    Boolean(input.requireDistributedStore) && !isPreviewEnvironment;
 
   if (env.NODE_ENV === "development" && process.env.SKIP_RATE_LIMIT_IN_DEV !== "false") {
     return {
@@ -53,6 +57,18 @@ export async function assertRateLimit(input: RateLimitInput) {
   }
 
   const limiter = getUpstashLimiter(input, env);
+
+  if (!limiter && shouldEnforceStrictDistributedStore) {
+    logServerError("Distributed rate limit store unavailable for strict route", {
+      rateLimitKey: input.key,
+    });
+
+    return {
+      success: false,
+      remaining: 0,
+      resetAt: Date.now() + input.windowMs,
+    };
+  }
 
   if (limiter) {
     try {
@@ -68,6 +84,14 @@ export async function assertRateLimit(input: RateLimitInput) {
         error,
         rateLimitKey: input.key,
       });
+
+      if (shouldEnforceStrictDistributedStore) {
+        return {
+          success: false,
+          remaining: 0,
+          resetAt: Date.now() + input.windowMs,
+        };
+      }
     }
   }
 

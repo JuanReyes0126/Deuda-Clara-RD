@@ -28,3 +28,7 @@ test-results/
 .env
 .env.local
 .env.*.local
+
+# Vercel — salida local de `vercel build` (Build Output API / prebuilt).
+# No versionar: se regenera en cada build y contiene rutas absolutas del equipo.
+.vercel/output/

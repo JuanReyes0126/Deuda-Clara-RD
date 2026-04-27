@@ -184,11 +184,12 @@ async function printStatus() {
 }
 
 function buildRuntimeEnv() {
-  const safeEnv = { ...resolvedEnv };
-  delete safeEnv.NODE_ENV;
+  // Archivos (.env) sobre el entorno del proceso (CI, shell local) para overrides explícitos.
+  const merged = { ...process.env, ...resolvedEnv };
+  delete merged.NODE_ENV;
 
   return {
-    ...safeEnv,
+    ...merged,
     APP_HOST: host,
     APP_PORT: String(port),
     APP_URL: appUrl,

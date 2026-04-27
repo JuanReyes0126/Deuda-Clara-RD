@@ -89,9 +89,14 @@ URL privada local:
 http://127.0.0.1:3000
 ```
 
-Credenciales demo:
+Credenciales demo (Premium en seed, útil para simulador cartera y flujos generales):
 
 - `demo@deudaclarard.com`
+- `DeudaClara123!`
+
+Credenciales admin (Pro en seed; algunos E2E usan exportación CSV en reportes):
+
+- `admin@deudaclarard.com`
 - `DeudaClara123!`
 
 ## Logs y archivos de runtime

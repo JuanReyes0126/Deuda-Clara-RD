@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
       key: buildRateLimitKey(request, "forgot-password", parsed.data.email),
       limit: 5,
       windowMs: 10 * 60 * 1000,
+      requireDistributedStore: true,
     });
 
     if (!rateLimit.success) {

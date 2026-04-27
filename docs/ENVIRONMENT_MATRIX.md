@@ -8,6 +8,8 @@ Esta matriz resume qué variables necesita Deuda Clara RD por entorno y cómo de
 - En Vercel, configúralas como Environment Variables del proyecto.
 - Usa valores distintos entre `staging` y `production`.
 - `AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `CRON_SECRET` y `HEALTHCHECK_SECRET` deben ser aleatorios y largos.
+- **CI y `npm run start`:** el script `private-runtime.mjs` arranca Next con `process.env` del runner fusionado con `.env` / `.env.local` (los archivos ganan si hay claves repetidas). Así GitHub Actions puede inyectar `DATABASE_URL`, secretos y placeholders de AZUL sin depender de un `.env` versionado.
+- **Rate limit en local:** con `SKIP_RATE_LIMIT_IN_DEV=true` (por defecto en `.env.example`) el límite no aplica en desarrollo. Para acercarte al comportamiento de producción usa `SKIP_RATE_LIMIT_IN_DEV=false` y configura `UPSTASH_*`.
 
 ## 1. Core obligatorio
 

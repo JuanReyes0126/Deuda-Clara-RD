@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resolveFeatureAccess } from "@/lib/feature-access";
+
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     user: {
@@ -31,13 +33,12 @@ describe("simulator-service membership access", () => {
     const { prisma } = await import("@/lib/db/prisma");
     const { runSimulator } = await import("@/server/simulator/simulator-service");
 
-    vi.mocked(getUserFeatureAccess).mockResolvedValueOnce({
-      canUseAdvancedSimulation: false,
-      canUseAdvancedExtraPayments: false,
-      canSeeOptimizedSavings: false,
-      canSeeRecommendedStrategy: false,
-      canCompareScenarios: false,
-    } as never);
+    vi.mocked(getUserFeatureAccess).mockResolvedValueOnce(
+      resolveFeatureAccess({
+        membershipTier: "NORMAL",
+        membershipBillingStatus: "INACTIVE",
+      }),
+    );
     vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValueOnce({
       settings: {
         hybridRateWeight: 70,
@@ -75,5 +76,97 @@ describe("simulator-service membership access", () => {
     expect(result.refinancePlan.debtId).toBeNull();
     expect(result.selectedStrategyExplanation).toContain("Premium");
     expect(result.monthlyProjection.length).toBeLessThanOrEqual(6);
+  }, 15000);
+
+  it("Premium activo filtra refinanciar aunque lleguen campos en el cuerpo", async () => {
+    const { getUserFeatureAccess } = await import(
+      "@/server/membership/membership-access-service"
+    );
+    const { prisma } = await import("@/lib/db/prisma");
+    const { runSimulator } = await import("@/server/simulator/simulator-service");
+
+    vi.mocked(getUserFeatureAccess).mockResolvedValueOnce(
+      resolveFeatureAccess({
+        membershipTier: "NORMAL",
+        membershipBillingStatus: "ACTIVE",
+      }),
+    );
+    vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValueOnce({
+      settings: {
+        hybridRateWeight: 70,
+        hybridBalanceWeight: 30,
+      },
+      debts: [
+        {
+          id: "debt-1",
+          name: "Tarjeta oro",
+          type: "CREDIT_CARD",
+          status: "CURRENT",
+          currentBalance: 100000,
+          interestRate: 48,
+          interestRateType: "ANNUAL",
+          minimumPayment: 6000,
+          lateFeeAmount: 0,
+          extraChargesAmount: 0,
+          nextDueDate: new Date("2026-04-20T00:00:00.000Z"),
+        },
+      ],
+    } as never);
+
+    const result = await runSimulator("user-1", {
+      strategy: "AVALANCHE",
+      monthlyBudget: 22000,
+      refinanceDebtId: "debt-1",
+      refinancedRate: 12,
+    });
+
+    expect(result.refinancePlan.debtId).toBeNull();
+    expect(result.refinancePlan.newRate).toBeNull();
+  }, 15000);
+
+  it("Pro activo devuelve refinanciar cuando el cuerpo lo pide", async () => {
+    const { getUserFeatureAccess } = await import(
+      "@/server/membership/membership-access-service"
+    );
+    const { prisma } = await import("@/lib/db/prisma");
+    const { runSimulator } = await import("@/server/simulator/simulator-service");
+
+    vi.mocked(getUserFeatureAccess).mockResolvedValueOnce(
+      resolveFeatureAccess({
+        membershipTier: "PRO",
+        membershipBillingStatus: "ACTIVE",
+      }),
+    );
+    vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValueOnce({
+      settings: {
+        hybridRateWeight: 70,
+        hybridBalanceWeight: 30,
+      },
+      debts: [
+        {
+          id: "debt-1",
+          name: "Tarjeta oro",
+          type: "CREDIT_CARD",
+          status: "CURRENT",
+          currentBalance: 100000,
+          interestRate: 48,
+          interestRateType: "ANNUAL",
+          minimumPayment: 6000,
+          lateFeeAmount: 0,
+          extraChargesAmount: 0,
+          nextDueDate: new Date("2026-04-20T00:00:00.000Z"),
+        },
+      ],
+    } as never);
+
+    const result = await runSimulator("user-1", {
+      strategy: "AVALANCHE",
+      monthlyBudget: 22000,
+      refinanceDebtId: "debt-1",
+      refinancedRate: 12,
+    });
+
+    expect(result.refinancePlan.debtId).toBe("debt-1");
+    expect(result.refinancePlan.newRate).toBe(12);
   }, 15000);
 });

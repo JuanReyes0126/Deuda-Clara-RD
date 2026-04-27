@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
       key: buildRateLimitKey(request, "register"),
       limit: 5,
       windowMs: 10 * 60 * 1000,
+      requireDistributedStore: true,
     });
 
     if (!rateLimit.success) {
