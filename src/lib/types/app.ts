@@ -258,6 +258,16 @@ export type DashboardCoachDto = {
   notes: string[];
 };
 
+export type DashboardPaydownChallengeDto = {
+  state: "none" | "active" | "ended";
+  startedAt: string | null;
+  endsAt: string | null;
+  extraMonthly: number | null;
+  daysRemaining: number | null;
+  totalDays: number;
+  paymentsLoggedDuringChallenge: number;
+};
+
 export type DashboardDto = {
   summary: DashboardSummaryDto;
   membership: MembershipInfoDto;
@@ -306,6 +316,7 @@ export type DashboardDto = {
   }>;
   strategyExplanation: string;
   riskAlerts: Array<{ title: string; description: string }>;
+  paydownChallenge: DashboardPaydownChallengeDto;
 };
 
 export type OnboardingPreviewDto = {

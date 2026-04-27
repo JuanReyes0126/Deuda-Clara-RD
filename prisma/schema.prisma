@@ -293,6 +293,9 @@ model UserSettings {
   monthlyTransportCost  Decimal?       @db.Decimal(14, 2)
   monthlyOtherEssentialExpenses Decimal? @db.Decimal(14, 2)
   monthlyDebtBudget     Decimal?       @db.Decimal(14, 2)
+  paydownChallengeStartedAt DateTime?
+  paydownChallengeEndsAt    DateTime?
+  paydownChallengeExtraMonthly Decimal? @db.Decimal(14, 2)
   notifyDueSoon         Boolean        @default(true)
   notifyOverdue         Boolean        @default(true)
   notifyMinimumRisk     Boolean        @default(true)

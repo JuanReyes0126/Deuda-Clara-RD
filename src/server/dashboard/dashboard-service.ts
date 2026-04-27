@@ -23,6 +23,7 @@ import { isBillingConfigured } from "@/server/billing/billing-service";
 import { buildDashboardFinancialCoach } from "@/server/dashboard/financial-coach";
 import { buildDashboardPlanComparison } from "@/server/dashboard/plan-optimization";
 import { buildUpcomingReminderTimeline } from "@/server/reminders/reminder-engine";
+import { buildPaydownChallengeDto } from "@/server/dashboard/paydown-challenge";
 
 type MembershipSnapshotInput = {
   debts: Array<
@@ -580,6 +581,10 @@ function buildDashboardDataFromUser(user: DashboardSourceUser): DashboardDto {
       ? `${optimizedResult.strategyExplanation} ${membershipPlan.guidanceLabel}.`
       : "El plan recomendado está disponible en los planes Premium y Pro.",
     riskAlerts,
+    paydownChallenge: buildPaydownChallengeDto(
+      user.settings,
+      user.payments.map((payment) => ({ paidAt: payment.paidAt })),
+    ),
   };
 }
 

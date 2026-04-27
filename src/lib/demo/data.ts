@@ -289,6 +289,15 @@ export const dashboardData: DashboardDto = {
         "La tarjeta principal sigue demasiado cerca del interés del mes.",
     },
   ],
+  paydownChallenge: {
+    state: "none",
+    startedAt: null,
+    endsAt: null,
+    extraMonthly: null,
+    daysRemaining: null,
+    totalDays: 30,
+    paymentsLoggedDuringChallenge: 0,
+  },
 };
 
 export const membershipConversionSnapshot: MembershipConversionSnapshotDto = {

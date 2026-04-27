@@ -39,6 +39,7 @@ import {
 import { UPGRADE_MESSAGES } from "@/config/upgrade-messages";
 import { useSessionUpgradePrompt } from "@/lib/membership/use-session-upgrade-prompt";
 import { DailyMissionCard } from "./daily-mission-card";
+import { PaydownChallengeCard } from "./paydown-challenge-card";
 import { DashboardAssistantChat } from "./dashboard-assistant-chat";
 import type {
   DashboardDto,
@@ -994,6 +995,7 @@ export function DashboardOverview({
     <div className="flex flex-col gap-5 sm:gap-6">
       <section className="-mx-1 grid gap-3 lg:hidden">
         <DailyMissionCard data={data} />
+        <PaydownChallengeCard data={data} />
         <Card className="border-border shadow-soft rounded-[2rem] border bg-white/92 p-4">
           <CardHeader className="gap-3 px-0 pt-0">
             <div className="flex items-center justify-between gap-3">
@@ -1204,6 +1206,8 @@ export function DashboardOverview({
           <ExecutiveSummaryStrip items={dashboardSummaryItems} />
 
           <DailyMissionCard data={data} />
+
+          <PaydownChallengeCard data={data} />
 
           <PrimaryActionCard
             eyebrow="Mini IA financiera"

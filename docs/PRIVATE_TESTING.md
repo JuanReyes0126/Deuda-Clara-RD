@@ -99,6 +99,32 @@ Credenciales admin (Pro en seed; algunos E2E usan exportación CSV en reportes):
 - `admin@deudaclarard.com`
 - `DeudaClara123!`
 
+## QA rápido: reto de pago extra (30 días)
+
+Flujo recomendado para validar la feature en dashboard:
+
+1. Inicia sesión con `demo@deudaclarard.com`.
+2. Ve a `/dashboard` y ubica la tarjeta **Reto de 30 días**.
+3. Activa el reto con un monto (ej. `750`) y confirma que se vea:
+   - estado `Activo`
+   - barra de avance
+   - días restantes
+4. Haz clic en **Registrar pago**, guarda un pago en `/pagos` y vuelve al dashboard.
+5. Verifica que suba `paymentsLoggedDuringChallenge`.
+6. Prueba **Cancelar reto** y luego **Iniciar nuevo reto**.
+
+Eventos de telemetría esperados en logs (`product:plan_event`):
+
+- `paydown_challenge_started`
+- `paydown_challenge_payment_click`
+- `paydown_challenge_cleared`
+
+Tip: para filtrar rápido en logs locales, usa:
+
+```bash
+npm run private:logs | rg "paydown_challenge_|product:plan_event"
+```
+
 ## Logs y archivos de runtime
 
 Los archivos del entorno privado viven en:

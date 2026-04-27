@@ -9,7 +9,10 @@ export type PlanTelemetryEvent =
   | "simulator_portfolio_run"
   | "debt_limit_hit"
   | "premium_preview_seen"
-  | "dashboard_daily_mission_click";
+  | "dashboard_daily_mission_click"
+  | "paydown_challenge_started"
+  | "paydown_challenge_cleared"
+  | "paydown_challenge_payment_click";
 
 function buildTelemetryDedupKey(
   event: PlanTelemetryEvent,
