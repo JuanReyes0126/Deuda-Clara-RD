@@ -8,7 +8,8 @@ export type PlanTelemetryEvent =
   | "simulator_used"
   | "simulator_portfolio_run"
   | "debt_limit_hit"
-  | "premium_preview_seen";
+  | "premium_preview_seen"
+  | "dashboard_daily_mission_click";
 
 function buildTelemetryDedupKey(
   event: PlanTelemetryEvent,

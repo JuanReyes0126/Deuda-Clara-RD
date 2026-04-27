@@ -481,16 +481,16 @@ function getScenarioSupportCopy(
   extraPayment: number,
 ) {
   if (scenarioId === "BASE") {
-    return "Mantiene tu pago actual sin esfuerzo adicional.";
+    return "Tu ritmo actual, sin presión extra: buena línea base para comparar.";
   }
 
   if (scenarioId === "EXTRA") {
     return extraPayment > 0
-      ? "Usa exactamente el extra que introdujiste arriba."
-      : "Te muestra el impacto apenas añadas un pago extra.";
+      ? "Usa el extra que pusiste arriba: suele ser el mejor equilibrio esfuerzo/beneficio."
+      : "Cuando añadas un pago extra, aquí verás cuánto adelantas la salida.";
   }
 
-  return "Aprieta más el ritmo para ver el techo de mejora posible.";
+  return "Máximo impulso en la simulación: para ver hasta dónde podrías llegar si aprietas el ritmo.";
 }
 
 function getSelectedSchedule(
@@ -2046,7 +2046,7 @@ export function SimulatorPanel({
                 <CardHeader className="gap-3">
                   <div className="flex flex-wrap items-center gap-3">
                     <Badge variant="default">
-                      {selectedScenario ? selectedScenario.label : "Pago normal"}
+                      {selectedScenario ? selectedScenario.label : "Conservador"}
                     </Badge>
                     {selectedScenario?.payoffDate ? (
                       <Badge variant="success">

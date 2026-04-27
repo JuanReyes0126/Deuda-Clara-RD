@@ -13,6 +13,7 @@ const telemetrySchema = z.object({
     "simulator_portfolio_run",
     "debt_limit_hit",
     "premium_preview_seen",
+    "dashboard_daily_mission_click",
   ]),
   path: z.string().trim().min(1).max(256),
   meta: z.record(z.string(), z.unknown()).optional(),

@@ -30,7 +30,7 @@ type OnboardingWizardProps = {
   defaultValues: OnboardingInput;
 };
 
-const totalSteps = 5;
+const totalSteps = 3;
 
 function getPresetName(presetType: OnboardingDebtPresetType, index: number) {
   const preset = ONBOARDING_DEBT_PRESETS[presetType];
@@ -47,44 +47,36 @@ function buildEmptyDebt(index = 0): OnboardingInput["debts"][number] {
   };
 }
 
-function getStepTitle(step: number) {
+function getStepTitle(step: number, preview: OnboardingPreviewDto | null) {
   if (step === 1) {
-    return "Ponle claridad a tus deudas";
+    return "Tu situación mensual";
   }
 
   if (step === 2) {
-    return "¿Cuánto entra y cuánto sale cada mes?";
-  }
-
-  if (step === 3) {
     return "Agrega tus deudas principales";
   }
 
-  if (step === 4) {
-    return "¿Cuánto puedes pagar al mes?";
+  if (!preview) {
+    return "¿Cuánto puedes dedicar al mes?";
   }
 
   return "Así se vería tu salida";
 }
 
-function getStepDescription(step: number) {
+function getStepDescription(step: number, preview: OnboardingPreviewDto | null) {
   if (step === 1) {
-    return "En menos de 2 minutos te mostramos cuándo sales y cómo pagar menos intereses.";
+    return "En tres pasos rápidos estimamos tu capacidad de pago y te damos una primera salida clara.";
   }
 
   if (step === 2) {
-    return "Usamos tu ingreso y tus gastos base para estimar cuánto podrías dedicar a deudas sin ir a ciegas.";
-  }
-
-  if (step === 3) {
     return "Empieza con 1 a 3 deudas. No necesitas tenerlo perfecto para recibir una ruta útil.";
   }
 
-  if (step === 4) {
-    return "Puedes empezar con el mínimo y luego ajustar.";
+  if (!preview) {
+    return "Puedes usar la capacidad estimada o ajustar a un ritmo más conservador.";
   }
 
-  return "Este resultado sale del planner del servidor con los datos que acabas de registrar.";
+  return "Este resultado sale del planner con lo que acabas de registrar. Puedes volver atrás si quieres ajustar montos.";
 }
 
 function parseMoneyInput(value: string) {
@@ -219,11 +211,6 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
     setStepError(null);
 
     if (currentStep === 1) {
-      setCurrentStep(2);
-      return;
-    }
-
-    if (currentStep === 2) {
       const isValid = await form.trigger([
         "monthlyIncome",
         "monthlyHousingCost",
@@ -234,12 +221,12 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
       ]);
 
       if (isValid) {
-        setCurrentStep(3);
+        setCurrentStep(2);
       }
       return;
     }
 
-    if (currentStep === 3) {
+    if (currentStep === 2) {
       if (debtsFieldArray.fields.length === 0) {
         setStepError("Debes registrar al menos una deuda.");
         return;
@@ -248,24 +235,21 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
       const isValid = await form.trigger("debts");
 
       if (isValid) {
-        setCurrentStep(4);
+        setPreview(null);
+        setCurrentStep(3);
       }
+    }
+  }
+
+  async function loadPlanPreviewForStep3() {
+    setStepError(null);
+    const isValid = await form.trigger("monthlyDebtBudget");
+
+    if (!isValid) {
       return;
     }
 
-    if (currentStep === 4) {
-      const isValid = await form.trigger("monthlyDebtBudget");
-
-      if (!isValid) {
-        return;
-      }
-
-      const previewLoaded = await loadPreview();
-
-      if (previewLoaded) {
-        setCurrentStep(5);
-      }
-    }
+    await loadPreview();
   }
 
   const onSubmit = form.handleSubmit(async (values) => {
@@ -285,7 +269,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
       return;
     }
 
-    toast.success("Tu plan inicial ya está listo.");
+    toast.success("¡Listo! Ya tienes tu plan inicial en el panel.");
     router.push("/dashboard" as Route);
     router.refresh();
   });
@@ -300,10 +284,10 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                 Paso {currentStep}/{totalSteps}
               </p>
               <h1 className="mt-3 font-display text-3xl tracking-tight text-foreground sm:text-4xl">
-                {getStepTitle(currentStep)}
+                {getStepTitle(currentStep, preview)}
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-muted">
-                {getStepDescription(currentStep)}
+                {getStepDescription(currentStep, preview)}
               </p>
             </div>
             <Badge variant="success">Menos de 2 minutos</Badge>
@@ -322,43 +306,23 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
         <div className="grid gap-6">
           {currentStep === 1 ? (
             <section className="rounded-[2rem] border border-border bg-white p-6 shadow-soft sm:p-8">
-              <div className="flex items-start gap-4">
-                <span className="grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
                   <Sparkles className="size-5" />
                 </span>
-                <div>
-                  <h2 className="text-2xl font-semibold text-foreground">
-                    Ponle claridad a tus deudas
-                  </h2>
-                  <p className="mt-3 text-sm leading-7 text-muted">
-                    En menos de 2 minutos te mostramos cuándo sales y cómo pagar menos intereses.
+                <div className="grid gap-3 text-sm leading-7 text-muted">
+                  <p className="text-base font-semibold text-foreground">
+                    Tres pasos: ingresos y gastos base, tus deudas, y cuánto puedes pagar. Luego ves tu primera salida.
                   </p>
+                  <ul className="grid list-inside list-disc gap-1">
+                    <li>Fecha de salida estimada y por dónde empezar</li>
+                    <li>Sin conectar bancos</li>
+                    <li>Recordatorios opcionales después</li>
+                  </ul>
                 </div>
               </div>
 
-              <div className="mt-6 grid gap-3 rounded-[1.5rem] border border-primary/10 bg-[rgba(240,248,245,0.88)] p-5">
-                <p className="text-sm font-medium text-foreground">Esto es lo que te llevas hoy:</p>
-                <ul className="grid gap-3 text-sm leading-7 text-muted">
-                  <li>Verás tu fecha de salida.</li>
-                  <li>Te diremos por dónde empezar.</li>
-                  <li>Sin conectar cuentas bancarias.</li>
-                </ul>
-              </div>
-
-              <div className="mt-4 rounded-[1.5rem] border border-border bg-secondary/35 p-5">
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
-                  Siempre a tiempo
-                </p>
-                <p className="mt-3 text-sm leading-7 text-muted">
-                  Te avisamos antes del corte y antes del pago para que no se te pase nada.
-                </p>
-              </div>
-            </section>
-          ) : null}
-
-          {currentStep === 2 ? (
-            <section className="rounded-[2rem] border border-border bg-white p-6 shadow-soft sm:p-8">
-              <div className="grid gap-5">
+              <div className="mt-8 grid gap-5">
                 <div className="space-y-3">
                   <Label htmlFor="monthlyIncome">Ingreso mensual (RD$)</Label>
                   <Input
@@ -481,7 +445,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
             </section>
           ) : null}
 
-          {currentStep === 3 ? (
+          {currentStep === 2 ? (
             <section className="rounded-[2rem] border border-border bg-white p-6 shadow-soft sm:p-8">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
@@ -700,7 +664,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
             </section>
           ) : null}
 
-          {currentStep === 4 ? (
+          {currentStep === 3 && !preview ? (
             <section className="rounded-[2rem] border border-border bg-white p-6 shadow-soft sm:p-8">
               <div className="space-y-3">
                 <Label htmlFor="monthlyDebtBudget">Monto mensual disponible (RD$)</Label>
@@ -784,7 +748,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
             </section>
           ) : null}
 
-          {currentStep === 5 ? (
+          {currentStep === 3 && preview ? (
             <section className="rounded-[2rem] border border-border bg-white p-6 shadow-soft sm:p-8">
               {isLoadingPreview ? (
                 <div className="grid gap-4">
@@ -885,6 +849,11 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
               disabled={currentStep === 1 || isSubmitting || isLoadingPreview}
               onClick={() => {
                 setStepError(null);
+                if (currentStep === 3 && preview) {
+                  setPreview(null);
+                  return;
+                }
+
                 setCurrentStep((step) => Math.max(1, step - 1));
               }}
             >
@@ -892,18 +861,23 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
               Atrás
             </Button>
 
-            {currentStep < totalSteps ? (
+            {currentStep < 3 ? (
+              <Button type="button" disabled={isLoadingPreview} onClick={goToNextStep}>
+                Continuar
+                <ArrowRight className="ml-2 size-4" />
+              </Button>
+            ) : !preview ? (
               <Button
                 type="button"
-                disabled={isLoadingPreview}
-                onClick={goToNextStep}
+                disabled={isSubmitting || isLoadingPreview}
+                onClick={() => void loadPlanPreviewForStep3()}
               >
-                {currentStep === 1 ? "Empezar" : "Continuar"}
+                Ver mi plan inicial
                 <ArrowRight className="ml-2 size-4" />
               </Button>
             ) : (
               <Button type="submit" disabled={isSubmitting || isLoadingPreview}>
-                Ver mi plan completo
+                Abrir mi panel
                 <ArrowRight className="ml-2 size-4" />
               </Button>
             )}

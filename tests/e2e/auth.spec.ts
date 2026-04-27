@@ -15,7 +15,6 @@ test("registro y onboarding inicial", async ({ page }) => {
   await page.getByRole("button", { name: "Crear cuenta y continuar" }).click();
 
   await expect(page).toHaveURL(/onboarding/, { timeout: 30_000 });
-  await page.getByRole("button", { name: "Empezar" }).click();
   await page.getByLabel("Ingreso mensual (RD$)").fill("42000");
   await page.getByRole("button", { name: "Continuar" }).click();
   await page.getByRole("button", { name: "Tarjeta" }).click();
@@ -24,8 +23,8 @@ test("registro y onboarding inicial", async ({ page }) => {
   await page.getByLabel("Pago mínimo (RD$)").fill("6500");
   await page.getByRole("button", { name: "Continuar" }).click();
   await page.getByLabel("Monto mensual disponible (RD$)").fill("18000");
-  await page.getByRole("button", { name: "Continuar" }).click();
-  await page.getByRole("button", { name: "Ver mi plan completo" }).click();
+  await page.getByRole("button", { name: "Ver mi plan inicial" }).click();
+  await page.getByRole("button", { name: "Abrir mi panel" }).click();
   await expect(page).toHaveURL(/dashboard/, { timeout: 30_000 });
 });
 
