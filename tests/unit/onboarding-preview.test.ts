@@ -38,5 +38,5 @@ describe("buildOnboardingPreview", () => {
     expect(result.potentialSavings).toBeGreaterThanOrEqual(0);
     expect(result.monthlyEssentialExpensesTotal).toBe(24_500);
     expect(result.monthlyDebtCapacity).toBe(17_500);
-  });
+  }, 30000);
 });

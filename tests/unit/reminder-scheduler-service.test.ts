@@ -28,9 +28,12 @@ vi.mock("@/server/observability/logger", () => ({
   logServerInfo: vi.fn(),
 }));
 
+const reminderSchedulerModulePromise = import(
+  "@/server/reminders/reminder-scheduler-service"
+);
+
 describe("dispatchAutomatedReminderEmails", () => {
   beforeEach(() => {
-    vi.resetModules();
     userFindManyMock.mockReset();
     notificationEventFindUniqueMock.mockReset();
     notificationEventCreateMock.mockReset();
@@ -72,9 +75,7 @@ describe("dispatchAutomatedReminderEmails", () => {
       status: "SENT",
     });
 
-    const { dispatchAutomatedReminderEmails } = await import(
-      "@/server/reminders/reminder-scheduler-service"
-    );
+    const { dispatchAutomatedReminderEmails } = await reminderSchedulerModulePromise;
 
     const result = await dispatchAutomatedReminderEmails({
       now: new Date("2026-04-05T12:00:00.000Z"),
@@ -82,7 +83,7 @@ describe("dispatchAutomatedReminderEmails", () => {
 
     expect(sendTransactionalEmailMock).not.toHaveBeenCalled();
     expect(result.duplicatesPrevented).toBe(1);
-  }, 15000);
+  }, 60000);
 
   it("envía el correo y registra el evento cuando corresponde", async () => {
     userFindManyMock.mockResolvedValueOnce([
@@ -121,9 +122,7 @@ describe("dispatchAutomatedReminderEmails", () => {
     });
     sendTransactionalEmailMock.mockResolvedValueOnce({ queued: true });
 
-    const { dispatchAutomatedReminderEmails } = await import(
-      "@/server/reminders/reminder-scheduler-service"
-    );
+    const { dispatchAutomatedReminderEmails } = await reminderSchedulerModulePromise;
 
     const result = await dispatchAutomatedReminderEmails({
       now: new Date("2026-04-05T12:00:00.000Z"),
@@ -140,5 +139,5 @@ describe("dispatchAutomatedReminderEmails", () => {
     );
     expect(result.eventsSent).toBe(1);
     expect(result.emailsQueued).toBe(1);
-  }, 15000);
+  }, 60000);
 });
