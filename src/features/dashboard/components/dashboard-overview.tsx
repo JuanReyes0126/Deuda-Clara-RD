@@ -41,6 +41,22 @@ import { useSessionUpgradePrompt } from "@/lib/membership/use-session-upgrade-pr
 import { DailyMissionCard } from "./daily-mission-card";
 import { PaydownChallengeCard } from "./paydown-challenge-card";
 import { DashboardAssistantChat } from "./dashboard-assistant-chat";
+import { usePremiumActivation } from "./use-premium-activation";
+import {
+  buildPremiumActivationSteps,
+  getActivationProgress,
+} from "./dashboard-premium-activation-steps";
+import { buildDashboardSummaryItems } from "./dashboard-summary-items";
+import {
+  buildDashboardQuickActions,
+  buildMobileActionButtons,
+} from "./dashboard-actions";
+import {
+  getMobileProgressLabel,
+  getMobileRiskLabel,
+  getMobileRiskSupport,
+  getPlanStatusCopy,
+} from "./dashboard-derived-copy";
 import type {
   DashboardDto,
   DashboardPlanSnapshotDto,
@@ -120,14 +136,6 @@ const planReasonLabels: Record<string, string> = {
     "El presupuesto actual no cubre los mínimos necesarios.",
   non_amortizing: "A este ritmo, la deuda no baja de forma sostenible.",
   max_months_reached: "La proyección supera el horizonte razonable de cálculo.",
-};
-
-const premiumActivationStorageKey = "deuda-clara-rd-premium-activation";
-const premiumActivationWindowMs = 5 * 60 * 1000;
-
-type PremiumActivationState = {
-  startedAt: number;
-  completed: string[];
 };
 
 type RecommendedDebtPriorityItem = DashboardDto["recommendedOrder"][number];
@@ -218,48 +226,6 @@ function getPriorityReasonMeta({
     support:
       "Hoy rinde más poner el excedente aquí que repartirlo. Así el plan gana tracción más rápido.",
   };
-}
-
-function readPremiumActivationState() {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const raw = window.localStorage.getItem(premiumActivationStorageKey);
-
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as PremiumActivationState;
-
-    if (!parsed.startedAt || !Array.isArray(parsed.completed)) {
-      return null;
-    }
-
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function persistPremiumActivationState(
-  nextState: PremiumActivationState | null,
-) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  if (!nextState) {
-    window.localStorage.removeItem(premiumActivationStorageKey);
-    return;
-  }
-
-  window.localStorage.setItem(
-    premiumActivationStorageKey,
-    JSON.stringify(nextState),
-  );
 }
 
 function getLockedUpgradeContext({
@@ -491,14 +457,6 @@ export function DashboardOverview({
   const { navigate } = useAppNavigation();
   const navigateTo = (path: string) => navigate(path);
   const [chartsReady, setChartsReady] = useState(false);
-  const [showOptimization, setShowOptimization] = useState(
-    initialShowOptimization,
-  );
-  const [showPremiumWelcome, setShowPremiumWelcome] = useState(premiumWelcome);
-  const [activationCompletedSteps, setActivationCompletedSteps] = useState<
-    string[]
-  >([]);
-  const [activationRemainingMs, setActivationRemainingMs] = useState(0);
   const optimizationRef = useRef<HTMLElement | null>(null);
   const isPremiumUnlocked =
     data.membership.recommendationUnlocked && data.planComparison !== null;
@@ -561,102 +519,20 @@ export function DashboardOverview({
   const isProUnlocked =
     data.membership.tier === "PRO" && data.membership.billingStatus === "ACTIVE";
   const nextTimelineItem = data.upcomingTimeline.items[0] ?? null;
-  const mobileRiskLabel =
-    data.riskAlerts.length > 0
-      ? `${data.riskAlerts.length} alerta${data.riskAlerts.length === 1 ? "" : "s"}`
-      : formatCurrency(data.summary.estimatedMonthlyInterest);
-  const mobileRiskSupport =
-    data.riskAlerts.length > 0
-      ? "Requiere atención hoy"
-      : "Interés del mes";
-  const mobileProgressLabel = data.summary.projectedDebtFreeDate
-    ? `Salida estimada: ${formatDate(data.summary.projectedDebtFreeDate, "MMM yyyy")}`
-    : formatMonthsLabel(data.summary.monthsToDebtFree);
-  const mobileActionButtons = [
-    {
-      label: "Registrar pago",
-      href: paymentPriorityHref,
-      variant: "primary" as const,
-    },
-    {
-      label: "Ver deudas",
-      href: "/deudas",
-      variant: "secondary" as const,
-    },
-    {
-      label: "Abrir simulador",
-      href: "/simulador",
-      variant: "secondary" as const,
-    },
-  ];
-  const quickActions = [
-    !hasDebts
-      ? {
-          title: "Carga tu primera deuda",
-          description:
-            "Sin deudas registradas todavía no podemos construir una ruta real ni alertarte a tiempo.",
-          actionLabel: "Ir a deudas",
-          href: "/deudas",
-          icon: CreditCard,
-        }
-      : null,
-    hasDebts && data.recentPayments.length === 0
-      ? {
-          title: "Registra tu primer pago",
-          description:
-            "Con un pago registrado el sistema ya empieza a medir avance real y presión mensual.",
-          actionLabel: "Ir a pagos",
-          href: "/pagos",
-          icon: Wallet,
-        }
-      : null,
-    !isPremiumUnlocked && data.membership.billingStatus === "FREE"
-      ? {
-          title: "Desbloquea el plan recomendado",
-          description:
-            "Premium te guía por 6 meses para dejar de perder dinero y mostrar cuánto tiempo podrías recortar.",
-          actionLabel: getCommercialUpgradeCta("Premium"),
-          href: upgradePlanHref,
-          icon: Crown,
-        }
-      : null,
-    data.membership.billingStatus === "PAST_DUE"
-      ? {
-          title: "Tu plan premium necesita atención",
-          description:
-            "Actualiza la facturación para no perder el módulo recomendado ni el seguimiento.",
-          actionLabel: "Revisar facturación",
-          href: managePlanHref,
-          icon: AlertTriangle,
-        }
-      : null,
-    data.membership.cancelAtPeriodEnd
-      ? {
-          title: "Tu plan terminará al cierre del período",
-          description:
-            "Si quieres mantener la guía premium y el orden optimizado, reactívalo antes del corte.",
-          actionLabel: "Gestionar plan",
-          href: managePlanHref,
-          icon: CircleCheck,
-        }
-      : null,
-    hasDebts && data.riskAlerts.length > 0
-      ? {
-          title: "Hay señales de pago mínimo riesgoso",
-          description:
-            "Revisar esto ahora puede evitar que sigas pagando intereses sin bajar el saldo.",
-          actionLabel: "Revisar deudas",
-          href: "/deudas",
-          icon: Sparkles,
-        }
-      : null,
-  ].filter(Boolean) as Array<{
-    title: string;
-    description: string;
-    actionLabel: string;
-    href: string;
-    icon: typeof AlertTriangle;
-  }>;
+  const mobileRiskLabel = getMobileRiskLabel(data);
+  const mobileRiskSupport = getMobileRiskSupport(data);
+  const mobileProgressLabel = getMobileProgressLabel({
+    data,
+    formatMonthsLabel,
+  });
+  const mobileActionButtons = buildMobileActionButtons(paymentPriorityHref);
+  const quickActions = buildDashboardQuickActions({
+    data,
+    hasDebts,
+    isPremiumUnlocked,
+    upgradePlanHref,
+    managePlanHref,
+  });
   const secondaryQuickActions = quickActions.slice(0, 2);
   const priorityOne =
     data.recommendedOrder.find((item) => item.priorityRank === 1) ?? null;
@@ -666,70 +542,27 @@ export function DashboardOverview({
   const priorityReason = priorityOne
     ? getPriorityReasonMeta({ data, item: priorityOne })
     : null;
-  const planStatusCopy = data.membership.cancelAtPeriodEnd
-    ? `Tu plan terminará al cierre actual${data.membership.currentPeriodEnd ? `, el ${formatDate(data.membership.currentPeriodEnd)}` : ""}.`
-    : data.membership.billingStatus === "ACTIVE"
-      ? data.membership.currentPeriodEnd
-        ? `Tu membresía premium está activa hasta ${formatDate(data.membership.currentPeriodEnd)}.`
-        : "Tu membresía premium está activa y desbloqueada."
-      : data.membership.billingStatus === "PAST_DUE"
-        ? "Tu membresía premium tiene un pago pendiente. Conviene regularizarla para no perder acceso."
-        : data.membership.label === "Base"
-          ? "Estás viendo el modo Base. Aquí ya tienes control y simulación simple, pero el plan recomendado sigue bloqueado."
-          : data.membership.description;
-  const activationSteps = [
-    {
-      id: "optimization",
-      title: "Abrir plan inteligente",
-      description: "Mira la comparación entre tu plan actual y el optimizado.",
-      actionLabel: "Abrir plan",
-      actionTarget: "optimization" as const,
-    },
-    {
-      id: "priority",
-      title: data.summary.recommendedDebtName
-        ? `Confirmar foco en ${data.summary.recommendedDebtName}`
-        : "Confirmar la deuda prioritaria",
-      description: data.summary.recommendedDebtName
-        ? `Asegúrate de que ${data.summary.recommendedDebtName} siga siendo la deuda a la que enviarás el excedente.`
-        : "Revisa cuál deuda quedó primero antes de mover más dinero.",
-      actionLabel: "Revisar prioridad",
-      actionTarget: "debts" as const,
-    },
-    {
-      id: "follow-up",
-      title:
-        data.dueSoonDebts.length > 0
-          ? "Cubrir próximos vencimientos"
-          : data.recentPayments.length === 0
-            ? "Registrar tu primer avance"
-            : "Mirar alertas y siguiente paso",
-      description:
-        data.dueSoonDebts.length > 0
-          ? `Tienes ${data.dueSoonDebts.length} vencimiento${data.dueSoonDebts.length === 1 ? "" : "s"} cercano${data.dueSoonDebts.length === 1 ? "" : "s"} que conviene dejar alineado${data.dueSoonDebts.length === 1 ? "" : "s"}.`
-          : data.recentPayments.length === 0
-            ? "Registrar un pago te ayuda a convertir el plan en movimiento real desde hoy."
-            : "Tus alertas y recomendaciones ya tienen suficiente contexto para una primera revisión semanal.",
-      actionLabel:
-        data.dueSoonDebts.length > 0
-          ? "Ver vencimientos"
-          : data.recentPayments.length === 0
-            ? "Ir a pagos"
-            : "Abrir alertas",
-      actionTarget:
-        data.dueSoonDebts.length > 0
-          ? ("debts" as const)
-          : data.recentPayments.length === 0
-            ? ("payments" as const)
-            : ("notifications" as const),
-    },
-  ];
-  const activationCompletedCount = activationSteps.filter((step) =>
-    activationCompletedSteps.includes(step.id),
-  ).length;
-  const activationProgressPct = Math.round(
-    (activationCompletedCount / activationSteps.length) * 100,
-  );
+  const planStatusCopy = getPlanStatusCopy(data);
+  const activationSteps = buildPremiumActivationSteps(data);
+  const {
+    showOptimization,
+    showPremiumWelcome,
+    activationCompletedSteps,
+    activationRemainingMs,
+    revealOptimization,
+    completeActivationStep,
+    dismissPremiumWelcome,
+    runActivationStepAction,
+  } = usePremiumActivation({
+    isPremiumUnlocked,
+    premiumWelcome,
+    initialShowOptimization,
+    upgradePlanHref,
+    navigateTo,
+    optimizationRef,
+  });
+  const { completedCount: activationCompletedCount, progressPct: activationProgressPct } =
+    getActivationProgress(activationSteps, activationCompletedSteps);
   const activationMinutesRemaining = Math.max(
     1,
     Math.ceil(activationRemainingMs / 60000),
@@ -742,165 +575,6 @@ export function DashboardOverview({
 
     return () => window.cancelAnimationFrame(frame);
   }, []);
-
-  useEffect(() => {
-    if (!initialShowOptimization || !isPremiumUnlocked) {
-      return;
-    }
-
-    window.requestAnimationFrame(() => {
-      optimizationRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    });
-  }, [initialShowOptimization, isPremiumUnlocked]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const frame = window.requestAnimationFrame(() => {
-      if (!isPremiumUnlocked) {
-        setShowPremiumWelcome(false);
-        setActivationCompletedSteps([]);
-        setActivationRemainingMs(0);
-        return;
-      }
-
-      const now = Date.now();
-      let nextState = readPremiumActivationState();
-
-      if (premiumWelcome) {
-        nextState = {
-          startedAt: now,
-          completed: [],
-        };
-        persistPremiumActivationState(nextState);
-      }
-
-      if (!nextState) {
-        setShowPremiumWelcome(false);
-        setActivationCompletedSteps([]);
-        setActivationRemainingMs(0);
-        return;
-      }
-
-      const elapsed = now - nextState.startedAt;
-
-      if (elapsed >= premiumActivationWindowMs) {
-        persistPremiumActivationState(null);
-        setShowPremiumWelcome(false);
-        setActivationCompletedSteps([]);
-        setActivationRemainingMs(0);
-        return;
-      }
-
-      setShowPremiumWelcome(true);
-      setActivationCompletedSteps(nextState.completed);
-      setActivationRemainingMs(premiumActivationWindowMs - elapsed);
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [isPremiumUnlocked, premiumWelcome]);
-
-  useEffect(() => {
-    if (!showPremiumWelcome || typeof window === "undefined") {
-      return;
-    }
-
-    const interval = window.setInterval(() => {
-      const currentState = readPremiumActivationState();
-
-      if (!currentState) {
-        setShowPremiumWelcome(false);
-        setActivationCompletedSteps([]);
-        setActivationRemainingMs(0);
-        window.clearInterval(interval);
-        return;
-      }
-
-      const remaining =
-        premiumActivationWindowMs - (Date.now() - currentState.startedAt);
-
-      if (remaining <= 0) {
-        persistPremiumActivationState(null);
-        setShowPremiumWelcome(false);
-        setActivationCompletedSteps([]);
-        setActivationRemainingMs(0);
-        window.clearInterval(interval);
-        return;
-      }
-
-      setActivationRemainingMs(remaining);
-    }, 15000);
-
-    return () => window.clearInterval(interval);
-  }, [showPremiumWelcome]);
-
-  const revealOptimization = () => {
-    if (!isPremiumUnlocked) {
-      navigateTo(upgradePlanHref);
-      return;
-    }
-
-    setShowOptimization(true);
-    window.requestAnimationFrame(() => {
-      optimizationRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    });
-  };
-
-  const completeActivationStep = (stepId: string) => {
-    setActivationCompletedSteps((current) => {
-      if (current.includes(stepId)) {
-        return current;
-      }
-
-      const nextCompleted = [...current, stepId];
-      const currentState = readPremiumActivationState();
-
-      if (currentState) {
-        persistPremiumActivationState({
-          ...currentState,
-          completed: nextCompleted,
-        });
-      }
-
-      return nextCompleted;
-    });
-  };
-
-  const dismissPremiumWelcome = () => {
-    persistPremiumActivationState(null);
-    setActivationCompletedSteps([]);
-    setActivationRemainingMs(0);
-    setShowPremiumWelcome(false);
-  };
-
-  const runActivationStepAction = (
-    actionTarget: "optimization" | "debts" | "payments" | "notifications",
-  ) => {
-    if (actionTarget === "optimization") {
-      revealOptimization();
-      return;
-    }
-
-    if (actionTarget === "debts") {
-      navigateTo("/deudas");
-      return;
-    }
-
-    if (actionTarget === "payments") {
-      navigateTo("/pagos");
-      return;
-    }
-
-    navigateTo("/notificaciones");
-  };
 
   const featuredStatCard = statCards[0];
   const secondaryStatCards = statCards.slice(1);
@@ -929,68 +603,11 @@ export function DashboardOverview({
         variant: "secondary" as const,
       }
     : undefined;
-  const dashboardSummaryItems: ExecutiveSummaryItem[] = [
-    {
-      label: "Deuda total",
-      value: formatCurrency(data.summary.totalDebt),
-      support: hasDebts
-        ? "Saldo, mora y cargos que hoy están compitiendo por tu flujo."
-        : "Todavía no hay deudas activas para construir una ruta real.",
-      icon: CircleDollarSign,
-      featured: true,
-      badgeLabel: hasDebts ? "Panorama real" : "Activa tu base",
-      badgeVariant: hasDebts ? "success" : "default",
-    },
-    {
-      label: "Pago mínimo del mes",
-      value: formatCurrency(data.summary.totalMinimumPayment),
-      support: "Lo mínimo para que el mes no se te complique más.",
-      icon: CalendarClock,
-    },
-    {
-      label: "Interés estimado del mes",
-      value: formatCurrency(data.summary.estimatedMonthlyInterest),
-      support:
-        data.summary.estimatedMonthlyInterest > 0
-          ? `Estás pagando ${formatCurrency(data.summary.estimatedMonthlyInterest)} en intereses.`
-          : "Cuando registres deuda activa, aquí verás el costo financiero del mes.",
-      icon: AlertTriangle,
-      badgeLabel:
-        data.summary.estimatedMonthlyInterest > 0 ? "Costo visible" : undefined,
-      badgeVariant: "warning" as const,
-    },
-    {
-      label: "Tiempo estimado de salida",
-      value: formatMonthsLabel(data.summary.monthsToDebtFree),
-      support: data.summary.projectedDebtFreeDate
-        ? `Si mantienes este ritmo, apuntas a ${formatDate(
-            data.summary.projectedDebtFreeDate,
-            "MMM yyyy",
-          )}.`
-        : "Completa deudas y pagos para proyectar una salida más clara.",
-      icon: Sparkles,
-      valueKind: "text" as const,
-      badgeLabel:
-        premiumMonthsSaved !== null && premiumMonthsSaved > 0
-          ? `${premiumMonthsSaved} meses menos`
-          : undefined,
-      badgeVariant: "success" as const,
-    },
-    {
-      label: "Prioridad actual",
-      value:
-        data.summary.recommendedDebtName ??
-        data.urgentDebt?.name ??
-        (hasDebts ? "Revisa tu prioridad" : "Registra tu primera deuda"),
-      support: data.summary.recommendedDebtName
-        ? "Hoy es la deuda que más conviene proteger o acelerar."
-        : hasDebts
-          ? "Aún falta una señal más clara para decirte cuál va primero."
-          : "Con una deuda registrada ya activamos la prioridad principal.",
-      icon: CreditCard,
-      valueKind: "text" as const,
-    },
-  ];
+  const dashboardSummaryItems = buildDashboardSummaryItems({
+    data,
+    hasDebts,
+    premiumMonthsSaved,
+  });
   return (
     <div className="flex flex-col gap-5 sm:gap-6">
       <section className="-mx-1 grid gap-3 lg:hidden">

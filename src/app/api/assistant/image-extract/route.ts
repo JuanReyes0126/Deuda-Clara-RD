@@ -42,6 +42,7 @@ type OpenAiResponsePayload = {
 
 const maxImageDataUrlLength = 7_000_000;
 const imageDataUrlPattern = /^data:image\/(png|jpeg|jpg|webp);base64,/i;
+const visionProviderTimeoutMs = 12_000;
 
 function buildVisionPrompt(prompt?: string) {
   return `Extrae datos financieros de esta imagen para una app de deudas personales en República Dominicana.
@@ -175,6 +176,8 @@ async function readImageWithOpenAi({
   }
 
   const model = process.env.OPENAI_VISION_MODEL ?? "gpt-4.1-mini";
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => abortController.abort(), visionProviderTimeoutMs);
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -199,7 +202,8 @@ async function readImageWithOpenAi({
         },
       ],
     }),
-  });
+    signal: abortController.signal,
+  }).finally(() => clearTimeout(timeoutId));
   const payload = (await response.json()) as OpenAiResponsePayload;
 
   if (!response.ok) {
@@ -236,26 +240,31 @@ async function readImageWithGateway({
   const gatewayModel =
     process.env.AI_GATEWAY_VISION_MODEL ??
     `openai/${process.env.OPENAI_VISION_MODEL ?? "gpt-4.1-mini"}`;
-  const result = await generateText({
-    model: gatewayModel,
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: buildVisionPrompt(prompt),
-          },
-          {
-            type: "image",
-            image: parsedImage.base64,
-            mediaType: parsedImage.mediaType,
-          },
-        ],
-      },
-    ],
-    maxRetries: 1,
-  });
+  const result = await Promise.race([
+    generateText({
+      model: gatewayModel,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: buildVisionPrompt(prompt),
+            },
+            {
+              type: "image",
+              image: parsedImage.base64,
+              mediaType: parsedImage.mediaType,
+            },
+          ],
+        },
+      ],
+      maxRetries: 1,
+    }),
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("AI Gateway request timed out.")), visionProviderTimeoutMs);
+    }),
+  ]);
 
   return result.text;
 }
@@ -292,10 +301,6 @@ export async function POST(request: NextRequest) {
       outputText = await readImageWithOpenAi({ imageDataUrl, prompt });
     } catch (error) {
       logServerError("OpenAI vision request failed", { error });
-      return apiBadRequest(
-        "No pudimos leer la imagen ahora mismo. Inténtalo de nuevo.",
-        502,
-      );
     }
 
     if (!outputText) {

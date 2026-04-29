@@ -23,6 +23,7 @@ const securityAlertRules: Record<string, SecurityAlertRule> = {
   rate_limit_forgot_password: { threshold: 10, windowMs: 10 * 60 * 1000 },
   rate_limit_reauth: { threshold: 10, windowMs: 10 * 60 * 1000 },
   rate_limit_change_password: { threshold: 10, windowMs: 10 * 60 * 1000 },
+  rate_limit_settings_update: { threshold: 20, windowMs: 10 * 60 * 1000 },
   rate_limit_billing_checkout: { threshold: 10, windowMs: 10 * 60 * 1000 },
   rate_limit_billing_portal: { threshold: 10, windowMs: 10 * 60 * 1000 },
   rate_limit_cron_notifications: { threshold: 10, windowMs: 10 * 60 * 1000 },
