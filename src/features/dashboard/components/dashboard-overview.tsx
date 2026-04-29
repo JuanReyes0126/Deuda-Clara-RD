@@ -52,11 +52,19 @@ import {
   buildMobileActionButtons,
 } from "./dashboard-actions";
 import {
+  dashboardStatCards,
+  getDashboardStatCardValue,
+} from "./dashboard-stat-cards";
+import {
   getMobileProgressLabel,
   getMobileRiskLabel,
   getMobileRiskSupport,
   getPlanStatusCopy,
 } from "./dashboard-derived-copy";
+import { formatMonthsLabel } from "./dashboard-formatters";
+import { getPlanSupportText } from "./dashboard-plan-copy";
+import { getPriorityReasonMeta } from "./dashboard-priority-reason";
+import { getLockedUpgradeContext } from "./dashboard-upgrade-locked-context";
 import type {
   DashboardDto,
   DashboardPlanSnapshotDto,
@@ -104,42 +112,6 @@ const DashboardDebtBreakdownChart = dynamic(
   },
 );
 
-const statCards = [
-  {
-    key: "totalDebt",
-    label: "Deuda total real",
-    icon: CircleDollarSign,
-    description: "Incluye saldo, mora y cargos adicionales.",
-  },
-  {
-    key: "totalMinimumPayment",
-    label: "Pago mínimo del mes",
-    icon: CalendarClock,
-    description: "Lo que necesitas cubrir para mantenerte al día.",
-  },
-  {
-    key: "estimatedMonthlyInterest",
-    label: "Interés estimado del mes",
-    icon: AlertTriangle,
-    description: "Lo que te cuesta seguir cargando esta estructura.",
-  },
-  {
-    key: "interestSavings",
-    label: "Ahorro potencial",
-    icon: Sparkles,
-    description: "Lo que podrías ahorrar con el plan recomendado.",
-  },
-] as const;
-
-const planReasonLabels: Record<string, string> = {
-  budget_below_minimum:
-    "El presupuesto actual no cubre los mínimos necesarios.",
-  non_amortizing: "A este ritmo, la deuda no baja de forma sostenible.",
-  max_months_reached: "La proyección supera el horizonte razonable de cálculo.",
-};
-
-type RecommendedDebtPriorityItem = DashboardDto["recommendedOrder"][number];
-
 type DashboardOverviewProps = {
   data: DashboardDto;
   conversionSnapshot?: MembershipConversionSnapshotDto | null;
@@ -148,184 +120,6 @@ type DashboardOverviewProps = {
   /** Clave para persistir el chat de Clara en este dispositivo (p. ej. id de usuario). */
   claraStorageKey?: string;
 };
-
-function formatMonthsLabel(months: number | null) {
-  if (months === null) {
-    return "Sin salida clara";
-  }
-
-  if (months === 0) {
-    return "Sin deuda activa";
-  }
-
-  return `${months} ${months === 1 ? "mes" : "meses"}`;
-}
-
-function getPlanSupportText(plan: DashboardPlanSnapshotDto) {
-  if (!plan.feasible) {
-    return plan.reason
-      ? planReasonLabels[plan.reason]
-      : "Faltan datos para proyectar esta ruta.";
-  }
-
-  if (plan.monthsToDebtFree === 0) {
-    return "No quedan saldos activos pendientes.";
-  }
-
-  return `Presupuesto mensual estimado: ${formatCurrency(plan.monthlyBudget)}`;
-}
-
-function getPriorityReasonMeta({
-  data,
-  item,
-}: {
-  data: DashboardDto;
-  item: RecommendedDebtPriorityItem;
-}) {
-  const dueSoonDebt = data.dueSoonDebts.find((debt) => debt.id === item.id);
-  const isUrgentDebt = data.urgentDebt?.id === item.id;
-
-  if (isUrgentDebt && data.urgentDebt?.status === "LATE") {
-    return {
-      badgeVariant: "danger" as const,
-      badgeLabel: "Evita más mora",
-      support:
-        "Ya viene atrasada. Frenarla primero evita que siga absorbiendo flujo con cargos y presión extra.",
-    };
-  }
-
-  if (dueSoonDebt?.nextDueDate) {
-    return {
-      badgeVariant: "warning" as const,
-      badgeLabel: "Vencimiento primero",
-      support: `Está demasiado cerca del corte. Si la cubres antes de ${formatRelativeDistance(dueSoonDebt.nextDueDate)}, mantienes el resto del plan respirando.`,
-    };
-  }
-
-  if (item.monthlyRatePct >= 4) {
-    return {
-      badgeVariant: "warning" as const,
-      badgeLabel: "Sube al frente por tasa alta",
-      support:
-        "Está consumiendo más interés que el resto. Cada semana que se queda atrás le cuesta más a tu flujo.",
-    };
-  }
-
-  if (item.monthlyRatePct >= 2) {
-    return {
-      badgeVariant: "warning" as const,
-      badgeLabel: "Está consumiendo más interés",
-      support:
-        "Aunque no esté vencida, esta deuda ya compite fuerte por el dinero del mes y conviene concentrar el excedente aquí.",
-    };
-  }
-
-  return {
-    badgeVariant: "default" as const,
-    badgeLabel: "Compite por el mismo flujo",
-    support:
-      "Hoy rinde más poner el excedente aquí que repartirlo. Así el plan gana tracción más rápido.",
-  };
-}
-
-function getLockedUpgradeContext({
-  data,
-  conversionSnapshot,
-}: {
-  data: DashboardDto;
-  conversionSnapshot: MembershipConversionSnapshotDto | null;
-}) {
-  if (!conversionSnapshot?.hasDebts) {
-    return {
-      eyebrow: "Desbloqueo premium",
-      title: "Primero necesitamos una deuda activa para optimizar de verdad.",
-      description:
-        "En cuanto registres una deuda, Premium podrá comparar tu ritmo actual contra una salida más rápida y convertirlo en un plan accionable.",
-      primaryCtaLabel: "Ir a deudas",
-      primaryHref: "/deudas",
-      secondaryCtaLabel: "Ver planes",
-      secondaryHref: "/planes?plan=NORMAL&source=dashboard",
-      badges: [],
-    };
-  }
-
-  const monthsSaved = conversionSnapshot.monthsSaved;
-  const interestSavings = conversionSnapshot.interestSavings;
-  const badges = [
-    monthsSaved !== null && monthsSaved > 0
-      ? `${monthsSaved} meses menos`
-      : null,
-    interestSavings !== null && interestSavings > 0
-      ? `${formatCurrency(interestSavings)} evitables`
-      : null,
-    conversionSnapshot.urgentDebtName
-      ? `Prioridad: ${conversionSnapshot.urgentDebtName}`
-      : null,
-  ].filter(Boolean) as string[];
-
-  if (
-    conversionSnapshot.riskAlertCount > 0 &&
-    conversionSnapshot.dueSoonCount > 0
-  ) {
-    return {
-      eyebrow: "Presión detectada",
-      title:
-        "Ya tienes intereses caros y vencimientos compitiendo por tu flujo.",
-      description: `Hoy mismo tienes ${conversionSnapshot.riskAlertCount} alerta${
-        conversionSnapshot.riskAlertCount === 1 ? "" : "s"
-      } de riesgo y ${conversionSnapshot.dueSoonCount} vencimiento${
-        conversionSnapshot.dueSoonCount === 1 ? "" : "s"
-      } cercano${conversionSnapshot.dueSoonCount === 1 ? "" : "s"}. Premium te devuelve una sola prioridad clara para que no sigas decidiendo a ciegas.`,
-      primaryCtaLabel: "Desbloquear prioridad",
-      primaryHref: "/planes?plan=NORMAL&source=dashboard",
-      secondaryCtaLabel: "Ver alertas",
-      secondaryHref: "/notificaciones",
-      badges,
-    };
-  }
-
-  if (monthsSaved !== null && monthsSaved > 0) {
-    return {
-      eyebrow: "Tiempo recuperable",
-      title: `Tu ritmo actual podría recortarse en ${monthsSaved} ${
-        monthsSaved === 1 ? "mes" : "meses"
-      }.`,
-      description: `${conversionSnapshot.immediateAction} Premium toma esa oportunidad y la convierte en una ruta clara para los próximos 6 meses, sin tener que comparar escenarios manualmente.`,
-      primaryCtaLabel: "Ver cómo salir antes",
-      primaryHref: "/planes?plan=NORMAL&source=dashboard",
-      secondaryCtaLabel: "Abrir simulador",
-      secondaryHref: "/simulador",
-      badges,
-    };
-  }
-
-  if (data.summary.estimatedMonthlyInterest > 0) {
-    return {
-      eyebrow: "Costo mensual visible",
-      title: `Ahora mismo estás cargando ${formatCurrency(data.summary.estimatedMonthlyInterest)} al mes en intereses estimados.`,
-      description:
-        "El módulo premium no solo te muestra el problema: te dice qué deuda atacar primero, con qué presupuesto, y qué tanto recortas si sostienes el plan recomendado.",
-      primaryCtaLabel: "Desbloquear mi mejor estrategia",
-      primaryHref: "/planes?plan=NORMAL&source=dashboard",
-      secondaryCtaLabel: "Revisar deudas",
-      secondaryHref: "/deudas",
-      badges,
-    };
-  }
-
-  return {
-    eyebrow: "Desbloqueo premium",
-    title:
-      "Ya tienes suficiente información para pasar de control a estrategia.",
-    description:
-      "Premium convierte tus deudas actuales en un orden de pago optimizado, con ahorro estimado, horizonte de salida y una guía más clara para sostener el plan.",
-    primaryCtaLabel: "Desbloquear mi mejor estrategia",
-    primaryHref: "/planes?plan=NORMAL&source=dashboard",
-    secondaryCtaLabel: "Abrir simulador",
-    secondaryHref: "/simulador",
-    badges,
-  };
-}
 
 function getMomentumSummary({
   data,
@@ -521,10 +315,7 @@ export function DashboardOverview({
   const nextTimelineItem = data.upcomingTimeline.items[0] ?? null;
   const mobileRiskLabel = getMobileRiskLabel(data);
   const mobileRiskSupport = getMobileRiskSupport(data);
-  const mobileProgressLabel = getMobileProgressLabel({
-    data,
-    formatMonthsLabel,
-  });
+  const mobileProgressLabel = getMobileProgressLabel({ data });
   const mobileActionButtons = buildMobileActionButtons(paymentPriorityHref);
   const quickActions = buildDashboardQuickActions({
     data,
@@ -576,24 +367,18 @@ export function DashboardOverview({
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
-  const featuredStatCard = statCards[0];
-  const secondaryStatCards = statCards.slice(1);
+  const featuredStatCard = dashboardStatCards[0];
+  const secondaryStatCards = dashboardStatCards.slice(1);
   const secondaryLeadStatCard = secondaryStatCards[0];
   const trailingSecondaryStatCards = secondaryStatCards.slice(1);
   const FeaturedStatIcon = featuredStatCard.icon;
   const SecondaryLeadStatIcon = secondaryLeadStatCard?.icon;
-  const getStatCardValue = (card: (typeof statCards)[number]) => {
-    const rawValue =
-      card.key === "interestSavings"
-        ? (data.summary.interestSavings ?? 0)
-        : data.summary[card.key];
-
-    if (card.key === "interestSavings" && !isPremiumUnlocked) {
-      return "Premium";
-    }
-
-    return formatCurrency(rawValue);
-  };
+  const getStatCardValue = (card: (typeof dashboardStatCards)[number]) =>
+    getDashboardStatCardValue({
+      data,
+      isPremiumUnlocked,
+      key: card.key,
+    });
   const assistantCoachIcon =
     data.assistantCoach.tone === "warning" ? AlertTriangle : Sparkles;
   const assistantSecondaryAction = data.assistantCoach.secondaryAction

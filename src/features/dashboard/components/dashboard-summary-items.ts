@@ -10,18 +10,7 @@ import type { ExecutiveSummaryItem } from "@/components/shared/executive-summary
 import type { DashboardDto } from "@/lib/types/app";
 import { formatCurrency } from "@/lib/utils/currency";
 import { formatDate } from "@/lib/utils/date";
-
-function formatMonthsLabel(months: number | null) {
-  if (months === null) {
-    return "Sin salida clara";
-  }
-
-  if (months === 0) {
-    return "Sin deuda activa";
-  }
-
-  return `${months} ${months === 1 ? "mes" : "meses"}`;
-}
+import { formatMonthsLabel } from "./dashboard-formatters";
 
 export function buildDashboardSummaryItems(input: {
   data: DashboardDto;
