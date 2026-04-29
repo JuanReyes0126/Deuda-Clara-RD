@@ -8,6 +8,11 @@ vi.mock("@/server/auth/auth-service", () => ({
   requestPasswordReset: vi.fn(),
 }));
 
+vi.mock("@/lib/security/rate-limit", () => ({
+  assertRateLimit: vi.fn(),
+  buildRateLimitKey: vi.fn(() => "forgot-password-key"),
+}));
+
 describe("api/auth recovery", () => {
   afterEach(() => {
     vi.clearAllMocks();
@@ -15,7 +20,9 @@ describe("api/auth recovery", () => {
 
   it("solicita recuperación con respuesta uniforme", async () => {
     const { requestPasswordReset } = await import("@/server/auth/auth-service");
+    const { assertRateLimit } = await import("@/lib/security/rate-limit");
 
+    vi.mocked(assertRateLimit).mockResolvedValueOnce({ success: true } as never);
     vi.mocked(requestPasswordReset).mockResolvedValueOnce(undefined);
 
     const response = await forgotPasswordPost(
@@ -31,7 +38,9 @@ describe("api/auth recovery", () => {
 
   it("propaga errores de servicio de forma controlada", async () => {
     const { requestPasswordReset } = await import("@/server/auth/auth-service");
+    const { assertRateLimit } = await import("@/lib/security/rate-limit");
 
+    vi.mocked(assertRateLimit).mockResolvedValueOnce({ success: true } as never);
     vi.mocked(requestPasswordReset).mockRejectedValueOnce(
       new ServiceError(
         "RESET_BLOCKED",
