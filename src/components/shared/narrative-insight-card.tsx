@@ -55,7 +55,7 @@ export function NarrativeInsightCard({
           </div>
           <div className="mt-4 flex items-start gap-4">
             {Icon ? (
-              <span className="bg-white/85 text-primary mt-1 grid size-11 shrink-0 place-items-center rounded-2xl border border-white/80">
+              <span className="bg-white/85 text-primary mt-1 grid size-11 shrink-0 place-items-center rounded-2xl border border-border/50">
                 <Icon className="size-5" />
               </span>
             ) : null}

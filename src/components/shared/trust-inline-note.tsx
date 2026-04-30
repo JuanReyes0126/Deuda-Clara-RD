@@ -20,7 +20,7 @@ export function TrustInlineNote({
   return (
     <section
       className={cn(
-        "rounded-[1.75rem] border border-border/70 bg-white/82 px-4 py-4 sm:px-5",
+        "rounded-2xl border border-border/70 bg-white/82 px-4 py-4 sm:px-5",
         className,
       )}
     >

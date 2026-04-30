@@ -15,7 +15,7 @@ export function LegalDocumentPage({ document }: LegalDocumentPageProps) {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(148,183,172,0.2),transparent_28%),linear-gradient(180deg,#f7faf8_0%,#edf3ef_100%)]" />
       <div className="relative">
         <header className="px-4 pt-4">
-          <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 rounded-full border border-white/70 bg-white/85 px-4 py-3 shadow-soft backdrop-blur sm:px-5">
+          <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 rounded-full border border-border/50 bg-white/85 px-4 py-3 shadow-soft backdrop-blur sm:px-5">
             <Link href="/" className="flex items-center gap-3">
               <BrandBadge className="size-12 rounded-2xl" markClassName="size-[90%]" />
               <div className="min-w-0">

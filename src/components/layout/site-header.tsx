@@ -17,7 +17,7 @@ const navItems: ReadonlyArray<{ href: Route | `#${string}`; label: string }> = [
 export function SiteHeader() {
   return (
     <header className="sticky top-4 z-30 w-full">
-      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 rounded-full border border-white/70 bg-white/85 px-4 py-3 shadow-soft backdrop-blur sm:gap-6 sm:px-5">
+      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 rounded-full border border-border/50 bg-white/85 px-4 py-3 shadow-soft backdrop-blur sm:gap-6 sm:px-5">
         <Link href="/" className="flex items-center gap-3">
           <BrandBadge className="size-12 rounded-2xl" markClassName="size-[90%]" />
           <div className="min-w-0">

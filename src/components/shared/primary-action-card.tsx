@@ -52,7 +52,7 @@ export function PrimaryActionCard({
   return (
     <section
       className={cn(
-        "rounded-[2rem] border p-4 sm:p-6",
+        "rounded-2xl border p-4 sm:p-6",
         toneClassName[tone],
         className,
       )}
@@ -67,7 +67,7 @@ export function PrimaryActionCard({
           </div>
           <div className="mt-4 flex items-start gap-4">
             {Icon ? (
-              <span className="bg-white/85 text-primary mt-1 grid size-11 shrink-0 place-items-center rounded-2xl border border-white/80">
+              <span className="bg-white/85 text-primary mt-1 grid size-11 shrink-0 place-items-center rounded-2xl border border-border/50">
                 <Icon className="size-5" />
               </span>
             ) : null}
@@ -107,7 +107,7 @@ export function PrimaryActionCard({
           {notes.map((note) => (
             <div
               key={note}
-              className="rounded-3xl border border-white/70 bg-white/86 px-4 py-3 text-sm leading-6 text-foreground"
+              className="rounded-xl border border-border/50 bg-white/86 px-4 py-3 text-sm leading-6 text-foreground"
             >
               {note}
             </div>
