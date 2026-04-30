@@ -526,19 +526,19 @@ export default function HomePage() {
             </div>
 
             <div className="grid gap-4">
-              <div className="rounded-3xl border border-border bg-secondary/70 p-5">
+              <div className="rounded-2xl border border-border bg-secondary/70 p-5">
                 <p className="text-sm font-semibold text-foreground">Acceso seguro</p>
                 <p className="mt-2 text-sm leading-7 text-muted">
                   Protegemos el inicio de sesión y las acciones sensibles.
                 </p>
               </div>
-              <div className="rounded-3xl border border-border bg-secondary/70 p-5">
+              <div className="rounded-2xl border border-border bg-secondary/70 p-5">
                 <p className="text-sm font-semibold text-foreground">Protección de datos</p>
                 <p className="mt-2 text-sm leading-7 text-muted">
                   Tú decides qué información registrar dentro de la app.
                 </p>
               </div>
-              <div className="rounded-3xl border border-border bg-secondary/70 p-5">
+              <div className="rounded-2xl border border-border bg-secondary/70 p-5">
                 <p className="text-sm font-semibold text-foreground">Buenas prácticas de seguridad</p>
                 <p className="mt-2 text-sm leading-7 text-muted">
                   Aplicamos controles razonables para proteger tu cuenta y tus datos.

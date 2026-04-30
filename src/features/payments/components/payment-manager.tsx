@@ -62,6 +62,73 @@ function optionalNotesValue(value: string) {
   return sanitized.length ? sanitized : undefined;
 }
 
+type DebtCurrency = DebtItemDto["currency"];
+
+function buildDebtCurrencyMap(debts: DebtItemDto[]) {
+  const map = new Map<string, DebtCurrency>();
+  for (const debt of debts) {
+    map.set(debt.id, debt.currency);
+  }
+  return map;
+}
+
+type PaymentAggregateTotals = {
+  count: number;
+  totalPaid: number;
+  principalPaid: number;
+  interestPaid: number;
+  chargesPaid: number;
+};
+
+function emptyPaymentAggregate(): PaymentAggregateTotals {
+  return {
+    count: 0,
+    totalPaid: 0,
+    principalPaid: 0,
+    interestPaid: 0,
+    chargesPaid: 0,
+  };
+}
+
+function buildPaymentTotalsByCurrency(
+  payments: PaymentItemDto[],
+  debtCurrencyById: Map<string, DebtCurrency>,
+): Record<DebtCurrency, PaymentAggregateTotals> {
+  const acc: Record<DebtCurrency, PaymentAggregateTotals> = {
+    DOP: emptyPaymentAggregate(),
+    USD: emptyPaymentAggregate(),
+  };
+
+  for (const payment of payments) {
+    const currency = debtCurrencyById.get(payment.debtId) ?? "DOP";
+    const bucket = acc[currency];
+    bucket.count += 1;
+    bucket.totalPaid += payment.amount;
+    bucket.principalPaid += payment.principalAmount ?? 0;
+    bucket.interestPaid += payment.interestAmount ?? 0;
+    bucket.chargesPaid +=
+      (payment.lateFeeAmount ?? 0) + (payment.extraChargesAmount ?? 0);
+  }
+
+  return acc;
+}
+
+/** When both currencies have activity, show both; otherwise a single formatted amount. */
+function formatDualCurrencyAmounts(dopAmount: number, usdAmount: number) {
+  const hasDop = dopAmount !== 0;
+  const hasUsd = usdAmount !== 0;
+
+  if (hasDop && hasUsd) {
+    return `${formatCurrency(dopAmount, "DOP")} · ${formatCurrency(usdAmount, "USD")}`;
+  }
+
+  if (hasUsd) {
+    return formatCurrency(usdAmount, "USD");
+  }
+
+  return formatCurrency(dopAmount, "DOP");
+}
+
 const debtIdValidation = {
   validate: (value: string) =>
     sanitizeText(value).length >= 1 || "Este campo es obligatorio.",
@@ -214,6 +281,7 @@ export function PaymentManager({
     () => debts.filter((debt) => debt.status !== "ARCHIVED"),
     [debts],
   );
+  const debtCurrencyById = useMemo(() => buildDebtCurrencyMap(debts), [debts]);
   const isOnboardingFlow = entryFlow === "onboarding";
   const form = useForm<PaymentFormValues>({
     defaultValues: emptyPaymentValues(
@@ -242,6 +310,7 @@ export function PaymentManager({
     () => debtOptions.find((debt) => debt.id === watchedDebtId) ?? null,
     [debtOptions, watchedDebtId],
   );
+  const selectedCurrency = selectedDebt?.currency ?? "DOP";
   const filteredPayments = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
 
@@ -401,16 +470,32 @@ export function PaymentManager({
     }),
     [payments],
   );
-  const combinedInterestAndCharges = paymentTotals.interestPaid + paymentTotals.chargesPaid;
-  const recentPaymentTotal = useMemo(() => {
+  const paymentTotalsByCurrency = useMemo(
+    () => buildPaymentTotalsByCurrency(payments, debtCurrencyById),
+    [payments, debtCurrencyById],
+  );
+  const recentPaymentsDisplay = useMemo(() => {
     const lastThirtyDays = new Date();
     lastThirtyDays.setDate(lastThirtyDays.getDate() - 30);
 
-    return payments.reduce((sum, payment) => {
-      const paidAt = new Date(payment.paidAt);
-      return paidAt >= lastThirtyDays ? sum + payment.amount : sum;
-    }, 0);
-  }, [payments]);
+    let dop = 0;
+    let usd = 0;
+
+    for (const payment of payments) {
+      if (new Date(payment.paidAt) < lastThirtyDays) {
+        continue;
+      }
+
+      const currency = debtCurrencyById.get(payment.debtId) ?? "DOP";
+      if (currency === "USD") {
+        usd += payment.amount;
+      } else {
+        dop += payment.amount;
+      }
+    }
+
+    return formatDualCurrencyAmounts(dop, usd);
+  }, [payments, debtCurrencyById]);
   const latestPayment = payments[0] ?? null;
   const nextAttentionDebt = useMemo(() => {
     if (!debtOptions.length) {
@@ -430,8 +515,6 @@ export function PaymentManager({
       return leftDueTime - rightDueTime;
     })[0] ?? null;
   }, [debtOptions]);
-  const paymentComplianceRatio =
-    paymentTotals.totalPaid > 0 ? paymentTotals.principalPaid / paymentTotals.totalPaid : 0;
   const inferredPrincipalAmount =
     watchedPrincipal > 0
       ? watchedPrincipal
@@ -443,7 +526,10 @@ export function PaymentManager({
   const paymentSummaryItems = [
     {
       label: "Pagado total",
-      value: formatCurrency(paymentTotals.totalPaid),
+      value: formatDualCurrencyAmounts(
+        paymentTotalsByCurrency.DOP.totalPaid,
+        paymentTotalsByCurrency.USD.totalPaid,
+      ),
       support: payments.length
         ? "Lo que ya registraste entre capital, intereses y cargos."
         : "Tu historial empezará a respirar apenas captures el primer pago.",
@@ -453,12 +539,20 @@ export function PaymentManager({
     },
     {
       label: "A principal",
-      value: formatCurrency(paymentTotals.principalPaid),
+      value: formatDualCurrencyAmounts(
+        paymentTotalsByCurrency.DOP.principalPaid,
+        paymentTotalsByCurrency.USD.principalPaid,
+      ),
       support: "Lo que de verdad bajó capital hasta ahora.",
     },
     {
       label: "Intereses y cargos",
-      value: formatCurrency(combinedInterestAndCharges),
+      value: formatDualCurrencyAmounts(
+        paymentTotalsByCurrency.DOP.interestPaid +
+          paymentTotalsByCurrency.DOP.chargesPaid,
+        paymentTotalsByCurrency.USD.interestPaid +
+          paymentTotalsByCurrency.USD.chargesPaid,
+      ),
       support: "Lo que el flujo ha absorbido en costo financiero.",
     },
     {
@@ -489,7 +583,7 @@ export function PaymentManager({
         ? "Ajusta principal, interés o cargos para que el reparto coincida con el pago registrado."
         : inferredPrincipalAmount <= watchedAmount * 0.35
           ? "Conviene revisar la estrategia si este patrón se repite, porque el dinero todavía rinde poco contra el saldo."
-          : `Si lo guardas así, el saldo visible bajaría a ${formatCurrency(estimatedRemainingBalance ?? 0)}.`;
+          : `Si lo guardas así, el saldo visible bajaría a ${formatCurrency(estimatedRemainingBalance ?? 0, selectedDebt.currency)}.`;
 
   return (
     <div className="flex flex-col gap-5 sm:gap-6">
@@ -543,13 +637,13 @@ export function PaymentManager({
 
       <section className="-mx-1 grid gap-3 lg:hidden">
         <div className="rounded-[1.5rem] border border-border bg-white/92 p-4 shadow-soft">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="rounded-[1.2rem] border border-border/70 bg-secondary/45 p-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
                 Pagado reciente
               </p>
               <p className="value-stable mt-1 text-lg font-semibold text-foreground">
-                {formatCurrency(recentPaymentTotal)}
+                {recentPaymentsDisplay}
               </p>
               <p className="mt-1 text-sm text-muted">Últimos 30 días</p>
             </div>
@@ -568,24 +662,6 @@ export function PaymentManager({
                     : "Necesitas una deuda activa"}
               </p>
             </div>
-            <div className="rounded-[1.2rem] border border-border/70 bg-secondary/45 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
-                Señal de avance
-              </p>
-              <p className="mt-1 text-sm font-semibold leading-5 text-foreground">
-                {paymentTotals.totalPaid === 0
-                  ? "Sin pagos"
-                  : paymentComplianceRatio >= 0.55
-                    ? "Buen ritmo"
-                    : "Revisar reparto"}
-              </p>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
-                <div
-                  className="h-full rounded-full bg-primary transition-[width] duration-300"
-                  style={{ width: `${Math.max(8, Math.min(100, paymentComplianceRatio * 100))}%` }}
-                />
-              </div>
-            </div>
           </div>
         </div>
 
@@ -601,7 +677,7 @@ export function PaymentManager({
               </p>
               <p className="mt-1 text-sm text-muted">
                 {selectedDebt
-                  ? `Saldo actual ${formatCurrency(selectedDebt.effectiveBalance)}`
+                  ? `Saldo actual ${formatCurrency(selectedDebt.effectiveBalance, selectedDebt.currency)}`
                   : debtOptions.length
                     ? "Una captura rápida mantiene el historial al día."
                     : "Sin deudas activas no puedes registrar pagos."}
@@ -661,8 +737,8 @@ export function PaymentManager({
           notes={
             selectedDebt
               ? [
-                  `Saldo actual: ${formatCurrency(selectedDebt.effectiveBalance)}.`,
-                  `${selectedDebt.paymentAmountType === "VARIABLE" ? "Pago referencia" : "Pago mínimo"}: ${formatCurrency(selectedDebt.minimumPayment)}.`,
+                  `Saldo actual: ${formatCurrency(selectedDebt.effectiveBalance, selectedDebt.currency)}.`,
+                  `${selectedDebt.paymentAmountType === "VARIABLE" ? "Pago referencia" : "Pago mínimo"}: ${formatCurrency(selectedDebt.minimumPayment, selectedDebt.currency)}.`,
                 ]
               : [
                   "La app estima el reparto si no conoces todo el desglose.",
@@ -708,7 +784,7 @@ export function PaymentManager({
             {selectedDebt ? (
               <div className="border-primary/15 mb-5 rounded-[1.75rem] border bg-[linear-gradient(135deg,rgba(13,148,136,0.12),rgba(14,116,144,0.04))] p-3.5 sm:mb-6 sm:rounded-[2rem] sm:p-6">
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-                  <div className="rounded-[1.35rem] border border-white/70 bg-white/88 p-4 lg:hidden">
+                  <div className="rounded-[1.35rem] border border-border/50 bg-white/88 p-4 lg:hidden">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/80">
                       Deuda elegida
                     </p>
@@ -753,7 +829,7 @@ export function PaymentManager({
                   </div>
 
                   <div className="hidden lg:block">
-                    <div className="rounded-[1.55rem] border border-white/70 bg-white/88 p-4 sm:rounded-[1.85rem] sm:p-6">
+                    <div className="rounded-[1.55rem] border border-border/50 bg-white/88 p-4 sm:rounded-[1.85rem] sm:p-6">
                       <p className="text-primary/80 text-xs font-semibold tracking-[0.22em] uppercase">
                         Contexto de la deuda
                       </p>
@@ -770,7 +846,7 @@ export function PaymentManager({
                   </div>
 
                   <div className="hidden lg:block">
-                    <div className="rounded-[1.55rem] border border-white/70 bg-white/82 p-4 sm:rounded-[1.85rem] sm:p-6">
+                    <div className="rounded-[1.55rem] border border-border/50 bg-white/82 p-4 sm:rounded-[1.85rem] sm:p-6">
                       <p className="text-muted text-[11px] font-semibold tracking-[0.22em] uppercase">
                         Acciones rápidas
                       </p>
@@ -820,7 +896,10 @@ export function PaymentManager({
                   items={[
                     {
                       label: "Saldo actual",
-                      value: formatCurrency(selectedDebt.effectiveBalance),
+                      value: formatCurrency(
+                        selectedDebt.effectiveBalance,
+                        selectedDebt.currency,
+                      ),
                       support: "Incluye mora y cargos acumulados.",
                     },
                     {
@@ -828,7 +907,10 @@ export function PaymentManager({
                         selectedDebt.paymentAmountType === "VARIABLE"
                           ? "Pago referencia"
                           : "Pago mínimo",
-                      value: formatCurrency(selectedDebt.minimumPayment),
+                      value: formatCurrency(
+                        selectedDebt.minimumPayment,
+                        selectedDebt.currency,
+                      ),
                       support:
                         selectedDebt.paymentAmountType === "VARIABLE"
                           ? "La referencia más reciente que hoy conviene cubrir."
@@ -845,7 +927,10 @@ export function PaymentManager({
                     {
                       label: "Último pago",
                       value: selectedDebt.lastPaymentAmount
-                        ? formatCurrency(selectedDebt.lastPaymentAmount)
+                        ? formatCurrency(
+                            selectedDebt.lastPaymentAmount,
+                            selectedDebt.currency,
+                          )
                         : "Sin registro",
                       support: selectedDebt.lastPaymentAt
                         ? formatDate(selectedDebt.lastPaymentAt)
@@ -869,7 +954,8 @@ export function PaymentManager({
                   <option value="">Selecciona una deuda</option>
                   {debtOptions.map((debt) => (
                     <option key={debt.id} value={debt.id}>
-                      {debt.name} - {formatCurrency(debt.effectiveBalance)}
+                      {debt.name} -{" "}
+                      {formatCurrency(debt.effectiveBalance, debt.currency)}
                     </option>
                   ))}
                 </select>
@@ -908,7 +994,7 @@ export function PaymentManager({
                   Úsalo solo si quieres separar principal, interés o cargos.
                 </p>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <div className="rounded-[1.55rem] border border-white/70 bg-white/88 p-4 sm:rounded-[1.85rem] sm:p-6">
+                  <div className="rounded-[1.55rem] border border-border/50 bg-white/88 p-4 sm:rounded-[1.85rem] sm:p-6">
                     <Label htmlFor="principalAmount">Principal</Label>
                     <Input
                       id="principalAmount"
@@ -919,7 +1005,7 @@ export function PaymentManager({
                       {...form.register("principalAmount", optionalPaymentAmountValidation)}
                     />
                   </div>
-                  <div className="rounded-[1.55rem] border border-white/70 bg-white/82 p-4 sm:rounded-[1.85rem] sm:p-6">
+                  <div className="rounded-[1.55rem] border border-border/50 bg-white/82 p-4 sm:rounded-[1.85rem] sm:p-6">
                     <Label htmlFor="interestAmount">Interés</Label>
                     <Input
                       id="interestAmount"
@@ -930,7 +1016,7 @@ export function PaymentManager({
                       {...form.register("interestAmount", optionalPaymentAmountValidation)}
                     />
                   </div>
-                  <div className="rounded-[1.55rem] border border-white/70 bg-white/82 p-4 sm:rounded-[1.85rem] sm:p-6">
+                  <div className="rounded-[1.55rem] border border-border/50 bg-white/82 p-4 sm:rounded-[1.85rem] sm:p-6">
                     <Label htmlFor="lateFeeAmount">Mora cubierta</Label>
                     <Input
                       id="lateFeeAmount"
@@ -941,7 +1027,7 @@ export function PaymentManager({
                       {...form.register("lateFeeAmount", optionalPaymentAmountValidation)}
                     />
                   </div>
-                  <div className="rounded-[1.55rem] border border-white/70 bg-white/82 p-4 sm:rounded-[1.85rem] sm:p-6">
+                  <div className="rounded-[1.55rem] border border-border/50 bg-white/82 p-4 sm:rounded-[1.85rem] sm:p-6">
                     <Label htmlFor="extraChargesAmount">
                       Cargos extras cubiertos
                     </Label>
@@ -1015,7 +1101,7 @@ export function PaymentManager({
                     Cambio estimado
                   </Badge>
                   <span className="value-stable text-sm font-semibold text-foreground">
-                    {formatCurrency(watchedAmount)}
+                    {formatCurrency(watchedAmount, selectedCurrency)}
                   </span>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3">
@@ -1024,7 +1110,7 @@ export function PaymentManager({
                       A principal
                     </p>
                     <p className="value-stable mt-1 text-sm font-semibold text-foreground">
-                      {formatCurrency(inferredPrincipalAmount)}
+                      {formatCurrency(inferredPrincipalAmount, selectedCurrency)}
                     </p>
                   </div>
                   <div className="rounded-[1.15rem] bg-white/88 p-3">
@@ -1032,7 +1118,7 @@ export function PaymentManager({
                       Saldo luego
                     </p>
                     <p className="value-stable mt-1 text-sm font-semibold text-foreground">
-                      {formatCurrency(estimatedRemainingBalance ?? 0)}
+                      {formatCurrency(estimatedRemainingBalance ?? 0, selectedCurrency)}
                     </p>
                   </div>
                 </div>
@@ -1052,7 +1138,7 @@ export function PaymentManager({
                     Qué cambia con este pago
                   </Badge>
                   <Badge variant="default" className="value-stable max-w-full text-center">
-                    {formatCurrency(watchedAmount)}
+                    {formatCurrency(watchedAmount, selectedCurrency)}
                   </Badge>
                 </div>
                 <p className="text-foreground mt-4 text-lg font-semibold leading-tight">
@@ -1064,27 +1150,27 @@ export function PaymentManager({
                   items={[
                     {
                       label: "A principal",
-                      value: formatCurrency(inferredPrincipalAmount),
+                      value: formatCurrency(inferredPrincipalAmount, selectedCurrency),
                       support: "Lo que hoy empuja capital visible.",
                     },
                     {
                       label: "Interés",
-                      value: formatCurrency(watchedInterest),
+                      value: formatCurrency(watchedInterest, selectedCurrency),
                       support: "Costo financiero cubierto en esta captura.",
                     },
                     {
                       label: "Cargos",
-                      value: formatCurrency(watchedLateFee + watchedExtraCharges),
+                      value: formatCurrency(watchedLateFee + watchedExtraCharges, selectedCurrency),
                       support: "Mora y extras absorbidos.",
                     },
                     {
                       label: "Saldo luego del pago",
-                      value: formatCurrency(estimatedRemainingBalance ?? 0),
+                      value: formatCurrency(estimatedRemainingBalance ?? 0, selectedCurrency),
                       support:
                         pendingSplitAmount > 0
-                          ? `Aún faltan ${formatCurrency(pendingSplitAmount)} por asignar dentro del pago.`
+                          ? `Aún faltan ${formatCurrency(pendingSplitAmount, selectedCurrency)} por asignar dentro del pago.`
                           : pendingSplitAmount < 0
-                            ? `El desglose supera el pago por ${formatCurrency(Math.abs(pendingSplitAmount))}.`
+                            ? `El desglose supera el pago por ${formatCurrency(Math.abs(pendingSplitAmount), selectedCurrency)}.`
                             : "El desglose coincide con el pago registrado.",
                     },
                   ]}
@@ -1144,7 +1230,10 @@ export function PaymentManager({
             </div>
 
             {filteredPayments.length ? (
-              filteredPayments.map((payment) => (
+              filteredPayments.map((payment) => {
+                const paymentCurrency = debtCurrencyById.get(payment.debtId) ?? "DOP";
+
+                return (
                 <div key={payment.id}>
                   <div className="border-border bg-secondary/45 min-w-0 rounded-[1.65rem] border p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] lg:hidden">
                     <div className="flex items-start justify-between gap-3">
@@ -1162,15 +1251,15 @@ export function PaymentManager({
                     </div>
 
                     <div className="mt-4 grid grid-cols-2 gap-3">
-                      <div className="rounded-[1.15rem] border border-white/70 bg-white/88 p-3">
+                      <div className="rounded-[1.15rem] border border-border/50 bg-white/88 p-3">
                         <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
                           Monto
                         </p>
                         <p className="value-stable mt-1 text-base font-semibold text-foreground">
-                          {formatCurrency(payment.amount)}
+                          {formatCurrency(payment.amount, paymentCurrency)}
                         </p>
                       </div>
-                      <div className="rounded-[1.15rem] border border-white/70 bg-white/88 p-3">
+                      <div className="rounded-[1.15rem] border border-border/50 bg-white/88 p-3">
                         <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
                           Estado
                         </p>
@@ -1188,7 +1277,7 @@ export function PaymentManager({
                               Principal
                             </p>
                             <p className="value-stable mt-1 text-sm font-semibold text-foreground">
-                              {formatCurrency(payment.principalAmount ?? 0)}
+                              {formatCurrency(payment.principalAmount ?? 0, paymentCurrency)}
                             </p>
                           </div>
                           <div>
@@ -1196,7 +1285,7 @@ export function PaymentManager({
                               Saldo luego
                             </p>
                             <p className="value-stable mt-1 text-sm font-semibold text-foreground">
-                              {formatCurrency(payment.remainingBalanceAfter ?? 0)}
+                              {formatCurrency(payment.remainingBalanceAfter ?? 0, paymentCurrency)}
                             </p>
                           </div>
                         </div>
@@ -1250,7 +1339,7 @@ export function PaymentManager({
                     </div>
                   </div>
 
-                  <div className="hidden border-border bg-secondary/70 min-w-0 rounded-[1.65rem] border p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:rounded-3xl sm:p-5 lg:block">
+                  <div className="hidden border-border bg-secondary/70 min-w-0 rounded-[1.65rem] border p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:rounded-2xl sm:p-5 lg:block">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0">
                         <div className="flex min-w-0 flex-wrap items-center gap-3">
@@ -1261,7 +1350,9 @@ export function PaymentManager({
                             variant="success"
                             className="max-w-full text-center"
                           >
-                            {payment.source}
+                            {getPaymentSourceLabel(
+                              payment.source as PaymentFormValues["source"],
+                            )}
                           </Badge>
                         </div>
                         <p className="date-stable text-muted mt-2 text-sm">
@@ -1300,7 +1391,7 @@ export function PaymentManager({
                           Monto
                         </p>
                         <p className="value-stable text-foreground mt-1 font-semibold">
-                          {formatCurrency(payment.amount)}
+                          {formatCurrency(payment.amount, paymentCurrency)}
                         </p>
                       </div>
                       <div className="min-w-0">
@@ -1308,7 +1399,7 @@ export function PaymentManager({
                           Principal
                         </p>
                         <p className="value-stable text-foreground mt-1 font-semibold">
-                          {formatCurrency(payment.principalAmount ?? 0)}
+                          {formatCurrency(payment.principalAmount ?? 0, paymentCurrency)}
                         </p>
                       </div>
                       <div className="min-w-0">
@@ -1316,7 +1407,7 @@ export function PaymentManager({
                           Interés
                         </p>
                         <p className="value-stable text-foreground mt-1 font-semibold">
-                          {formatCurrency(payment.interestAmount ?? 0)}
+                          {formatCurrency(payment.interestAmount ?? 0, paymentCurrency)}
                         </p>
                       </div>
                       <div className="min-w-0">
@@ -1324,21 +1415,22 @@ export function PaymentManager({
                           Saldo luego del pago
                         </p>
                         <p className="value-stable text-foreground mt-1 font-semibold">
-                          {formatCurrency(payment.remainingBalanceAfter ?? 0)}
+                          {formatCurrency(payment.remainingBalanceAfter ?? 0, paymentCurrency)}
                         </p>
                       </div>
                     </div>
 
                     {payment.notes ? (
-                      <p className="text-muted mt-4 rounded-[1.25rem] border border-white/70 bg-white/70 px-4 py-3 break-words text-sm leading-7 transition-colors duration-200 ease-out">
+                      <p className="text-muted mt-4 rounded-[1.25rem] border border-border/50 bg-white/70 px-4 py-3 break-words text-sm leading-7 transition-colors duration-200 ease-out">
                         {payment.notes}
                       </p>
                     ) : null}
                   </div>
                 </div>
-              ))
+              );
+              })
             ) : payments.length ? (
-              <div className="border-border rounded-3xl border border-dashed p-8 text-center">
+              <div className="border-border rounded-2xl border border-dashed p-8 text-center">
                 <p className="text-foreground text-base font-semibold">
                   No hay pagos que coincidan con ese filtro.
                 </p>
@@ -1364,7 +1456,7 @@ export function PaymentManager({
                 </div>
               </div>
             ) : (
-              <div className="border-border rounded-3xl border border-dashed p-8 text-center">
+              <div className="border-border rounded-2xl border border-dashed p-8 text-center">
                 <p className="text-base font-semibold text-foreground">
                   Aún no hay pagos registrados.
                 </p>

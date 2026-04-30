@@ -75,6 +75,7 @@ export function PaydownChallengeCard({ data }: PaydownChallengeCardProps) {
     challenge.state,
     challenge.startedAt,
     challenge.endsAt,
+    data,
     data.summary.monthlyDebtCapacity,
     data.summary.currentMonthlyBudget,
   ]);
@@ -139,8 +140,8 @@ export function PaydownChallengeCard({ data }: PaydownChallengeCardProps) {
   };
 
   return (
-    <Card className="border-border/80 bg-white/92 shadow-soft">
-      <CardHeader className="gap-3 pb-2 sm:flex-row sm:items-start sm:justify-between">
+    <Card className="bg-white/92 shadow-soft">
+      <CardHeader className="gap-3 pb-2 pr-1 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
           <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-orange-500/12 text-orange-700">
             <Flame className="size-5" />
@@ -228,6 +229,7 @@ export function PaydownChallengeCard({ data }: PaydownChallengeCardProps) {
               value={extraInput}
               onChange={(event) => setExtraInput(event.target.value)}
               placeholder="Ej. 750"
+              className="rounded-xl border-border/55 shadow-[0_6px_16px_rgba(24,49,59,0.04)] focus:shadow-[0_10px_22px_-18px_rgba(23,56,74,0.35)]"
             />
             <p className="text-xs text-muted">
               Sugerido según tu capacidad hoy:{" "}
@@ -268,7 +270,7 @@ export function PaydownChallengeCard({ data }: PaydownChallengeCardProps) {
               <Button
                 size="lg"
                 variant="ghost"
-                className="w-full border border-border/80 sm:w-auto"
+                className="w-full border border-border/55 sm:w-auto"
                 disabled={isSubmitting}
                 onClick={() => {
                   if (
@@ -290,7 +292,7 @@ export function PaydownChallengeCard({ data }: PaydownChallengeCardProps) {
             <Button
               size="lg"
               variant="ghost"
-              className="w-full border border-border/80 sm:w-auto"
+              className="w-full border border-border/55 sm:w-auto"
               disabled={isSubmitting}
               onClick={() => void clearChallenge()}
             >
