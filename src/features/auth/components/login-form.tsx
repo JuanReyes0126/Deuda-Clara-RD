@@ -193,7 +193,7 @@ export function LoginForm({
           ].map((item) => (
             <div
               key={item}
-              className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm leading-7 text-muted"
+              className="rounded-2xl border border-border/50 bg-white/80 px-4 py-3 text-sm leading-7 text-muted"
             >
               {item}
             </div>

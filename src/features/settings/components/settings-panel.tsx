@@ -644,7 +644,7 @@ export function SettingsPanel({ user, securityNotice = null }: SettingsPanelProp
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 pt-4">
-          <div className="rounded-[1.5rem] border border-primary/12 bg-[linear-gradient(135deg,rgba(15,118,110,0.08),rgba(240,138,93,0.08))] p-5">
+          <div className="rounded-2xl border border-primary/12 bg-[linear-gradient(135deg,rgba(15,118,110,0.08),rgba(240,138,93,0.08))] p-5">
             <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">
               Estado MFA
             </p>
@@ -941,7 +941,7 @@ export function SettingsPanel({ user, securityNotice = null }: SettingsPanelProp
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 pt-4">
-          <div className="rounded-[1.5rem] border border-primary/12 bg-[linear-gradient(135deg,rgba(15,118,110,0.08),rgba(240,138,93,0.08))] p-5">
+          <div className="rounded-2xl border border-primary/12 bg-[linear-gradient(135deg,rgba(15,118,110,0.08),rgba(240,138,93,0.08))] p-5">
             <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">
               Estado passkeys
             </p>
@@ -1010,7 +1010,7 @@ export function SettingsPanel({ user, securityNotice = null }: SettingsPanelProp
               {passkeys.map((passkey, index) => (
                 <div
                   key={passkey.id}
-                  className="flex flex-col gap-4 rounded-[1.5rem] border border-border bg-white/88 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-4 rounded-2xl border border-border bg-white/88 p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="space-y-1">
                     <p className="text-sm font-semibold text-foreground">
@@ -1061,7 +1061,7 @@ export function SettingsPanel({ user, securityNotice = null }: SettingsPanelProp
               ))}
             </div>
           ) : (
-            <div className="rounded-[1.5rem] border border-dashed border-border bg-white/72 px-4 py-5 text-sm leading-7 text-muted">
+            <div className="rounded-2xl border border-dashed border-border bg-white/72 px-4 py-5 text-sm leading-7 text-muted">
               Cuando registres una passkey, aquí verás cada dispositivo autorizado para entrar a tu cuenta.
             </div>
           )}
@@ -1155,17 +1155,17 @@ export function SettingsPanel({ user, securityNotice = null }: SettingsPanelProp
               </div>
 
               <div className="mt-4 grid gap-3 md:grid-cols-3">
-                <div className="rounded-3xl border border-white/70 bg-white/80 p-4">
+                <div className="rounded-2xl border border-border/50 bg-white/80 p-4">
                   <p className="text-xs uppercase tracking-[0.16em] text-muted">Canal</p>
                   <p className="mt-2 text-lg font-semibold text-foreground">{reminderChannelLabel}</p>
                 </div>
-                <div className="rounded-3xl border border-white/70 bg-white/80 p-4">
+                <div className="rounded-2xl border border-border/50 bg-white/80 p-4">
                   <p className="text-xs uppercase tracking-[0.16em] text-muted">Avisos por correo</p>
                   <p className="mt-2 text-lg font-semibold text-foreground">
                     {reminderDayLabels.length ? reminderDayLabels.join(", ") : "Sin aviso"}
                   </p>
                 </div>
-                <div className="rounded-3xl border border-white/70 bg-white/80 p-4">
+                <div className="rounded-2xl border border-border/50 bg-white/80 p-4">
                   <p className="text-xs uppercase tracking-[0.16em] text-muted">Hora preferida</p>
                   <p className="mt-2 text-lg font-semibold text-foreground">
                     {reminderHourLabel}
@@ -1182,7 +1182,7 @@ export function SettingsPanel({ user, securityNotice = null }: SettingsPanelProp
                 Registra cuánto ganas y cuánto se te va en gastos base. Así el presupuesto de deudas y el simulador parten de una realidad más clara.
               </p>
               <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-[1.5rem] border border-white/70 bg-white/85 p-4">
+                <div className="rounded-2xl border border-border/50 bg-white/85 p-4">
                   <p className="text-xs uppercase tracking-[0.16em] text-muted">Ingreso mensual</p>
                   <p className="mt-2 text-lg font-semibold text-foreground">
                     {formatCurrency(
@@ -1191,7 +1191,7 @@ export function SettingsPanel({ user, securityNotice = null }: SettingsPanelProp
                     )}
                   </p>
                 </div>
-                <div className="rounded-[1.5rem] border border-white/70 bg-white/85 p-4">
+                <div className="rounded-2xl border border-border/50 bg-white/85 p-4">
                   <p className="text-xs uppercase tracking-[0.16em] text-muted">Gastos base</p>
                   <p className="mt-2 text-lg font-semibold text-foreground">
                     {formatCurrency(
@@ -1200,7 +1200,7 @@ export function SettingsPanel({ user, securityNotice = null }: SettingsPanelProp
                     )}
                   </p>
                 </div>
-                <div className="rounded-[1.5rem] border border-white/70 bg-white/85 p-4">
+                <div className="rounded-2xl border border-border/50 bg-white/85 p-4">
                   <p className="text-xs uppercase tracking-[0.16em] text-muted">Capacidad de deudas</p>
                   <p className="mt-2 text-lg font-semibold text-foreground">
                     {formatCurrency(
@@ -1209,7 +1209,7 @@ export function SettingsPanel({ user, securityNotice = null }: SettingsPanelProp
                     )}
                   </p>
                 </div>
-                <div className="rounded-[1.5rem] border border-white/70 bg-white/85 p-4">
+                <div className="rounded-2xl border border-border/50 bg-white/85 p-4">
                   <p className="text-xs uppercase tracking-[0.16em] text-muted">Presupuesto actual</p>
                   <p className="mt-2 text-lg font-semibold text-foreground">
                     {formatCurrency(

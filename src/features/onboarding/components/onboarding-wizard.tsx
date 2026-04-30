@@ -417,7 +417,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-[1.5rem] border border-border bg-secondary/20 p-4">
+                  <div className="rounded-2xl border border-border bg-secondary/20 p-4">
                     <p className="text-xs uppercase tracking-[0.16em] text-muted">
                       Gastos base estimados
                     </p>
@@ -427,7 +427,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                         : "Pendiente"}
                     </p>
                   </div>
-                  <div className="rounded-[1.5rem] border border-primary/12 bg-[rgba(240,248,245,0.88)] p-4">
+                  <div className="rounded-2xl border border-primary/12 bg-[rgba(240,248,245,0.88)] p-4">
                     <p className="text-xs uppercase tracking-[0.16em] text-primary">
                       Capacidad estimada para deudas
                     </p>
@@ -496,7 +496,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                   return (
                     <div
                       key={field.id}
-                      className="rounded-[1.5rem] border border-border bg-secondary/30 p-5"
+                      className="rounded-2xl border border-border bg-secondary/30 p-5"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -652,12 +652,12 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                 })}
 
                 {debtsFieldArray.fields.length === 0 ? (
-                  <div className="rounded-[1.5rem] border border-dashed border-border bg-secondary/20 p-5 text-sm leading-7 text-muted">
+                  <div className="rounded-2xl border border-dashed border-border bg-secondary/20 p-5 text-sm leading-7 text-muted">
                     Agrega al menos una deuda para poder estimar tu fecha de salida.
                   </div>
                 ) : null}
 
-                <div className="rounded-[1.5rem] border border-border bg-secondary/20 p-4 text-sm leading-7 text-muted">
+                <div className="rounded-2xl border border-border bg-secondary/20 p-4 text-sm leading-7 text-muted">
                   Después podrás agregar fecha de corte y fecha de pago para activar <span className="font-semibold text-foreground">Siempre a tiempo</span> sin fricción.
                 </div>
               </div>
@@ -683,7 +683,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                   Puedes aceptar la capacidad estimada o ajustarla si quieres ser más conservador.
                 </p>
                 {cashflow.monthlyDebtCapacity !== null ? (
-                  <div className="rounded-[1.5rem] border border-primary/12 bg-[rgba(240,248,245,0.88)] p-4">
+                  <div className="rounded-2xl border border-primary/12 bg-[rgba(240,248,245,0.88)] p-4">
                     <p className="text-sm font-medium text-foreground">
                       Según tu flujo base, te quedan {formatCurrency(cashflow.monthlyDebtCapacity)} al mes para deudas.
                     </p>
@@ -712,7 +712,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                     </Button>
                   </div>
                 ) : null}
-                <div className="rounded-[1.5rem] border border-primary/12 bg-[rgba(240,248,245,0.88)] p-4">
+                <div className="rounded-2xl border border-primary/12 bg-[rgba(240,248,245,0.88)] p-4">
                   <p className="text-sm font-medium text-foreground">
                     Mínimo sugerido ahora mismo: {formatCurrency(minimumSuggestedBudget)}
                   </p>
@@ -737,7 +737,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                 </div>
                 {cashflow.monthlyDebtCapacity !== null &&
                 cashflow.monthlyDebtCapacity < minimumSuggestedBudget ? (
-                  <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-900">
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-900">
                     Tus gastos base dejan {formatCurrency(cashflow.monthlyDebtCapacity)} disponibles, pero tus pagos base suman {formatCurrency(minimumSuggestedBudget)}. Conviene revisar gastos, negociar cuotas o empezar con la deuda más urgente.
                   </div>
                 ) : null}
@@ -753,12 +753,12 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
               {isLoadingPreview ? (
                 <div className="grid gap-4">
                   <div className="h-6 w-48 animate-pulse rounded-full bg-secondary" />
-                  <div className="h-28 animate-pulse rounded-[1.5rem] bg-secondary" />
-                  <div className="h-24 animate-pulse rounded-[1.5rem] bg-secondary" />
+                  <div className="h-28 animate-pulse rounded-2xl bg-secondary" />
+                  <div className="h-24 animate-pulse rounded-2xl bg-secondary" />
                 </div>
               ) : preview ? (
                 <div className="grid gap-5">
-                  <div className="rounded-[1.75rem] border border-primary/12 bg-[linear-gradient(160deg,rgba(12,88,74,0.98),rgba(33,132,113,0.92))] p-5 text-white">
+                  <div className="rounded-2xl border border-primary/12 bg-[linear-gradient(160deg,rgba(12,88,74,0.98),rgba(33,132,113,0.92))] p-5 text-white">
                     <p className="text-sm font-semibold uppercase tracking-[0.18em] text-white/75">
                       Resultado inicial
                     </p>
@@ -776,7 +776,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                   </div>
 
                   <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-[1.5rem] border border-border bg-secondary/30 p-5">
+                    <div className="rounded-2xl border border-border bg-secondary/30 p-5">
                       <p className="text-xs uppercase tracking-[0.16em] text-muted">
                         Ahorro potencial
                       </p>
@@ -784,7 +784,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                         {formatCurrency(preview.potentialSavings)}
                       </p>
                     </div>
-                    <div className="rounded-[1.5rem] border border-border bg-secondary/30 p-5">
+                    <div className="rounded-2xl border border-border bg-secondary/30 p-5">
                       <p className="text-xs uppercase tracking-[0.16em] text-muted">
                         Plan recomendado
                       </p>
@@ -792,7 +792,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                         {preview.recommendedStrategyLabel}
                       </p>
                     </div>
-                    <div className="rounded-[1.5rem] border border-border bg-secondary/30 p-5">
+                    <div className="rounded-2xl border border-border bg-secondary/30 p-5">
                       <p className="text-xs uppercase tracking-[0.16em] text-muted">
                         Gastos base
                       </p>
@@ -800,7 +800,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                         {formatCurrency(preview.monthlyEssentialExpensesTotal)}
                       </p>
                     </div>
-                    <div className="rounded-[1.5rem] border border-border bg-secondary/30 p-5">
+                    <div className="rounded-2xl border border-border bg-secondary/30 p-5">
                       <p className="text-xs uppercase tracking-[0.16em] text-muted">
                         Capacidad para deudas
                       </p>
@@ -810,7 +810,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                     </div>
                   </div>
 
-                  <div className="rounded-[1.5rem] border border-primary/12 bg-[rgba(240,248,245,0.88)] p-5">
+                  <div className="rounded-2xl border border-primary/12 bg-[rgba(240,248,245,0.88)] p-5">
                     <p className="text-sm font-semibold text-foreground">
                       {preview.monthsSaved && preview.monthsSaved > 0
                         ? `Podrías ahorrar ${formatCurrency(preview.potentialSavings)} y salir ${preview.monthsSaved} ${preview.monthsSaved === 1 ? "mes" : "meses"} antes.`
@@ -824,11 +824,11 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                     </p>
                   </div>
 
-                  <div className="rounded-[1.5rem] border border-border bg-secondary/20 p-4 text-sm leading-7 text-muted">
+                  <div className="rounded-2xl border border-border bg-secondary/20 p-4 text-sm leading-7 text-muted">
                     <span className="font-semibold text-foreground">Siempre a tiempo:</span> después de entrar podrás registrar fechas de corte y pago para recibir recordatorios por correo antes de cada fecha importante.
                   </div>
 
-                  <div className="rounded-[1.5rem] border border-border bg-secondary/20 p-4 text-sm leading-7 text-muted">
+                  <div className="rounded-2xl border border-border bg-secondary/20 p-4 text-sm leading-7 text-muted">
                     Optimiza tu plan y ahorra más con Premium.
                   </div>
                 </div>
@@ -906,7 +906,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
               Resumen rápido
             </p>
             <div className="mt-4 grid gap-4">
-              <div className="rounded-[1.5rem] border border-border bg-secondary/20 p-4">
+              <div className="rounded-2xl border border-border bg-secondary/20 p-4">
                 <p className="text-xs uppercase tracking-[0.16em] text-muted">
                   Ingreso mensual
                 </p>
@@ -916,7 +916,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                     : "Pendiente"}
                 </p>
               </div>
-              <div className="rounded-[1.5rem] border border-border bg-secondary/20 p-4">
+              <div className="rounded-2xl border border-border bg-secondary/20 p-4">
                 <p className="text-xs uppercase tracking-[0.16em] text-muted">
                   Gastos base
                 </p>
@@ -926,7 +926,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                     : "Pendiente"}
                 </p>
               </div>
-              <div className="rounded-[1.5rem] border border-border bg-secondary/20 p-4">
+              <div className="rounded-2xl border border-border bg-secondary/20 p-4">
                 <p className="text-xs uppercase tracking-[0.16em] text-muted">
                   Deudas cargadas
                 </p>
@@ -934,7 +934,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                   {watchedDebts.length} / {ONBOARDING_MAX_DEBTS}
                 </p>
               </div>
-              <div className="rounded-[1.5rem] border border-border bg-secondary/20 p-4">
+              <div className="rounded-2xl border border-border bg-secondary/20 p-4">
                 <p className="text-xs uppercase tracking-[0.16em] text-muted">
                   Presupuesto mensual
                 </p>
@@ -944,7 +944,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                     : "Pendiente"}
                 </p>
               </div>
-              <div className="rounded-[1.5rem] border border-primary/12 bg-[rgba(240,248,245,0.88)] p-4">
+              <div className="rounded-2xl border border-primary/12 bg-[rgba(240,248,245,0.88)] p-4">
                 <p className="text-xs uppercase tracking-[0.16em] text-primary">
                   Capacidad estimada
                 </p>

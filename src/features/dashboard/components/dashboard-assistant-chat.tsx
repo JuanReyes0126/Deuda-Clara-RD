@@ -579,7 +579,7 @@ export function DashboardAssistantChat({ data, storageKey }: DashboardAssistantC
       <div className="grid gap-5 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] xl:items-start">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-2xl bg-primary/95 text-white shadow-[0_8px_20px_rgba(15,88,74,0.14)] ring-1 ring-white/25 sm:size-12">
+            <span className="grid size-11 place-items-center rounded-2xl bg-primary/95 text-white shadow-[0_8px_20px_rgba(15,88,74,0.14)] sm:size-12">
               <Bot className="size-[1.15rem] sm:size-5" />
             </span>
             <div>
@@ -621,7 +621,7 @@ export function DashboardAssistantChat({ data, storageKey }: DashboardAssistantC
           </div>
 
           {latestAssistantReply ? (
-            <div className="mt-5 rounded-[1.5rem] border border-white/70 bg-white/75 p-4 shadow-[0_4px_24px_rgba(24,49,59,0.04)]">
+            <div className="mt-5 rounded-[1.5rem] border border-border/50 bg-white/75 p-4 shadow-[0_4px_24px_rgba(24,49,59,0.04)]">
               <div className="flex items-start gap-3">
                 <span className="mt-1 grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
                   <Sparkles className="size-4" />

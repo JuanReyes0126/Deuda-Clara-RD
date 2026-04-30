@@ -837,9 +837,9 @@ export function SimulatorPanel({
       <>
       {hasFinancialContext ? (
         <section className="-mx-1 sm:mx-0">
-          <div className="rounded-[1.6rem] border border-primary/12 bg-[rgba(240,248,245,0.9)] p-4 sm:p-5">
+          <div className="rounded-2xl border border-primary/12 bg-[rgba(240,248,245,0.9)] p-4 sm:p-5">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-[1.2rem] border border-white/80 bg-white/88 p-3">
+              <div className="rounded-[1.2rem] border border-border/55 bg-white/88 p-3">
                 <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
                   Ingreso mensual
                 </p>
@@ -847,7 +847,7 @@ export function SimulatorPanel({
                   {formatRoundedCurrency(_conversionSnapshot?.monthlyIncome ?? 0)}
                 </p>
               </div>
-              <div className="rounded-[1.2rem] border border-white/80 bg-white/88 p-3">
+              <div className="rounded-[1.2rem] border border-border/55 bg-white/88 p-3">
                 <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
                   Gastos base
                 </p>
@@ -857,7 +857,7 @@ export function SimulatorPanel({
                   )}
                 </p>
               </div>
-              <div className="rounded-[1.2rem] border border-white/80 bg-white/88 p-3">
+              <div className="rounded-[1.2rem] border border-border/55 bg-white/88 p-3">
                 <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
                   Capacidad para deudas
                 </p>
@@ -865,7 +865,7 @@ export function SimulatorPanel({
                   {formatRoundedCurrency(_conversionSnapshot?.monthlyDebtCapacity ?? 0)}
                 </p>
               </div>
-              <div className="rounded-[1.2rem] border border-white/80 bg-white/88 p-3">
+              <div className="rounded-[1.2rem] border border-border/55 bg-white/88 p-3">
                 <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
                   Presupuesto registrado
                 </p>
@@ -882,7 +882,7 @@ export function SimulatorPanel({
       ) : null}
 
       <section className="-mx-1 grid gap-3 lg:hidden">
-        <div className="rounded-[1.5rem] border border-border bg-white/92 p-4 shadow-soft">
+        <div className="rounded-2xl border border-border bg-white/92 p-4 shadow-soft">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-[1.2rem] border border-border/70 bg-secondary/45 p-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
@@ -912,9 +912,9 @@ export function SimulatorPanel({
         </div>
 
         {simulation ? (
-          <div className="rounded-[1.5rem] border border-primary/12 bg-[rgba(240,248,245,0.9)] p-4">
+          <div className="rounded-2xl border border-primary/12 bg-[rgba(240,248,245,0.9)] p-4">
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-[1.15rem] border border-white/70 bg-white/88 p-3">
+              <div className="rounded-[1.15rem] border border-border/50 bg-white/88 p-3">
                 <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
                   Tiempo estimado
                 </p>
@@ -922,7 +922,7 @@ export function SimulatorPanel({
                   {formatMonthsValue(simulation.monthsToPayoff)}
                 </p>
               </div>
-              <div className="rounded-[1.15rem] border border-white/70 bg-white/88 p-3">
+              <div className="rounded-[1.15rem] border border-border/50 bg-white/88 p-3">
                 <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
                   Intereses
                 </p>
@@ -931,7 +931,7 @@ export function SimulatorPanel({
                 </p>
               </div>
             </div>
-            <div className="mt-3 rounded-[1.15rem] border border-white/70 bg-white/88 p-3">
+            <div className="mt-3 rounded-[1.15rem] border border-border/50 bg-white/88 p-3">
               <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
                 Te conviene
               </p>
@@ -1003,7 +1003,7 @@ export function SimulatorPanel({
                 ) : null}
               </div>
             ) : (
-              <div className="rounded-[1.5rem] border border-dashed border-border bg-secondary/35 px-4 py-4 text-sm leading-7 text-muted">
+              <div className="rounded-2xl border border-dashed border-border bg-secondary/35 px-4 py-4 text-sm leading-7 text-muted">
                 Puedes usar este simulador aunque todavía no tengas deudas guardadas. Solo llena los campos y verás el impacto al instante.
               </div>
             )}
@@ -1185,7 +1185,7 @@ export function SimulatorPanel({
             </details>
 
             {fieldErrors.length && !simulation ? (
-              <div className="rounded-[1.5rem] border border-danger/20 bg-danger/5 p-4">
+              <div className="rounded-2xl border border-danger/20 bg-danger/5 p-4">
                 <p className="text-sm font-semibold text-foreground">
                   Completa estos datos para generar la proyección
                 </p>
@@ -1217,7 +1217,7 @@ export function SimulatorPanel({
           <CardContent className="space-y-4 pt-4">
             {simulation && resultHeadline ? (
               <>
-                <div className="rounded-[1.75rem] border border-primary/12 bg-[rgba(240,248,245,0.92)] p-4 sm:p-5">
+                <div className="rounded-2xl border border-primary/12 bg-[rgba(240,248,245,0.92)] p-4 sm:p-5">
                   <div className="flex flex-wrap items-center gap-3">
                     <Badge variant={simulation.scenarios.base.feasible ? "success" : "danger"}>
                       {simulation.scenarios.base.feasible ? "Salida estimada" : "Advertencia"}
@@ -1250,7 +1250,7 @@ export function SimulatorPanel({
                   </div>
                   <div className="mt-5 grid gap-3 lg:hidden">
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-[1.15rem] border border-white/80 bg-white/90 p-3">
+                      <div className="rounded-[1.15rem] border border-border/55 bg-white/90 p-3">
                         <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
                           Tiempo
                         </p>
@@ -1258,7 +1258,7 @@ export function SimulatorPanel({
                           {formatMonthsValue(simulation.monthsToPayoff)}
                         </p>
                       </div>
-                      <div className="rounded-[1.15rem] border border-white/80 bg-white/90 p-3">
+                      <div className="rounded-[1.15rem] border border-border/55 bg-white/90 p-3">
                         <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
                           Intereses
                         </p>
@@ -1268,7 +1268,7 @@ export function SimulatorPanel({
                       </div>
                     </div>
 
-                    <div className="rounded-[1.15rem] border border-white/80 bg-white/90 p-3">
+                    <div className="rounded-[1.15rem] border border-border/55 bg-white/90 p-3">
                       <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
                         Qué conviene ahora
                       </p>
@@ -1283,7 +1283,7 @@ export function SimulatorPanel({
                   </div>
 
                   <div className="mt-5 hidden gap-3 sm:gap-4 lg:grid">
-                    <div className="rounded-[1.9rem] border border-white/80 bg-white/90 p-4 shadow-[0_14px_32px_rgba(24,49,59,0.06)] sm:p-6">
+                    <div className="rounded-[1.9rem] border border-border/55 bg-white/90 p-4 shadow-[0_14px_32px_rgba(24,49,59,0.06)] sm:p-6">
                       <p className="text-[11px] uppercase tracking-[0.22em] text-muted">
                         Tiempo estimado
                       </p>
@@ -1349,7 +1349,7 @@ export function SimulatorPanel({
                 </div>
 
                 {simulation.warnings.length ? (
-                  <details className="rounded-[1.5rem] border border-danger/20 bg-danger/5 p-4 sm:p-5 lg:hidden">
+                  <details className="rounded-2xl border border-danger/20 bg-danger/5 p-4 sm:p-5 lg:hidden">
                     <summary className="cursor-pointer list-none font-semibold text-foreground">
                       Revisar advertencias
                     </summary>
@@ -1364,7 +1364,7 @@ export function SimulatorPanel({
                 ) : null}
 
                 {simulation.warnings.length ? (
-                  <div className="hidden rounded-[1.5rem] border border-danger/20 bg-danger/5 p-4 sm:p-5 lg:block">
+                  <div className="hidden rounded-2xl border border-danger/20 bg-danger/5 p-4 sm:p-5 lg:block">
                     <div className="flex items-start gap-3">
                       <AlertTriangle className="mt-0.5 size-5 text-danger" />
                       <div className="min-w-0">
@@ -1384,7 +1384,7 @@ export function SimulatorPanel({
                 ) : null}
               </>
             ) : (
-                      <div className="rounded-[1.75rem] border border-dashed border-border bg-secondary/35 p-4 sm:p-5">
+                      <div className="rounded-2xl border border-dashed border-border bg-secondary/35 p-4 sm:p-5">
                 <p className="text-base font-semibold text-foreground">
                   En cuanto completes los datos, aquí verás tu salida estimada.
                 </p>
@@ -1397,7 +1397,7 @@ export function SimulatorPanel({
         </Card>
       </section>
 
-      <div className="rounded-[1.55rem] border border-primary/12 bg-[rgba(240,248,245,0.92)] p-4 lg:hidden">
+      <div className="rounded-2xl border border-primary/12 bg-[rgba(240,248,245,0.92)] p-4 lg:hidden">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/80">
@@ -1576,7 +1576,7 @@ export function SimulatorPanel({
         <>
           {isPremiumUnlocked ? (
             <>
-              <details className="rounded-[1.5rem] border border-border bg-white/92 p-4 lg:hidden">
+              <details className="rounded-2xl border border-border bg-white/92 p-4 lg:hidden">
                 <summary className="cursor-pointer list-none text-sm font-semibold text-foreground">
                   Ver comparación de escenarios
                 </summary>
@@ -1642,7 +1642,7 @@ export function SimulatorPanel({
                         <button
                           key={scenario.id}
                           type="button"
-                          className={`min-w-0 rounded-[1.5rem] border p-4 text-left transition-all duration-200 ease-out active:scale-[0.985] sm:p-5 ${
+                          className={`min-w-0 rounded-2xl border p-4 text-left transition-all duration-200 ease-out active:scale-[0.985] sm:p-5 ${
                             isSelected
                               ? "border-primary/24 bg-[rgba(240,248,245,0.94)] shadow-[0_18px_36px_rgba(15,88,74,0.08)] ring-2 ring-primary/10"
                               : "border-border bg-white hover:-translate-y-[1px] hover:border-primary/18 hover:bg-[rgba(255,255,255,0.98)] hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)]"
@@ -1747,7 +1747,7 @@ export function SimulatorPanel({
                     ))}
 
                     {simulation.savingsWithExtraPayment.interestSaved > 0 ? (
-                      <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 p-4 sm:p-5">
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5">
                         <div className="flex items-start gap-3">
                           <Sparkles className="mt-0.5 size-5 text-amber-600" />
                           <div className="min-w-0">
@@ -1768,7 +1768,7 @@ export function SimulatorPanel({
 
               {isProUnlocked ? (
                 <>
-                  <div className="rounded-[1.5rem] border border-primary/14 bg-[rgba(240,248,245,0.92)] p-4 lg:hidden">
+                  <div className="rounded-2xl border border-primary/14 bg-[rgba(240,248,245,0.92)] p-4 lg:hidden">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="success">Capa Pro</Badge>
                       {simulation.recommendedStrategyLabel ? (
@@ -1782,7 +1782,7 @@ export function SimulatorPanel({
                       {simulation.proGuidance.stepByStepPlan.slice(0, 2).map((step) => (
                         <div
                           key={step}
-                          className="rounded-[1.1rem] border border-white/70 bg-white/88 px-3 py-3 text-sm text-foreground"
+                          className="rounded-[1.1rem] border border-border/50 bg-white/88 px-3 py-3 text-sm text-foreground"
                         >
                           {step}
                         </div>
@@ -1814,7 +1814,7 @@ export function SimulatorPanel({
                         }
                         description="Cada vez que cambia el flujo, Pro te ayuda a revisar si sigue conviniendo mantener la misma presión."
                       />
-                      <div className="rounded-[1.5rem] border border-white/70 bg-white/88 p-4 sm:p-5">
+                      <div className="rounded-2xl border border-border/50 bg-white/88 p-4 sm:p-5">
                         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
                           Paso a paso sugerido
                         </p>
@@ -1848,7 +1848,7 @@ export function SimulatorPanel({
                       {(proConversionCopy?.paywall.content ?? []).slice(0, 2).map((item) => (
                         <div
                           key={item}
-                          className="rounded-[1.1rem] border border-white/70 bg-white/88 px-3 py-3 text-sm font-medium text-foreground"
+                          className="rounded-[1.1rem] border border-border/50 bg-white/88 px-3 py-3 text-sm font-medium text-foreground"
                         >
                           {item}
                         </div>
@@ -1881,7 +1881,7 @@ export function SimulatorPanel({
                   >
                     {proConversionCopy ? (
                       <div className="space-y-4">
-                        <div className="rounded-[1.6rem] border border-white/70 bg-white/88 p-4 sm:p-5">
+                        <div className="rounded-2xl border border-border/50 bg-white/88 p-4 sm:p-5">
                           <div className="flex flex-wrap items-center gap-2">
                             {proConversionCopy.microcopy.slice(0, 2).map((item) => (
                               <Badge key={item} variant="warning">
@@ -1901,7 +1901,7 @@ export function SimulatorPanel({
                         </div>
 
                         <div className="grid gap-4 lg:grid-cols-2">
-                          <div className="rounded-[1.5rem] border border-white/70 bg-white/86 p-4 sm:p-5">
+                          <div className="rounded-2xl border border-border/50 bg-white/86 p-4 sm:p-5">
                             <p className="text-sm font-semibold text-foreground">
                               {proConversionCopy.painBlock.title}
                             </p>
@@ -1915,7 +1915,7 @@ export function SimulatorPanel({
                             </p>
                           </div>
 
-                          <div className="rounded-[1.5rem] border border-white/70 bg-white/86 p-4 sm:p-5">
+                          <div className="rounded-2xl border border-border/50 bg-white/86 p-4 sm:p-5">
                             <p className="text-sm font-semibold text-foreground">
                               {proConversionCopy.impact.title}
                             </p>
@@ -1947,14 +1947,14 @@ export function SimulatorPanel({
                           {proConversionCopy.paywall.content.map((item) => (
                             <div
                               key={item}
-                              className="rounded-3xl border border-white/70 bg-white/85 px-4 py-4 text-sm font-medium text-foreground"
+                              className="rounded-2xl border border-border/50 bg-white/85 px-4 py-4 text-sm font-medium text-foreground"
                             >
                               {item}
                             </div>
                           ))}
                         </div>
 
-                        <div className="rounded-[1.5rem] border border-primary/12 bg-[rgba(240,248,245,0.9)] px-4 py-4 text-sm font-medium text-foreground">
+                        <div className="rounded-2xl border border-primary/12 bg-[rgba(240,248,245,0.9)] px-4 py-4 text-sm font-medium text-foreground">
                           {proConversionCopy.urgency}
                         </div>
                       </div>
@@ -1980,7 +1980,7 @@ export function SimulatorPanel({
                       {PRO_CONVERSION_COPY.microcopy.slice(2).map((item) => (
                         <div
                           key={item}
-                          className="rounded-3xl border border-white/70 bg-white/85 px-4 py-4 text-sm font-medium text-foreground"
+                          className="rounded-2xl border border-border/50 bg-white/85 px-4 py-4 text-sm font-medium text-foreground"
                         >
                           {item}
                         </div>
@@ -2007,7 +2007,7 @@ export function SimulatorPanel({
                 </>
               ) : null}
 
-              <details className="rounded-[1.5rem] border border-border bg-white/92 p-4 lg:hidden">
+              <details className="rounded-2xl border border-border bg-white/92 p-4 lg:hidden">
                 <summary className="cursor-pointer list-none text-sm font-semibold text-foreground">
                   Ver tabla de pagos
                 </summary>
@@ -2064,7 +2064,7 @@ export function SimulatorPanel({
                 </CardHeader>
                 <CardContent className="pt-4">
                   {selectedScenario?.amortizationSchedule.length ? (
-                    <details className="rounded-[1.5rem] border border-border bg-secondary/30 p-4 sm:p-5">
+                    <details className="rounded-2xl border border-border bg-secondary/30 p-4 sm:p-5">
                       <summary className="cursor-pointer list-none text-sm font-semibold text-foreground">
                         Ver detalle de pagos
                       </summary>
@@ -2101,7 +2101,7 @@ export function SimulatorPanel({
                       ) : null}
                     </details>
                   ) : (
-                    <div className="rounded-[1.5rem] border border-dashed border-border bg-secondary/30 p-4 text-sm leading-7 text-muted sm:p-5">
+                    <div className="rounded-2xl border border-dashed border-border bg-secondary/30 p-4 text-sm leading-7 text-muted sm:p-5">
                       Cuando la simulación sea viable, aquí verás cómo se reparte cada pago.
                     </div>
                   )}
@@ -2180,7 +2180,7 @@ export function SimulatorPanel({
                 {upgradeNotes.map((note) => (
                   <div
                     key={note}
-                    className="rounded-3xl border border-white/70 bg-white/85 px-4 py-4 text-sm font-medium text-foreground"
+                    className="rounded-2xl border border-border/50 bg-white/85 px-4 py-4 text-sm font-medium text-foreground"
                   >
                     {note}
                   </div>

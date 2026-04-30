@@ -26,8 +26,8 @@ export function DailyMissionCard({ data }: DailyMissionCardProps) {
   const mission = buildDailyMission(data);
 
   return (
-    <Card className="border-primary/15 bg-[linear-gradient(135deg,rgba(240,248,245,0.95),rgba(255,255,255,0.98))] shadow-soft">
-      <CardHeader className="gap-3 pb-2 sm:flex-row sm:items-start sm:justify-between">
+    <Card className="border-primary/20 bg-[linear-gradient(135deg,rgba(240,248,245,0.95),rgba(255,255,255,0.98))] shadow-soft">
+      <CardHeader className="gap-3 pb-2 pr-1 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
           <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary/12 text-primary">
             <Target className="size-5" />

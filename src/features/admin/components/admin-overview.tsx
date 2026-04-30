@@ -139,7 +139,7 @@ export function AdminOverview({
             <CardDescription>Panorama rápido de Base, Premium, Pro y estados de cobro.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-3 pt-4">
-            <div className="rounded-3xl border border-border bg-secondary/70 p-4">
+            <div className="rounded-2xl border border-border bg-secondary/70 p-4">
               <p className="text-xs uppercase tracking-[0.16em] text-muted">Usuarios por plan</p>
               <div className="mt-3 space-y-2 text-sm text-foreground">
                 <p>Base: <span className="font-semibold">{data.membershipSummary.freeUsers}</span></p>
@@ -147,7 +147,7 @@ export function AdminOverview({
                 <p>Pro: <span className="font-semibold">{data.membershipSummary.proUsers}</span></p>
               </div>
             </div>
-            <div className="rounded-3xl border border-border bg-secondary/70 p-4">
+            <div className="rounded-2xl border border-border bg-secondary/70 p-4">
               <p className="text-xs uppercase tracking-[0.16em] text-muted">Estado de facturación</p>
               <div className="mt-3 space-y-2 text-sm text-foreground">
                 <p>Activas: <span className="font-semibold">{data.membershipSummary.activeBilling}</span></p>
@@ -155,7 +155,7 @@ export function AdminOverview({
                 <p>Con atención: <span className="font-semibold">{data.membershipSummary.attentionBilling}</span></p>
               </div>
             </div>
-            <div className="rounded-3xl border border-border bg-secondary/70 p-4">
+            <div className="rounded-2xl border border-border bg-secondary/70 p-4">
               <p className="text-xs uppercase tracking-[0.16em] text-muted">Retención por recordatorios</p>
               <div className="mt-3 space-y-2 text-sm text-foreground">
                 <p>Email activo: <span className="font-semibold">{data.reminderSummary.emailReminderUsers}</span></p>
@@ -171,16 +171,16 @@ export function AdminOverview({
             <CardDescription>Estado rápido de las plantillas operativas.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 pt-4">
-            <div className="rounded-3xl border border-border bg-secondary/70 p-4">
+            <div className="rounded-2xl border border-border bg-secondary/70 p-4">
               <p className="text-xs uppercase tracking-[0.16em] text-muted">Plantillas</p>
               <p className="mt-2 text-3xl font-semibold text-foreground">{data.emailTemplateSummary.totalTemplates}</p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-3xl border border-border bg-secondary/70 p-4">
+              <div className="rounded-2xl border border-border bg-secondary/70 p-4">
                 <p className="text-xs uppercase tracking-[0.16em] text-muted">Activas</p>
                 <p className="mt-2 text-2xl font-semibold text-foreground">{data.emailTemplateSummary.activeTemplates}</p>
               </div>
-              <div className="rounded-3xl border border-border bg-secondary/70 p-4">
+              <div className="rounded-2xl border border-border bg-secondary/70 p-4">
                 <p className="text-xs uppercase tracking-[0.16em] text-muted">Inactivas</p>
                 <p className="mt-2 text-2xl font-semibold text-foreground">{data.emailTemplateSummary.inactiveTemplates}</p>
               </div>
@@ -196,7 +196,7 @@ export function AdminOverview({
         </CardHeader>
         <CardContent className="space-y-4 pt-4">
           {data.users.map((user) => (
-            <div key={user.id} className="flex flex-col gap-4 rounded-3xl border border-border bg-secondary/70 p-4 lg:flex-row lg:items-center lg:justify-between">
+            <div key={user.id} className="flex flex-col gap-4 rounded-2xl border border-border bg-secondary/70 p-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-3">
                   <p className="font-semibold text-foreground">
@@ -258,7 +258,7 @@ export function AdminOverview({
             {data.recentDebts.map((debt) => (
               <div
                 key={debt.id}
-                className="rounded-3xl border border-border bg-secondary/70 p-4"
+                className="rounded-2xl border border-border bg-secondary/70 p-4"
               >
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
@@ -304,7 +304,7 @@ export function AdminOverview({
             {data.recentPayments.map((payment) => (
               <div
                 key={payment.id}
-                className="rounded-3xl border border-border bg-secondary/70 p-4"
+                className="rounded-2xl border border-border bg-secondary/70 p-4"
               >
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
@@ -337,7 +337,7 @@ export function AdminOverview({
           </CardHeader>
           <CardContent className="space-y-3 pt-4">
             {data.auditLogs.map((log) => (
-              <div key={log.id} className="rounded-3xl border border-border bg-secondary/70 p-4">
+              <div key={log.id} className="rounded-2xl border border-border bg-secondary/70 p-4">
                 <p className="font-semibold text-foreground">
                   {log.action} · {log.resourceType}
                 </p>
@@ -363,7 +363,7 @@ export function AdminOverview({
             {data.recentNotifications.map((notification) => (
               <div
                 key={notification.id}
-                className="rounded-3xl border border-border bg-secondary/70 p-4"
+                className="rounded-2xl border border-border bg-secondary/70 p-4"
               >
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
@@ -416,7 +416,7 @@ export function AdminOverview({
             {data.emailTemplates.map((template) => (
               <form
                 key={template.id}
-                className="rounded-3xl border border-border bg-secondary/70 p-4"
+                className="rounded-2xl border border-border bg-secondary/70 p-4"
                 onSubmit={(event) => {
                   event.preventDefault();
                   void saveTemplate(template.id, new FormData(event.currentTarget));

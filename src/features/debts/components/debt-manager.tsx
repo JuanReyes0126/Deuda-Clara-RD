@@ -1031,7 +1031,7 @@ export function DebtManager({
       ) : null}
 
       <section className="-mx-1 grid gap-3 lg:hidden">
-        <div className="rounded-[1.5rem] border border-border bg-white/92 p-4 shadow-soft">
+        <div className="rounded-2xl border border-border bg-white/92 p-4 shadow-soft">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="min-w-0 rounded-[1.2rem] border border-border/70 bg-secondary/45 p-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
@@ -1082,7 +1082,7 @@ export function DebtManager({
         </div>
 
         {access.isBase ? (
-          <div className="rounded-[1.5rem] border border-dashed border-primary/18 bg-[rgba(255,248,241,0.82)] p-4">
+          <div className="rounded-2xl border border-dashed border-primary/18 bg-[rgba(255,248,241,0.82)] p-4">
             <p className="text-sm font-semibold text-foreground">
               Base te deja organizar hasta {access.maxActiveDebts} deudas activas.
             </p>
@@ -1197,7 +1197,7 @@ export function DebtManager({
 
               <div className="mt-4 hidden gap-3 md:grid-cols-3 lg:grid">
                 {debtQuickPresets.map((preset) => (
-                  <div key={preset.key} className="min-w-0 rounded-3xl border border-white/70 bg-white/80 p-4">
+                  <div key={preset.key} className="min-w-0 rounded-2xl border border-border/50 bg-white/80 p-4">
                     <p className="break-words text-sm font-semibold text-foreground">{preset.label}</p>
                     <p className="mt-1 break-words text-sm text-muted">{preset.description}</p>
                   </div>
@@ -1229,7 +1229,7 @@ export function DebtManager({
                   {debtLimitNotes.map((note) => (
                     <div
                       key={note}
-                      className="rounded-3xl border border-white/70 bg-white/85 px-4 py-4 text-sm font-medium text-foreground"
+                      className="rounded-2xl border border-border/50 bg-white/85 px-4 py-4 text-sm font-medium text-foreground"
                     >
                       {note}
                     </div>
@@ -1264,7 +1264,7 @@ export function DebtManager({
             ) : null}
 
             <div className="mb-6 hidden gap-4 md:grid-cols-3 lg:grid">
-              <div className="min-w-0 rounded-3xl border border-border bg-secondary/60 p-4">
+              <div className="min-w-0 rounded-2xl border border-border bg-secondary/60 p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted">Deuda real estimada</p>
                 <p className="value-stable mt-2 text-[clamp(1rem,2.7vw,1.35rem)] font-semibold leading-tight text-foreground">
                   {formatDebtMoney(livePreview.effectiveBalance, watchedCurrency)}
@@ -1273,7 +1273,7 @@ export function DebtManager({
                   Incluye saldo, mora y cargos extra registrados.
                 </p>
               </div>
-              <div className="min-w-0 rounded-3xl border border-border bg-secondary/60 p-4">
+              <div className="min-w-0 rounded-2xl border border-border bg-secondary/60 p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted">Interés estimado del mes</p>
                 <p className="value-stable mt-2 text-[clamp(1rem,2.7vw,1.35rem)] font-semibold leading-tight text-foreground">
                   {formatDebtMoney(livePreview.monthlyInterestEstimate, watchedCurrency)}
@@ -1282,7 +1282,7 @@ export function DebtManager({
                   Calculado con la tasa y el saldo actual que has escrito.
                 </p>
               </div>
-              <div className="min-w-0 rounded-3xl border border-border bg-secondary/60 p-4">
+              <div className="min-w-0 rounded-2xl border border-border bg-secondary/60 p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted">Lectura rápida</p>
                 <p className="mt-2 break-words text-lg font-semibold text-foreground">
                   {livePreview.minimumPaymentRisk
@@ -1805,7 +1805,7 @@ export function DebtManager({
                     </div>
 
                     <div className="mt-4 grid grid-cols-2 gap-3">
-                      <div className="rounded-[1.15rem] border border-white/70 bg-white/88 p-3">
+                      <div className="rounded-[1.15rem] border border-border/50 bg-white/88 p-3">
                         <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
                           Balance actual
                         </p>
@@ -1813,7 +1813,7 @@ export function DebtManager({
                           {formatDebtMoney(debt.effectiveBalance, debt.currency)}
                         </p>
                       </div>
-                      <div className="rounded-[1.15rem] border border-white/70 bg-white/88 p-3">
+                      <div className="rounded-[1.15rem] border border-border/50 bg-white/88 p-3">
                         <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
                           {debt.nextDueDate ? "Próximo pago" : "Estado"}
                         </p>
@@ -2008,7 +2008,7 @@ export function DebtManager({
                 </div>
               ))
             ) : debts.length ? (
-              <div className="rounded-3xl border border-dashed border-border p-8 text-center">
+              <div className="rounded-2xl border border-dashed border-border p-8 text-center">
                 <p className="text-base font-semibold text-foreground">
                   No encontramos deudas con ese filtro.
                 </p>
@@ -2025,7 +2025,7 @@ export function DebtManager({
                 </div>
               </div>
             ) : (
-              <div className="rounded-3xl border border-dashed border-border p-8 text-center">
+              <div className="rounded-2xl border border-dashed border-border p-8 text-center">
                 <p className="text-base font-semibold text-foreground">
                   Todavía no has registrado deudas.
                 </p>

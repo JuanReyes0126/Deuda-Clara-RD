@@ -647,7 +647,7 @@ export function MembershipPanel({
             </Button>
           }
         />
-        <div className="border-primary/12 text-foreground mt-5 inline-flex max-w-5xl rounded-3xl border bg-[rgba(240,248,245,0.86)] px-4 py-4 text-sm leading-7 sm:px-5">
+        <div className="border-primary/12 text-foreground mt-5 inline-flex max-w-5xl rounded-2xl border bg-[rgba(240,248,245,0.86)] px-4 py-4 text-sm leading-7 sm:px-5">
           <span>
             <span className="text-primary font-semibold">Premium</span> es la
             opción pensada para salir más rápido: una ruta guiada de{" "}
@@ -671,7 +671,7 @@ export function MembershipPanel({
           ) : null}
         </div>
         {cancelAtPeriodEnd ? (
-          <div className="mt-4 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-7 text-amber-900">
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-7 text-amber-900">
             Tu plan seguirá activo hasta{" "}
             {currentPeriodEnd
               ? formatDate(currentPeriodEnd)
@@ -680,13 +680,13 @@ export function MembershipPanel({
           </div>
         ) : null}
         {!billingConfigured && !demoMode ? (
-          <div className="border-border text-muted mt-4 rounded-3xl border border-dashed px-5 py-4 text-sm leading-7">
+          <div className="border-border text-muted mt-4 rounded-2xl border border-dashed px-5 py-4 text-sm leading-7">
             La facturación real todavía no está configurada en este entorno.
             Aquí seguimos permitiendo el cambio manual para pruebas locales.
           </div>
         ) : null}
         {showReauthCard ? (
-          <div className="mt-4 rounded-[1.75rem] border border-primary/15 bg-[rgba(240,248,245,0.82)] p-4 sm:p-5">
+          <div className="mt-4 rounded-2xl border border-primary/15 bg-[rgba(240,248,245,0.82)] p-4 sm:p-5">
             <p className="section-kicker">Confirma tu identidad</p>
             <p className="text-foreground mt-3 text-xl font-semibold">
               Antes de abrir facturación, verifica que sigues siendo tú.
@@ -781,7 +781,7 @@ export function MembershipPanel({
           </div>
         ) : null}
         {contextualMessage && highlightedPlan ? (
-          <div className="border-primary/15 mt-4 rounded-[1.75rem] border bg-[rgba(255,248,241,0.82)] px-5 py-4">
+          <div className="border-primary/15 mt-4 rounded-2xl border bg-[rgba(255,248,241,0.82)] px-5 py-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div className="min-w-0 max-w-4xl">
                 <p className="section-kicker">
@@ -886,7 +886,7 @@ export function MembershipPanel({
           </div>
         ) : null}
         {checkoutOutcome === "cancelled" ? (
-          <div className="mt-4 rounded-[1.75rem] border border-amber-200 bg-amber-50 px-5 py-4">
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div className="min-w-0 max-w-4xl">
                 <p className="text-sm font-semibold tracking-[0.16em] text-amber-800 uppercase">
@@ -942,7 +942,7 @@ export function MembershipPanel({
               </div>
             </div>
             <div className="mt-5 grid gap-3 md:grid-cols-2">
-              <div className="min-w-0 rounded-3xl bg-white/85 p-4">
+              <div className="min-w-0 rounded-2xl bg-white/85 p-4">
                 <p className="text-muted text-xs tracking-[0.16em] uppercase">
                   Deuda total
                 </p>
@@ -950,7 +950,7 @@ export function MembershipPanel({
                   {formatCurrency(conversionSnapshot.totalDebt)}
                 </p>
               </div>
-              <div className="min-w-0 rounded-3xl bg-white/85 p-4">
+              <div className="min-w-0 rounded-2xl bg-white/85 p-4">
                 <p className="text-muted text-xs tracking-[0.16em] uppercase">
                   Ritmo actual
                 </p>
@@ -960,7 +960,7 @@ export function MembershipPanel({
                     : "Sin salida clara"}
                 </p>
               </div>
-              <div className="min-w-0 rounded-3xl bg-white/85 p-4">
+              <div className="min-w-0 rounded-2xl bg-white/85 p-4">
                 <p className="text-muted text-xs tracking-[0.16em] uppercase">
                   Con recomendación
                 </p>
@@ -970,7 +970,7 @@ export function MembershipPanel({
                     : "Por definir"}
                 </p>
               </div>
-              <div className="min-w-0 rounded-3xl bg-white/85 p-4">
+              <div className="min-w-0 rounded-2xl bg-white/85 p-4">
                 <p className="text-muted text-xs tracking-[0.16em] uppercase">
                   Interés mensual estimado
                 </p>
@@ -981,7 +981,7 @@ export function MembershipPanel({
             </div>
           </div>
         ) : (
-          <div className="border-border text-muted mt-4 rounded-[1.75rem] border border-dashed px-5 py-4 text-sm leading-7">
+          <div className="border-border text-muted mt-4 rounded-2xl border border-dashed px-5 py-4 text-sm leading-7">
             Todavía no tienes deudas activas registradas. Puedes mantenerte en
             Base para organizarte o activar Premium más adelante cuando quieras
             una recomendación real sobre tus propios datos.
@@ -1002,7 +1002,7 @@ export function MembershipPanel({
             {fitStory.description}
           </p>
           <div className="mt-5 grid gap-3 md:grid-cols-2">
-            <div className="min-w-0 rounded-3xl border border-white/70 bg-white/85 p-4">
+            <div className="min-w-0 rounded-2xl border border-border/50 bg-white/85 p-4">
               <p className="text-muted text-xs tracking-[0.16em] uppercase">
                 Deuda visible
               </p>
@@ -1010,7 +1010,7 @@ export function MembershipPanel({
                 {formatCurrency(conversionSnapshot.totalDebt)}
               </p>
             </div>
-            <div className="min-w-0 rounded-3xl border border-white/70 bg-white/85 p-4">
+            <div className="min-w-0 rounded-2xl border border-border/50 bg-white/85 p-4">
               <p className="text-muted text-xs tracking-[0.16em] uppercase">
                 Interés mensual estimado
               </p>
@@ -1018,7 +1018,7 @@ export function MembershipPanel({
                 {formatCurrency(conversionSnapshot.estimatedMonthlyInterest)}
               </p>
             </div>
-            <div className="min-w-0 rounded-3xl border border-white/70 bg-white/85 p-4 md:col-span-2">
+            <div className="min-w-0 rounded-2xl border border-border/50 bg-white/85 p-4 md:col-span-2">
               <p className="text-muted text-xs tracking-[0.16em] uppercase">
                 Señal más clara
               </p>
@@ -1038,20 +1038,20 @@ export function MembershipPanel({
             Cómo elegir sin complicarte
           </p>
           <div className="mt-4 grid gap-3">
-            <div className="text-foreground rounded-3xl border border-white/70 bg-white/85 px-4 py-3 text-sm">
+            <div className="text-foreground rounded-2xl border border-border/50 bg-white/85 px-4 py-3 text-sm">
               <span className="font-semibold">Base:</span> para organizarte,
               registrar deudas y entender tu panorama real.
             </div>
-            <div className="text-foreground rounded-3xl border border-white/70 bg-white/85 px-4 py-3 text-sm">
+            <div className="text-foreground rounded-2xl border border-border/50 bg-white/85 px-4 py-3 text-sm">
               <span className="font-semibold">Premium:</span> la mejor opción si
               lo que quieres es salir más rápido con una guía clara de 6 meses.
             </div>
-            <div className="text-foreground rounded-3xl border border-white/70 bg-white/85 px-4 py-3 text-sm">
+            <div className="text-foreground rounded-2xl border border-border/50 bg-white/85 px-4 py-3 text-sm">
               <span className="font-semibold">Pro:</span> para quien quiere el
               mismo motor premium, pero con más seguimiento durante 12 meses.
             </div>
           </div>
-          <div className="border-primary/12 text-foreground mt-4 rounded-3xl border bg-[rgba(240,248,245,0.9)] px-4 py-4 text-sm leading-7">
+          <div className="border-primary/12 text-foreground mt-4 rounded-2xl border bg-[rgba(240,248,245,0.9)] px-4 py-4 text-sm leading-7">
             En la mayoría de usuarios con urgencia real,{" "}
             <span className="font-semibold">Premium</span> es el punto natural
             de entrada porque convierte rápido el dolor visible en una prioridad
@@ -1118,7 +1118,7 @@ export function MembershipPanel({
                         </p>
                       </div>
 
-                      <div className="mt-5 rounded-[1.55rem] border border-white/70 bg-white/88 px-5 py-5">
+                      <div className="mt-5 rounded-[1.55rem] border border-border/50 bg-white/88 px-5 py-5">
                         <p className="text-muted text-[11px] font-semibold uppercase tracking-[0.2em]">
                           Mejor para
                         </p>
@@ -1129,7 +1129,7 @@ export function MembershipPanel({
                     </div>
 
                     <div className="border-border/70 bg-white/72 p-4 sm:p-7 2xl:border-l">
-                      <div className="rounded-[1.7rem] border border-white/80 bg-white/95 px-5 py-5">
+                      <div className="rounded-2xl border border-border/55 bg-white/95 px-5 py-5">
                         <p className="text-muted text-[11px] font-semibold uppercase tracking-[0.22em]">
                           Precio
                         </p>
@@ -1146,7 +1146,7 @@ export function MembershipPanel({
                         ) : null}
                       </div>
 
-                      <div className="mt-4 rounded-[1.55rem] border border-white/70 bg-white/92 px-4 py-4 text-sm leading-7 text-foreground">
+                      <div className="mt-4 rounded-[1.55rem] border border-border/50 bg-white/92 px-4 py-4 text-sm leading-7 text-foreground">
                         {plan.id === "FREE"
                           ? "Registro, pagos y panorama base."
                           : plan.id === "NORMAL"
@@ -1154,7 +1154,7 @@ export function MembershipPanel({
                             : "La misma lógica premium con acompañamiento más largo."}
                       </div>
 
-                      <div className="mt-4 rounded-[1.55rem] border border-white/70 bg-white/92 px-4 py-4 text-sm leading-7 text-muted">
+                      <div className="mt-4 rounded-[1.55rem] border border-border/50 bg-white/92 px-4 py-4 text-sm leading-7 text-muted">
                         {valueSignal}
                       </div>
                     </div>
@@ -1179,7 +1179,7 @@ export function MembershipPanel({
             {commercialNarrative.bullets.map((bullet) => (
               <div
                 key={bullet}
-                className="text-foreground rounded-3xl border border-white/70 bg-white/85 px-4 py-3 text-sm"
+                className="text-foreground rounded-2xl border border-border/50 bg-white/85 px-4 py-3 text-sm"
               >
                 {bullet}
               </div>
@@ -1197,7 +1197,7 @@ export function MembershipPanel({
             {activationSteps.map((step) => (
               <div
                 key={step.title}
-                className="border-border bg-secondary/35 rounded-[1.5rem] border p-4 sm:p-6"
+                className="border-border bg-secondary/35 rounded-2xl border p-4 sm:p-6"
               >
                 <p className="text-foreground text-lg font-semibold leading-tight">
                   {step.title}
@@ -1224,7 +1224,7 @@ export function MembershipPanel({
             {checkoutNarrative.trustItems.map((item) => (
               <div
                 key={item}
-                className="text-foreground rounded-3xl border border-white/70 bg-white/85 px-4 py-4 text-sm leading-6"
+                className="text-foreground rounded-2xl border border-border/50 bg-white/85 px-4 py-4 text-sm leading-6"
               >
                 {item}
               </div>
@@ -1336,16 +1336,16 @@ export function MembershipPanel({
                     </p>
                   ) : null}
                 </div>
-                <div className="border-border/70 text-foreground mt-4 rounded-3xl border bg-white/80 px-4 py-3 text-sm leading-7 transition-all duration-200 ease-out">
+                <div className="border-border/70 text-foreground mt-4 rounded-2xl border bg-white/80 px-4 py-3 text-sm leading-7 transition-all duration-200 ease-out">
                   <span className="font-semibold">Resultado esperado:</span>{" "}
                   {plan.outcome}
                 </div>
-                <div className="mt-3 rounded-3xl border border-border/70 bg-secondary/45 px-4 py-3 text-sm leading-7 text-foreground transition-all duration-200 ease-out">
+                <div className="mt-3 rounded-2xl border border-border/70 bg-secondary/45 px-4 py-3 text-sm leading-7 text-foreground transition-all duration-200 ease-out">
                   <span className="font-semibold">Mejor para:</span>{" "}
                   {plan.bestFor}
                 </div>
                 {plan.id !== "FREE" ? (
-                  <div className="border-primary/12 text-foreground mt-3 rounded-3xl border bg-[rgba(240,248,245,0.9)] px-4 py-3 text-sm leading-7 transition-all duration-200 ease-out">
+                  <div className="border-primary/12 text-foreground mt-3 rounded-2xl border bg-[rgba(240,248,245,0.9)] px-4 py-3 text-sm leading-7 transition-all duration-200 ease-out">
                     {getPlanValueSignal({
                       planId: plan.id,
                       conversionSnapshot,

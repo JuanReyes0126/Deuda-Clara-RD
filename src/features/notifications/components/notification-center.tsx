@@ -520,7 +520,7 @@ export function NotificationCenter({
       ) : null}
 
       {showNotificationsPremiumPrompt ? (
-        <div className="border-primary/15 rounded-[1.75rem] border bg-[rgba(255,248,241,0.82)] px-5 py-4">
+        <div className="border-primary/15 rounded-2xl border bg-[rgba(255,248,241,0.82)] px-5 py-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0 max-w-2xl">
               <p className="text-primary text-sm font-semibold tracking-[0.16em] uppercase">
@@ -549,7 +549,7 @@ export function NotificationCenter({
       ) : null}
 
       {premiumInsightsEnabled ? (
-        <div className="rounded-[1.75rem] border border-emerald-200 bg-[linear-gradient(135deg,rgba(236,253,245,0.96),rgba(240,248,245,0.92))] px-5 py-4">
+        <div className="rounded-2xl border border-emerald-200 bg-[linear-gradient(135deg,rgba(236,253,245,0.96),rgba(240,248,245,0.92))] px-5 py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0 max-w-2xl">
               <p className="text-sm font-semibold tracking-[0.16em] text-emerald-700 uppercase">
@@ -574,7 +574,7 @@ export function NotificationCenter({
       ) : null}
 
       {showNotificationsProPrompt ? (
-        <div className="rounded-[1.75rem] border border-primary/12 bg-[rgba(255,248,241,0.82)] px-5 py-4">
+        <div className="rounded-2xl border border-primary/12 bg-[rgba(255,248,241,0.82)] px-5 py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0 max-w-2xl">
               <p className="text-primary text-sm font-semibold tracking-[0.16em] uppercase">
@@ -644,7 +644,7 @@ export function NotificationCenter({
             {!Object.values(groupedNotifications).some((group) => group.length) &&
             primaryNotification ? (
               <Card className="p-6">
-                <CardContent className="border-border text-muted rounded-3xl border border-dashed p-8 text-center text-sm">
+                <CardContent className="border-border text-muted rounded-2xl border border-dashed p-8 text-center text-sm">
                   La alerta principal ya quedó destacada arriba. Cuando entren
                   más avisos, aquí aparecerá el resto del contexto.
                 </CardContent>
@@ -653,7 +653,7 @@ export function NotificationCenter({
           </>
         ) : (
           <Card className="p-6">
-            <CardContent className="border-border rounded-3xl border border-dashed p-8 text-center">
+            <CardContent className="border-border rounded-2xl border border-dashed p-8 text-center">
               <p className="text-base font-semibold text-foreground">
                 No hay notificaciones para ese filtro ahora mismo.
               </p>

@@ -5,13 +5,9 @@ import {
   AlertTriangle,
   ArrowRight,
   CalendarClock,
-  CircleCheck,
   CircleDollarSign,
-  CreditCard,
-  Crown,
   LockKeyhole,
   Sparkles,
-  Wallet,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -26,7 +22,6 @@ import {
 } from "@/components/ui/card";
 import {
   ExecutiveSummaryStrip,
-  type ExecutiveSummaryItem,
 } from "@/components/shared/executive-summary-strip";
 import { ModuleSectionHeader } from "@/components/shared/module-section-header";
 import { NarrativeInsightCard } from "@/components/shared/narrative-insight-card";
@@ -65,9 +60,9 @@ import { formatMonthsLabel } from "./dashboard-formatters";
 import { getPlanSupportText } from "./dashboard-plan-copy";
 import { getPriorityReasonMeta } from "./dashboard-priority-reason";
 import { getLockedUpgradeContext } from "./dashboard-upgrade-locked-context";
+import { getMomentumSummary, getProgressMilestones } from "./dashboard-momentum";
 import type {
   DashboardDto,
-  DashboardPlanSnapshotDto,
   MembershipConversionSnapshotDto,
 } from "@/lib/types/app";
 import { useAppNavigation } from "@/lib/navigation/use-app-navigation";
@@ -77,7 +72,7 @@ import { formatDate, formatRelativeDistance } from "@/lib/utils/date";
 
 function ChartLoadingPlaceholder() {
   return (
-    <div className="bg-secondary/35 flex h-full flex-col justify-end rounded-3xl p-6">
+    <div className="bg-secondary/35 flex h-full flex-col justify-end rounded-2xl p-6">
       <div className="space-y-3">
         <div className="h-3 w-28 rounded-full bg-white/80" />
         <div className="grid grid-cols-5 items-end gap-3">
@@ -120,126 +115,6 @@ type DashboardOverviewProps = {
   /** Clave para persistir el chat de Clara en este dispositivo (p. ej. id de usuario). */
   claraStorageKey?: string;
 };
-
-function getMomentumSummary({
-  data,
-  isPremiumUnlocked,
-}: {
-  data: DashboardDto;
-  isPremiumUnlocked: boolean;
-}) {
-  const progressPct = Math.max(
-    0,
-    Math.min(100, Math.round(data.summary.paidVsPendingPercentage)),
-  );
-
-  if (data.summary.totalDebt <= 0) {
-    return {
-      badgeVariant: "default" as const,
-      badgeLabel: "Pendiente de activar",
-      title: "Primero necesitamos una deuda para construir progreso real.",
-      description:
-        "En cuanto registres tu primera deuda, este bloque te mostrará avance, hitos y señales de ritmo.",
-      progressLabel: "Sin progreso medible todavía",
-    };
-  }
-
-  if (data.urgentDebt?.status === "LATE") {
-    return {
-      badgeVariant: "danger" as const,
-      badgeLabel: "Riesgo de estancarte",
-      title: "Hay presión real sobre tu flujo y conviene corregirla hoy.",
-      description:
-        "Tienes al menos una deuda atrasada. Resolver ese frente primero vale más que repartir dinero sin prioridad.",
-      progressLabel: `${progressPct}% del camino visible entre pagado y pendiente`,
-    };
-  }
-
-  if (data.riskAlerts.length > 0) {
-    return {
-      badgeVariant: "warning" as const,
-      badgeLabel: "Ritmo bajo presión",
-      title: "Todavía estás pagando, pero parte del flujo se sigue diluyendo.",
-      description:
-        "Las alertas de pago mínimo indican que el dinero no está bajando capital tan rápido como debería.",
-      progressLabel: `${progressPct}% de avance visible`,
-    };
-  }
-
-  if (data.recentPayments.length === 0) {
-    return {
-      badgeVariant: "default" as const,
-      badgeLabel: "Primer avance pendiente",
-      title: "Ya hay deudas cargadas. Falta convertir eso en movimiento.",
-      description:
-        "El siguiente salto es registrar el primer pago para que el sistema pueda medir si tu plan empieza a rendir mejor.",
-      progressLabel: `${progressPct}% del recorrido registrado`,
-    };
-  }
-
-  if (isPremiumUnlocked && (data.planComparison?.monthsSaved ?? 0) > 0) {
-    return {
-      badgeVariant: "success" as const,
-      badgeLabel: "Vas mejorando",
-      title: "Tu estructura ya muestra una salida más eficiente que la actual.",
-      description: data.planComparison?.interestSavings
-        ? `El plan premium detecta ${formatCurrency(data.planComparison.interestSavings)} evitables y una ruta más corta si sostienes la prioridad.`
-        : "La prioridad actual ya está trabajando a favor de una salida más corta.",
-      progressLabel: `${progressPct}% de avance visible con ruta optimizada`,
-    };
-  }
-
-  if (progressPct >= 35) {
-    return {
-      badgeVariant: "success" as const,
-      badgeLabel: "Primer avance importante",
-      title: "Ya hay suficiente movimiento para que el plan se sienta real.",
-      description:
-        "Todavía queda camino, pero tu historial ya muestra señales claras de avance y mejor lectura del flujo.",
-      progressLabel: `${progressPct}% de avance visible`,
-    };
-  }
-
-  return {
-    badgeVariant: "warning" as const,
-    badgeLabel: "Ritmo estable",
-    title: "La base ya está montada; ahora toca sostener una sola prioridad.",
-    description:
-      "No parece haber una caída fuerte, pero todavía hay espacio para que el dinero rinda mejor y la salida se acorte.",
-    progressLabel: `${progressPct}% del recorrido registrado`,
-  };
-}
-
-function getProgressMilestones({
-  data,
-  isPremiumUnlocked,
-}: {
-  data: DashboardDto;
-  isPremiumUnlocked: boolean;
-}) {
-  return [
-    {
-      label: "Primera deuda",
-      complete: data.summary.totalDebt > 0,
-      detail: "Ya hay base para proyectar.",
-    },
-    {
-      label: "Primer pago",
-      complete: data.recentPayments.length > 0,
-      detail: "Activa lectura real del avance.",
-    },
-    {
-      label: "Prioridad visible",
-      complete: Boolean(data.summary.recommendedDebtName || data.urgentDebt),
-      detail: "Ya sabes qué deuda mirar primero.",
-    },
-    {
-      label: "Plan premium",
-      complete: isPremiumUnlocked,
-      detail: "Desbloquea ahorro y orden optimizado.",
-    },
-  ];
-}
 
 export function DashboardOverview({
   data,
@@ -398,7 +273,7 @@ export function DashboardOverview({
       <section className="-mx-1 grid gap-3 lg:hidden">
         <DailyMissionCard data={data} />
         <PaydownChallengeCard data={data} />
-        <Card className="border-border shadow-soft rounded-[2rem] border bg-white/92 p-4">
+        <Card className="border-border/70 bg-white/92 p-4 shadow-soft">
           <CardHeader className="gap-3 px-0 pt-0">
             <div className="flex items-center justify-between gap-3">
               <Badge variant="default">Dashboard</Badge>
@@ -417,7 +292,7 @@ export function DashboardOverview({
           </CardHeader>
           <CardContent className="space-y-4 px-0 pb-0">
             <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-[1.5rem] border border-border/70 bg-secondary/45 p-4">
+              <div className="rounded-xl border border-border/60 bg-secondary/45 p-4">
                 <div className="flex items-center gap-2">
                   <CircleDollarSign className="size-4 text-primary" />
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
@@ -428,7 +303,7 @@ export function DashboardOverview({
                   {formatCurrency(data.summary.totalDebt)}
                 </p>
               </div>
-              <div className="rounded-[1.5rem] border border-border/70 bg-secondary/45 p-4">
+              <div className="rounded-xl border border-border/60 bg-secondary/45 p-4">
                 <div className="flex items-center gap-2">
                   <CalendarClock className="size-4 text-primary" />
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
@@ -458,7 +333,7 @@ export function DashboardOverview({
               </div>
             </div>
 
-            <div className="rounded-[1.5rem] border border-primary/12 bg-[rgba(240,248,245,0.9)] p-4">
+            <div className="rounded-xl border border-primary/15 bg-[rgba(240,248,245,0.9)] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/80">
@@ -479,7 +354,7 @@ export function DashboardOverview({
             </div>
 
             {!isPremiumUnlocked && hasDebts && showDashboardPremiumPrompt ? (
-              <div className="rounded-[1.5rem] border border-amber-200 bg-[rgba(255,248,241,0.96)] p-4">
+              <div className="rounded-xl border border-amber-200/90 bg-[rgba(255,248,241,0.96)] p-4">
                 <p className="text-sm font-semibold text-foreground">
                   {data.analysisScope.partialAnalysis
                     ? "Todavía estás viendo solo una parte del costo real."
@@ -543,18 +418,18 @@ export function DashboardOverview({
               </CardHeader>
               <CardContent className="flex flex-col gap-4 px-0 pb-0">
                 <div className="grid gap-3 md:grid-cols-3">
-                  <div className="rounded-[1.4rem] border border-white/80 bg-white/90 px-4 py-4 text-sm leading-6 text-foreground">
+                  <div className="rounded-[1.4rem] border border-border/55 bg-white/90 px-4 py-4 text-sm leading-6 text-foreground">
                     <span className="font-semibold">
                       Estás pagando {formatCurrency(data.summary.estimatedMonthlyInterest)} en intereses
                     </span>{" "}
                     y ese dinero no está bajando capital tan rápido como podría.
                   </div>
-                  <div className="rounded-[1.4rem] border border-white/80 bg-white/90 px-4 py-4 text-sm leading-6 text-foreground">
+                  <div className="rounded-[1.4rem] border border-border/55 bg-white/90 px-4 py-4 text-sm leading-6 text-foreground">
                     {data.analysisScope.partialAnalysis
                       ? "Hay deudas fuera del análisis Base. Tu lectura de hoy todavía está dejando dinero fuera del mapa."
                       : "Tu panorama ya muestra el costo. Lo que falta es ver la salida que menos te castiga."}
                   </div>
-                  <div className="rounded-[1.4rem] border border-white/80 bg-white/90 px-4 py-4 text-sm leading-6 text-foreground">
+                  <div className="rounded-[1.4rem] border border-border/55 bg-white/90 px-4 py-4 text-sm leading-6 text-foreground">
                     Premium compara tu ruta actual contra una mejor para mostrarte cuánto podrías recuperar en tiempo y dinero.
                   </div>
                 </div>
@@ -697,7 +572,7 @@ export function DashboardOverview({
               tone="soft"
               footer={
                 <div className="space-y-4">
-                  <div className="rounded-[1.5rem] border border-white/70 bg-white/85 p-4">
+                  <div className="rounded-[1.5rem] border border-border/50 bg-white/85 p-4">
                     <div className="flex min-w-0 items-end justify-between gap-4">
                       <div className="min-w-0">
                         <p className="text-muted text-xs tracking-[0.16em] uppercase">
@@ -723,7 +598,7 @@ export function DashboardOverview({
                     {progressMilestones.map((milestone) => (
                       <div
                         key={milestone.label}
-                        className="rounded-3xl border border-white/70 bg-white/82 px-4 py-4"
+                        className="rounded-2xl border border-border/50 bg-white/82 px-4 py-4"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-foreground text-sm font-semibold">
@@ -760,7 +635,7 @@ export function DashboardOverview({
                   : "Aún faltan datos para proyectar una salida confiable."}
               </p>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-3xl bg-white/10 p-4">
+                <div className="rounded-2xl bg-white/10 p-4">
                   <p className="text-xs tracking-[0.16em] text-white/70 uppercase">
                     {isPremiumUnlocked ? "Ahorro estimado" : "Intereses visibles"}
                   </p>
@@ -770,7 +645,7 @@ export function DashboardOverview({
                       : formatCurrency(data.summary.estimatedMonthlyInterest)}
                   </p>
                 </div>
-                <div className="rounded-3xl bg-white/10 p-4">
+                <div className="rounded-2xl bg-white/10 p-4">
                   <p className="text-xs tracking-[0.16em] text-white/70 uppercase">
                     Recomendación principal
                   </p>
@@ -845,7 +720,7 @@ export function DashboardOverview({
                         return (
                           <div
                             key={step.id}
-                            className="rounded-3xl bg-white/88 p-5"
+                            className="rounded-2xl bg-white/88 p-5"
                           >
                             <div className="flex items-center justify-between gap-3">
                               <p className="text-muted text-xs tracking-[0.16em] uppercase">
@@ -880,7 +755,7 @@ export function DashboardOverview({
                       })}
                     </div>
                   </div>
-                  <div className="rounded-[1.6rem] border border-white/70 bg-white/82 p-4 2xl:sticky 2xl:top-6">
+                  <div className="rounded-[1.6rem] border border-border/50 bg-white/82 p-4 2xl:sticky 2xl:top-6">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Siguiente foco
                     </p>
@@ -945,7 +820,7 @@ export function DashboardOverview({
               <p className="text-muted mt-2 text-sm leading-7">
                 {planStatusCopy}
               </p>
-              <div className="mt-4 rounded-[1.45rem] border border-white/70 bg-white/82 p-4 text-sm leading-7 text-muted">
+              <div className="mt-4 rounded-xl border border-border/50 bg-white/82 p-4 text-sm leading-7 text-muted">
                 {isPremiumUnlocked
                   ? "Aquí entras directo al simulador o revisas la estructura activa sin pasar por varias pantallas."
                   : "Aquí solo te mostramos el siguiente paso natural, no una lista larga de decisiones."}
@@ -999,7 +874,7 @@ export function DashboardOverview({
                       <button
                         key={action.title}
                         type="button"
-                        className="hover:border-primary/15 rounded-3xl border border-white/60 bg-white/80 p-4 text-left transition hover:bg-white"
+                        className="hover:border-primary/15 rounded-2xl border border-border/50 bg-white/80 p-4 text-left transition hover:bg-white"
                         onClick={() => navigateTo(action.href)}
                       >
                         <div className="flex items-start gap-3">
@@ -1023,7 +898,7 @@ export function DashboardOverview({
                     );
                   })
                 ) : (
-                  <div className="text-muted rounded-3xl border border-white/60 bg-white/80 p-4 text-sm leading-7">
+                  <div className="text-muted rounded-2xl border border-border/50 bg-white/80 p-4 text-sm leading-7">
                     Después de resolver lo de hoy, aquí verás los siguientes
                     ajustes útiles para sostener el ritmo sin abrir demasiados
                     frentes a la vez.
@@ -1067,7 +942,7 @@ export function DashboardOverview({
                       {getPlanSupportText(plan)}
                     </p>
                     <div className="mt-5 grid gap-4 md:grid-cols-2">
-                      <div className="rounded-[1.5rem] border border-white/70 bg-white/85 p-4">
+                      <div className="rounded-[1.5rem] border border-border/50 bg-white/85 p-4">
                         <p className="text-muted text-xs tracking-[0.16em] uppercase">
                           Intereses
                         </p>
@@ -1075,7 +950,7 @@ export function DashboardOverview({
                           {formatCurrency(plan.totalInterest)}
                         </p>
                       </div>
-                      <div className="rounded-[1.5rem] border border-white/70 bg-white/85 p-4">
+                      <div className="rounded-[1.5rem] border border-border/50 bg-white/85 p-4">
                         <p className="text-muted text-xs tracking-[0.16em] uppercase">
                           Presupuesto
                         </p>
@@ -1099,7 +974,7 @@ export function DashboardOverview({
                   <p className="support-copy mt-3">
                     {data.planComparison?.description}
                   </p>
-                  <div className="text-foreground mt-5 rounded-[1.6rem] border border-white/70 bg-white/82 p-4 text-sm leading-7">
+                  <div className="text-foreground mt-5 rounded-[1.6rem] border border-border/50 bg-white/82 p-4 text-sm leading-7">
                     <span className="font-semibold">Por qué va primero:</span>{" "}
                     {data.planComparison?.immediateAction}
                   </div>
@@ -1193,7 +1068,7 @@ export function DashboardOverview({
                   </div>
                 ) : null}
                 <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-                  <div className="rounded-3xl border border-white/70 bg-white/85 px-4 py-4 text-sm">
+                  <div className="rounded-2xl border border-border/50 bg-white/85 px-4 py-4 text-sm">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Interés visible
                     </p>
@@ -1201,7 +1076,7 @@ export function DashboardOverview({
                       {formatCurrency(data.summary.estimatedMonthlyInterest)}
                     </p>
                   </div>
-                  <div className="rounded-3xl border border-white/70 bg-white/85 px-4 py-4 text-sm">
+                  <div className="rounded-2xl border border-border/50 bg-white/85 px-4 py-4 text-sm">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Ritmo actual
                     </p>
@@ -1209,7 +1084,7 @@ export function DashboardOverview({
                       {formatMonthsLabel(data.summary.monthsToDebtFree)}
                     </p>
                   </div>
-                  <div className="rounded-3xl border border-white/70 bg-white/85 px-4 py-4 text-sm md:col-span-2 2xl:col-span-1">
+                  <div className="rounded-2xl border border-border/50 bg-white/85 px-4 py-4 text-sm md:col-span-2 2xl:col-span-1">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Presión principal
                     </p>
@@ -1221,15 +1096,15 @@ export function DashboardOverview({
                   </div>
                 </div>
                 <div className="mt-4 grid gap-3">
-                  <div className="text-foreground rounded-3xl border border-white/70 bg-white/85 px-4 py-3 text-sm">
+                  <div className="text-foreground rounded-2xl border border-border/50 bg-white/85 px-4 py-3 text-sm">
                     <span className="font-semibold">Base:</span> control,
                     registro y simulación simple.
                   </div>
-                  <div className="text-foreground rounded-3xl border border-white/70 bg-white/85 px-4 py-3 text-sm">
+                  <div className="text-foreground rounded-2xl border border-border/50 bg-white/85 px-4 py-3 text-sm">
                     <span className="font-semibold">Premium:</span> plan
                     recomendado para salir más rápido en 6 meses.
                   </div>
-                  <div className="text-foreground rounded-3xl border border-white/70 bg-white/85 px-4 py-3 text-sm">
+                  <div className="text-foreground rounded-2xl border border-border/50 bg-white/85 px-4 py-3 text-sm">
                     <span className="font-semibold">Pro:</span> seguimiento
                     premium extendido por 12 meses.
                   </div>
@@ -1369,7 +1244,7 @@ export function DashboardOverview({
                   principal.
                 </p>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <div className="rounded-3xl bg-white/85 p-4 sm:p-5 md:col-span-2">
+                  <div className="rounded-2xl bg-white/85 p-4 sm:p-5 md:col-span-2">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Presupuesto sugerido
                     </p>
@@ -1379,7 +1254,7 @@ export function DashboardOverview({
                       )}
                     </p>
                   </div>
-                  <div className="rounded-3xl bg-white/85 p-4 sm:p-5">
+                  <div className="rounded-2xl bg-white/85 p-4 sm:p-5">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Vencimientos cercanos
                     </p>
@@ -1387,7 +1262,7 @@ export function DashboardOverview({
                       {data.dueSoonDebts.length}
                     </p>
                   </div>
-                  <div className="rounded-3xl bg-white/85 p-4 sm:p-5">
+                  <div className="rounded-2xl bg-white/85 p-4 sm:p-5">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Alertas activas
                     </p>
@@ -1427,7 +1302,7 @@ export function DashboardOverview({
             <CardContent className="space-y-4 pt-4">
               {isProUnlocked ? (
                 <>
-                  <div className="border-border bg-secondary/70 rounded-3xl border p-4 sm:p-5">
+                  <div className="border-border bg-secondary/70 rounded-2xl border p-4 sm:p-5">
                     <p className="text-foreground font-semibold">
                       1. Mantén la revisión semanal viva
                     </p>
@@ -1436,7 +1311,7 @@ export function DashboardOverview({
                         "Tu seguimiento ya tiene suficiente contexto para revisar avance, alertas y prioridad una vez por semana."}
                     </p>
                   </div>
-                  <div className="border-border bg-secondary/70 rounded-3xl border p-4 sm:p-5">
+                  <div className="border-border bg-secondary/70 rounded-2xl border p-4 sm:p-5">
                     <p className="text-foreground font-semibold">
                       2. Lee el progreso con más historial
                     </p>
@@ -1446,7 +1321,7 @@ export function DashboardOverview({
                       juzgar si el ritmo está mejorando o se está estancando.
                     </p>
                   </div>
-                  <div className="border-border bg-secondary/70 rounded-3xl border p-4 sm:p-5">
+                  <div className="border-border bg-secondary/70 rounded-2xl border p-4 sm:p-5">
                     <p className="text-foreground font-semibold">
                       3. Convierte alertas en seguimiento
                     </p>
@@ -1473,7 +1348,7 @@ export function DashboardOverview({
                 </>
               ) : (
                 <>
-                  <div className="border-border bg-secondary/70 rounded-3xl border p-4 sm:p-5">
+                  <div className="border-border bg-secondary/70 rounded-2xl border p-4 sm:p-5">
                     <p className="text-foreground font-semibold">
                       1. Más historia para leer tu ritmo
                     </p>
@@ -1483,7 +1358,7 @@ export function DashboardOverview({
                       se está sosteniendo.
                     </p>
                   </div>
-                  <div className="border-border bg-secondary/70 rounded-3xl border p-4 sm:p-5">
+                  <div className="border-border bg-secondary/70 rounded-2xl border p-4 sm:p-5">
                     <p className="text-foreground font-semibold">
                       2. Exportes y seguimiento más operativo
                     </p>
@@ -1492,7 +1367,7 @@ export function DashboardOverview({
                       más contexto y una lectura más larga del plan.
                     </p>
                   </div>
-                  <div className="border-primary/15 rounded-3xl border bg-[rgba(255,248,241,0.88)] p-4 sm:p-5">
+                  <div className="border-primary/15 rounded-2xl border bg-[rgba(255,248,241,0.88)] p-4 sm:p-5">
                     <div className="flex items-center gap-3">
                       <Badge variant="warning">Control total en Pro</Badge>
                       <Badge variant="default">Seguimiento 12 meses</Badge>
@@ -1537,7 +1412,7 @@ export function DashboardOverview({
             ) : hasHistory ? (
               <ChartLoadingPlaceholder />
             ) : (
-              <div className="border-border bg-secondary/30 flex h-full flex-col items-center justify-center rounded-3xl border border-dashed px-6 text-center">
+              <div className="border-border bg-secondary/30 flex h-full flex-col items-center justify-center rounded-2xl border border-dashed px-6 text-center">
                 <p className="text-foreground text-base font-semibold">
                   Todavía no hay historial suficiente
                 </p>
@@ -1563,7 +1438,7 @@ export function DashboardOverview({
             ) : hasBreakdown ? (
               <ChartLoadingPlaceholder />
             ) : (
-              <div className="border-border bg-secondary/30 flex h-full flex-col items-center justify-center rounded-3xl border border-dashed px-6 text-center">
+              <div className="border-border bg-secondary/30 flex h-full flex-col items-center justify-center rounded-2xl border border-dashed px-6 text-center">
                 <p className="text-foreground text-base font-semibold">
                   Aquí aparecerá tu mezcla de deudas
                 </p>
@@ -1603,7 +1478,7 @@ export function DashboardOverview({
                   {data.planComparison?.immediateAction}
                 </p>
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-3xl bg-white/90 p-4 sm:p-5">
+                  <div className="rounded-2xl bg-white/90 p-4 sm:p-5">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Ruta elegida
                     </p>
@@ -1611,7 +1486,7 @@ export function DashboardOverview({
                       {optimizedPlan.strategyLabel}
                     </p>
                   </div>
-                  <div className="rounded-3xl bg-white/90 p-4 sm:p-5">
+                  <div className="rounded-2xl bg-white/90 p-4 sm:p-5">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Intereses evitables
                     </p>
@@ -1621,7 +1496,7 @@ export function DashboardOverview({
                       )}
                     </p>
                   </div>
-                  <div className="rounded-3xl bg-white/90 p-4 sm:p-5 md:col-span-2">
+                  <div className="rounded-2xl bg-white/90 p-4 sm:p-5 md:col-span-2">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Pago mensual sugerido
                     </p>
@@ -1701,7 +1576,7 @@ export function DashboardOverview({
                       {priorityOne.explanation}
                     </p>
                     {priorityReason ? (
-                      <div className="text-foreground mt-4 rounded-3xl border border-white/70 bg-white/85 p-4 text-sm leading-7">
+                      <div className="text-foreground mt-4 rounded-2xl border border-border/50 bg-white/85 p-4 text-sm leading-7">
                         <span className="font-semibold">Por qué va primero:</span>{" "}
                         {priorityReason.support}
                       </div>
@@ -1717,7 +1592,7 @@ export function DashboardOverview({
                   </div>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-3xl border border-white/70 bg-white/85 px-4 py-4 text-sm">
+                  <div className="rounded-2xl border border-border/50 bg-white/85 px-4 py-4 text-sm">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Saldo actual
                     </p>
@@ -1725,7 +1600,7 @@ export function DashboardOverview({
                       {formatCurrency(priorityOne.balance)}
                     </p>
                   </div>
-                  <div className="rounded-3xl border border-white/70 bg-white/85 px-4 py-4 text-sm">
+                  <div className="rounded-2xl border border-border/50 bg-white/85 px-4 py-4 text-sm">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Tasa mensual aprox.
                     </p>
@@ -1733,7 +1608,7 @@ export function DashboardOverview({
                       {priorityOne.monthlyRatePct.toFixed(2)}%
                     </p>
                   </div>
-                  <div className="rounded-3xl border border-white/70 bg-white/85 px-4 py-4 text-sm md:col-span-2">
+                  <div className="rounded-2xl border border-border/50 bg-white/85 px-4 py-4 text-sm md:col-span-2">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Si la sostienes
                     </p>
@@ -1780,7 +1655,7 @@ export function DashboardOverview({
                       </p>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
-                      <div className="rounded-3xl border border-white/70 bg-white/85 p-4 text-sm">
+                      <div className="rounded-2xl border border-border/50 bg-white/85 p-4 text-sm">
                         <p className="text-muted text-xs tracking-[0.16em] uppercase">
                           Saldo actual
                         </p>
@@ -1788,7 +1663,7 @@ export function DashboardOverview({
                           {formatCurrency(item.balance)}
                         </p>
                       </div>
-                      <div className="rounded-3xl border border-white/70 bg-white/85 p-4 text-sm">
+                      <div className="rounded-2xl border border-border/50 bg-white/85 p-4 text-sm">
                         <p className="text-muted text-xs tracking-[0.16em] uppercase">
                           Tasa mensual aprox.
                         </p>
@@ -1868,7 +1743,7 @@ export function DashboardOverview({
                 data.riskAlerts.map((alert) => (
                 <div
                   key={alert.title}
-                  className="border-border bg-secondary/70 rounded-3xl border p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:p-5"
+                  className="border-border bg-secondary/70 rounded-2xl border p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:p-5"
                 >
                     <p className="text-foreground font-semibold">
                       {alert.title}
@@ -1901,7 +1776,7 @@ export function DashboardOverview({
               data.dueSoonDebts.map((debt) => (
                 <div
                   key={debt.id}
-                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-3xl border p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:grid-cols-[minmax(0,1fr)_170px] sm:items-center"
+                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-2xl border p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:grid-cols-[minmax(0,1fr)_170px] sm:items-center"
                 >
                   <div className="min-w-0">
                     <p className="text-foreground font-semibold">{debt.name}</p>
@@ -1911,7 +1786,7 @@ export function DashboardOverview({
                         : "Sin fecha"}
                     </p>
                   </div>
-                  <div className="rounded-3xl border border-white/70 bg-white/85 px-4 py-3 sm:text-right">
+                  <div className="rounded-2xl border border-border/50 bg-white/85 px-4 py-3 sm:text-right">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Pago mínimo
                     </p>
@@ -1941,7 +1816,7 @@ export function DashboardOverview({
               data.recentPayments.map((payment) => (
                 <div
                   key={payment.id}
-                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-3xl border p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center"
+                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-2xl border p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center"
                 >
                   <div className="min-w-0">
                     <p className="text-foreground font-semibold">
@@ -1951,7 +1826,7 @@ export function DashboardOverview({
                       {formatDate(payment.paidAt)}
                     </p>
                   </div>
-                  <div className="rounded-3xl border border-white/70 bg-white/85 px-4 py-3 sm:text-right">
+                  <div className="rounded-2xl border border-border/50 bg-white/85 px-4 py-3 sm:text-right">
                     <p className="value-stable text-foreground text-sm font-semibold">
                       {formatCurrency(payment.amount)}
                     </p>
