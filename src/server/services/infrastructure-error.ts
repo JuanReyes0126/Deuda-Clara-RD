@@ -1,5 +1,10 @@
 import { Prisma } from "@prisma/client";
 
+import {
+  isPrismaClosedConnectionError,
+  isPrismaReconnectableError,
+} from "@/lib/db/prisma";
+
 const transientPrismaCodes = new Set([
   "P1001",
   "P1002",
@@ -10,7 +15,7 @@ const transientPrismaCodes = new Set([
 ]);
 
 export function isInfrastructureUnavailableError(error: unknown) {
-  if (error instanceof Prisma.PrismaClientInitializationError) {
+  if (isPrismaReconnectableError(error)) {
     return true;
   }
 
@@ -21,5 +26,7 @@ export function isInfrastructureUnavailableError(error: unknown) {
     return true;
   }
 
-  return false;
+  return error instanceof Prisma.PrismaClientUnknownRequestError
+    ? isPrismaClosedConnectionError(error)
+    : false;
 }

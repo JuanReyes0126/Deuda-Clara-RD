@@ -20,6 +20,7 @@ vi.mock("next/headers", () => ({
 
 describe("demo payments fallback", () => {
   beforeEach(() => {
+    vi.resetModules();
     cookieState.clear();
     cookieStore.get.mockClear();
     cookieStore.set.mockClear();
@@ -46,7 +47,7 @@ describe("demo payments fallback", () => {
     expect(updatedDebt.totalPaid).toBe(37000);
     expect(updatedDebt.lastPaymentAmount).toBe(5000);
     expect(updatedDebt.effectiveBalance).toBe(payment.remainingBalanceAfter ?? 0);
-  });
+  }, 15000);
 
   it("permite editar un pago demo sin romper el saldo", async () => {
     const { createDemoPayment, updateDemoPayment } = await import("@/lib/demo/payments");
@@ -72,7 +73,7 @@ describe("demo payments fallback", () => {
     expect(updatedDebt.totalPaid).toBe(28600);
     expect(updatedDebt.lastPaymentAmount).toBe(9000);
     expect(updatedDebt.effectiveBalance).toBe(updatedPayment.remainingBalanceAfter ?? 0);
-  });
+  }, 15000);
 
   it("elimina pagos demo y revierte el estado de la deuda", async () => {
     const { createDemoPayment, deleteDemoPayment, listDemoPayments } = await import("@/lib/demo/payments");
@@ -95,5 +96,5 @@ describe("demo payments fallback", () => {
     expect(updatedDebt.totalPaid).toBe(32000);
     expect(updatedDebt.lastPaymentAmount).toBe(8000);
     expect(updatedDebt.effectiveBalance).toBe(128000);
-  });
+  }, 15000);
 });

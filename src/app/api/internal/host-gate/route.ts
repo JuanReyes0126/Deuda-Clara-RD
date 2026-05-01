@@ -4,6 +4,7 @@ import { z } from "zod";
 import { HOST_PANEL_ROUTE } from "@/lib/host/panel";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { assertRateLimit, buildRateLimitKey } from "@/lib/security/rate-limit";
+import { apiBadRequest, apiRateLimited, handleApiError } from "@/server/api/api-response";
 import { logSecurityEvent, logServerWarn } from "@/server/observability/logger";
 import {
   assertHostPanelApiAccess,
@@ -24,27 +25,21 @@ export async function POST(request: NextRequest) {
     });
 
     if (decision.outcome === "LOGIN") {
-      return NextResponse.json({ error: "No autenticado." }, { status: 401 });
+      return apiBadRequest("No autenticado.", 401);
     }
 
     if (decision.outcome === "NOT_FOUND") {
-      return NextResponse.json({ error: "No encontrado." }, { status: 404 });
+      return apiBadRequest("No encontrado.", 404);
     }
 
     if (decision.outcome === "MFA_SETUP_REQUIRED") {
-      return NextResponse.json(
-        { error: "Activa MFA en Configuración antes de usar el panel interno." },
-        { status: 403 },
-      );
+      return apiBadRequest("Activa MFA en Configuración antes de usar el panel interno.", 403);
     }
 
     const parsed = hostGateSchema.safeParse(await request.json());
 
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? "Datos inválidos." },
-        { status: 400 },
-      );
+      return apiBadRequest(parsed.error.issues[0]?.message ?? "Datos inválidos.");
     }
 
     const rateLimit = await assertRateLimit({
@@ -57,9 +52,9 @@ export async function POST(request: NextRequest) {
       logSecurityEvent("rate_limit_host_gate", {
         userId: decision.user.id,
       });
-      return NextResponse.json(
-        { error: "Demasiados intentos. Intenta más tarde." },
-        { status: 429 },
+      return apiRateLimited(
+        "Demasiados intentos. Intenta más tarde.",
+        rateLimit.resetAt,
       );
     }
 
@@ -69,19 +64,13 @@ export async function POST(request: NextRequest) {
       logServerWarn("Host secondary password rejected", {
         email: decision.user.email,
       });
-      return NextResponse.json(
-        { error: "La clave secundaria no coincide." },
-        { status: 401 },
-      );
+      return apiBadRequest("La clave secundaria no coincide.", 401);
     }
 
     await setHostPanelGateCookie();
 
     return NextResponse.json({ ok: true, redirectTo: HOST_PANEL_ROUTE });
-  } catch {
-    return NextResponse.json(
-      { error: "No se pudo desbloquear el panel interno." },
-      { status: 500 },
-    );
+  } catch (error) {
+    return handleApiError(error, "No se pudo desbloquear el panel interno.");
   }
 }

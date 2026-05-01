@@ -36,6 +36,7 @@ export type BillableMembershipTier = (typeof billableMembershipTiers)[number];
 type BillingInterval = "MONTHLY" | "ANNUAL";
 type PaymentProviderEventStatus = "PROCESSING" | "PROCESSED" | "FAILED" | "SKIPPED";
 type AzulReturnOutcome = "approved" | "declined" | "cancelled";
+type BillingPaymentReturnAction = "APPROVE" | "DECLINE" | "CANCEL" | "IGNORE_ALREADY_APPROVED";
 
 type BillingProviderProcessingDecision =
   | { shouldProcess: true }
@@ -66,6 +67,21 @@ export function getBillingProviderEventProcessingDecision(input: {
   }
 
   return { shouldProcess: true };
+}
+
+export function getBillingPaymentReturnAction(input: {
+  currentStatus: "PENDING" | "APPROVED" | "DECLINED" | "CANCELED" | "FAILED";
+  outcome: AzulReturnOutcome;
+}): BillingPaymentReturnAction {
+  if (input.currentStatus === "APPROVED" && input.outcome !== "approved") {
+    return "IGNORE_ALREADY_APPROVED";
+  }
+
+  if (input.outcome === "approved") {
+    return "APPROVE";
+  }
+
+  return input.outcome === "cancelled" ? "CANCEL" : "DECLINE";
 }
 
 function getBillingProvider(): BillingProvider {
@@ -478,15 +494,26 @@ export async function handleAzulPaymentReturn(outcome: AzulReturnOutcome, params
       throw new ServiceError("BILLING_AMOUNT_MISMATCH", 400, "El monto confirmado por AZUL no coincide.");
     }
 
-    if (outcome === "approved" && !params.AuthHash) {
-      throw new ServiceError("BILLING_SIGNATURE_MISSING", 403, "La respuesta aprobada de AZUL no trae firma.");
+    if (!params.AuthHash) {
+      throw new ServiceError("BILLING_SIGNATURE_MISSING", 403, "La respuesta de AZUL no trae firma.");
     }
 
-    if (params.AuthHash && !verifyAzulResponseHash(params)) {
+    if (!verifyAzulResponseHash(params)) {
       throw new ServiceError("BILLING_SIGNATURE_INVALID", 403, "La firma de AZUL no es válida.");
     }
 
-    if (outcome === "approved" && isAzulApprovedResponse(params)) {
+    const returnAction = getBillingPaymentReturnAction({
+      currentStatus: payment.status,
+      outcome,
+    });
+
+    if (returnAction === "IGNORE_ALREADY_APPROVED") {
+      await markBillingProviderEvent({ provider: "AZUL", externalEventId, status: "PROCESSED" });
+
+      return { checkout: "success", orderNumber: externalOrderId };
+    }
+
+    if (returnAction === "APPROVE" && isAzulApprovedResponse(params)) {
       if (payment.status !== "APPROVED") {
         await activateMembershipFromApprovedPayment({
           paymentId: payment.id,
@@ -504,11 +531,10 @@ export async function handleAzulPaymentReturn(outcome: AzulReturnOutcome, params
       return { checkout: "success", orderNumber: externalOrderId };
     }
 
-    const declinedStatus = outcome === "cancelled" ? "CANCELED" : "DECLINED";
     await prisma.billingPayment.update({
       where: { id: payment.id },
       data:
-        declinedStatus === "CANCELED"
+        returnAction === "CANCEL"
           ? { status: "CANCELED", canceledAt: new Date(), externalTransactionId }
           : { status: "DECLINED", declinedAt: new Date(), externalTransactionId },
     });

@@ -37,7 +37,7 @@ const toneClassName: Record<
 };
 
 export function PrimaryActionCard({
-  eyebrow = "Tu siguiente mejor paso",
+  eyebrow = "Mini IA Clara",
   title,
   description,
   badgeLabel,
@@ -52,7 +52,7 @@ export function PrimaryActionCard({
   return (
     <section
       className={cn(
-        "rounded-[2rem] border p-4 sm:p-6",
+        "rounded-2xl border p-4 sm:p-6",
         toneClassName[tone],
         className,
       )}
@@ -67,15 +67,15 @@ export function PrimaryActionCard({
           </div>
           <div className="mt-4 flex items-start gap-4">
             {Icon ? (
-              <span className="bg-white/85 text-primary mt-1 grid size-11 shrink-0 place-items-center rounded-2xl border border-white/80">
+              <span className="bg-white/85 text-primary mt-1 grid size-11 shrink-0 place-items-center rounded-2xl border border-border/50">
                 <Icon className="size-5" />
               </span>
             ) : null}
             <div className="min-w-0">
-              <p className="text-foreground text-[clamp(1.4rem,3.2vw,2rem)] font-semibold leading-tight">
+              <p className="text-foreground text-[clamp(1.22rem,5.2vw,2rem)] font-semibold leading-[1.08] text-balance">
                 {title}
               </p>
-              <p className="section-summary mt-3 max-w-3xl text-pretty">
+              <p className="section-summary mt-2.5 max-w-3xl text-pretty text-sm leading-6 sm:text-base sm:leading-7">
                 {description}
               </p>
             </div>
@@ -103,11 +103,11 @@ export function PrimaryActionCard({
       </div>
 
       {notes.length ? (
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
           {notes.map((note) => (
             <div
               key={note}
-              className="rounded-3xl border border-white/70 bg-white/86 px-4 py-3 text-sm leading-6 text-foreground"
+              className="rounded-xl border border-border/50 bg-white/86 px-4 py-3 text-sm leading-6 text-foreground"
             >
               {note}
             </div>

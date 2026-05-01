@@ -3,10 +3,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { getRequestMeta } from "@/lib/security/request-meta";
+import {
+  assertRateLimit,
+  buildRateLimitKey,
+} from "@/lib/security/rate-limit";
 import { debtSchema } from "@/lib/validations/debts";
 import { isInfrastructureUnavailableError } from "@/server/services/infrastructure-error";
 import { listUserDebts, createDebt } from "@/server/debts/debt-service";
-import { apiBadRequest, handleApiError } from "@/server/api/api-response";
+import {
+  apiBadRequest,
+  apiRateLimited,
+  handleApiError,
+} from "@/server/api/api-response";
 
 export async function GET() {
   try {
@@ -36,6 +44,19 @@ export async function POST(request: NextRequest) {
 
     if (!session) {
       return apiBadRequest("No autenticado.", 401);
+    }
+
+    const rateLimit = await assertRateLimit({
+      key: buildRateLimitKey(request, "debts:create", session.user.id),
+      limit: 30,
+      windowMs: 10 * 60 * 1000,
+    });
+
+    if (!rateLimit.success) {
+      return apiRateLimited(
+        "Demasiadas creaciones de deudas. Intenta más tarde.",
+        rateLimit.resetAt,
+      );
     }
 
     const parsed = debtSchema.safeParse(await request.json());

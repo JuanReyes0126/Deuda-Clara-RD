@@ -10,8 +10,10 @@ export type DebtItemDto = {
   effectiveBalance: number;
   interestRate: number;
   interestRateType: string;
+  interestRateMode: "FIXED" | "VARIABLE";
   monthlyInterestEstimate: number;
   minimumPayment: number;
+  paymentAmountType: "FIXED" | "VARIABLE";
   statementDay: number | null;
   dueDay: number | null;
   nextDueDate: string | null;
@@ -83,6 +85,13 @@ export type UserSettingsPublicDto = {
   hybridRateWeight: number;
   hybridBalanceWeight: number;
   monthlyIncome: number | null;
+  monthlyHousingCost: number | null;
+  monthlyGroceriesCost: number | null;
+  monthlyUtilitiesCost: number | null;
+  monthlyTransportCost: number | null;
+  monthlyOtherEssentialExpenses: number | null;
+  monthlyEssentialExpensesTotal: number | null;
+  monthlyDebtCapacity: number | null;
   monthlyDebtBudget: number | null;
   notifyDueSoon: boolean;
   notifyOverdue: boolean;
@@ -155,6 +164,9 @@ export type DashboardSummaryDto = {
   totalDebt: number;
   totalMinimumPayment: number;
   currentMonthlyBudget: number;
+  monthlyIncome: number | null;
+  monthlyEssentialExpensesTotal: number | null;
+  monthlyDebtCapacity: number | null;
   estimatedMonthlyInterest: number;
   paidVsPendingPercentage: number;
   projectedDebtFreeDate: string | null;
@@ -182,6 +194,9 @@ export type MembershipConversionSnapshotDto = {
   hasDebts: boolean;
   totalDebt: number;
   estimatedMonthlyInterest: number;
+  monthlyIncome: number | null;
+  monthlyEssentialExpensesTotal: number | null;
+  monthlyDebtCapacity: number | null;
   currentMonthlyBudget: number;
   suggestedMonthlyBudget: number;
   inferredExtraPayment: number;
@@ -226,6 +241,33 @@ export type DashboardPlanComparisonDto = {
   optimizedPlan: DashboardPlanSnapshotDto;
 };
 
+export type DashboardCoachDto = {
+  title: string;
+  description: string;
+  badgeLabel: string;
+  badgeVariant: "default" | "warning" | "danger" | "success";
+  tone: "default" | "warning";
+  primaryAction: {
+    label: string;
+    href: string;
+  };
+  secondaryAction: {
+    label: string;
+    href: string;
+  } | null;
+  notes: string[];
+};
+
+export type DashboardPaydownChallengeDto = {
+  state: "none" | "active" | "ended";
+  startedAt: string | null;
+  endsAt: string | null;
+  extraMonthly: number | null;
+  daysRemaining: number | null;
+  totalDays: number;
+  paymentsLoggedDuringChallenge: number;
+};
+
 export type DashboardDto = {
   summary: DashboardSummaryDto;
   membership: MembershipInfoDto;
@@ -258,9 +300,11 @@ export type DashboardDto = {
   };
   debtBreakdown: Array<{ label: string; value: number }>;
   balanceHistory: Array<{ label: string; totalBalance: number }>;
+  activeDebts: DebtItemDto[];
   recentPayments: PaymentItemDto[];
   dueSoonDebts: DebtItemDto[];
   urgentDebt: DebtItemDto | null;
+  assistantCoach: DashboardCoachDto;
   recommendedOrder: Array<{
     id: string;
     name: string;
@@ -272,11 +316,14 @@ export type DashboardDto = {
   }>;
   strategyExplanation: string;
   riskAlerts: Array<{ title: string; description: string }>;
+  paydownChallenge: DashboardPaydownChallengeDto;
 };
 
 export type OnboardingPreviewDto = {
   estimatedDebtFreeDate: string | null;
   potentialSavings: number;
+  monthlyEssentialExpensesTotal: number;
+  monthlyDebtCapacity: number;
   recommendedStrategy: "SNOWBALL" | "AVALANCHE" | "HYBRID";
   recommendedStrategyLabel: string;
   priorityDebtName: string | null;

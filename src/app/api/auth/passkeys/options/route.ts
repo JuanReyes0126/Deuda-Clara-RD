@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
       key: buildRateLimitKey(request, "passkey-login-options", email),
       limit: 10,
       windowMs: 10 * 60 * 1000,
+      requireDistributedStore: true,
     });
 
     if (!rateLimit.success) {

@@ -333,6 +333,11 @@ export async function deletePayment(
         throw new ServiceError("DEBT_NOT_FOUND", 404, "No se encontró la deuda.");
       }
 
+      await transaction.auditLog.updateMany({
+        where: { paymentId },
+        data: { paymentId: null },
+      });
+
       const paymentDelete = await transaction.payment.deleteMany({
         where: { id: paymentId, userId },
       });
@@ -340,18 +345,24 @@ export async function deletePayment(
       if (paymentDelete.count !== 1) {
         throw new ServiceError("PAYMENT_NOT_FOUND", 404, "No se encontró el pago.");
       }
+      await createAuditLog(
+        {
+          userId,
+          debtId: debt.id,
+          action: AuditAction.PAYMENT_DELETED,
+          resourceType: "payment",
+          resourceId: paymentId,
+          ipAddress: meta.ipAddress,
+          userAgent: meta.userAgent,
+          metadata: {
+            deletedFromDebtId: debt.id,
+            deletedFromDebtName: debt.name,
+          },
+        },
+        transaction,
+      );
     });
 
-    await createAuditLog({
-      userId,
-      debtId: debt.id,
-      paymentId,
-      action: AuditAction.PAYMENT_DELETED,
-      resourceType: "payment",
-      resourceId: paymentId,
-      ipAddress: meta.ipAddress,
-      userAgent: meta.userAgent,
-    });
     await captureBalanceSnapshot(userId, BalanceSnapshotSource.MUTATION);
   } catch (error) {
     if (isInfrastructureUnavailableError(error) && isDemoModeEnabled()) {

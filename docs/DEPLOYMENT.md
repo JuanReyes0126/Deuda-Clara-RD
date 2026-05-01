@@ -40,7 +40,8 @@ Para no duplicar flujo:
 
 - setup base: [STAGING_SETUP.md](./STAGING_SETUP.md)
 - ejecución completa: [STAGING_GO_LIVE_RUNBOOK.md](./STAGING_GO_LIVE_RUNBOOK.md)
-- billing: [STRIPE_SETUP.md](./STRIPE_SETUP.md)
+- billing (membresías): [BILLING_AZUL.md](./BILLING_AZUL.md); referencia histórica Stripe: [STRIPE_SETUP.md](./STRIPE_SETUP.md)
+- previews rápidos para revisar cambios: [VERCEL_PREVIEW_WORKFLOW.md](./VERCEL_PREVIEW_WORKFLOW.md)
 
 ## Job de recordatorios
 

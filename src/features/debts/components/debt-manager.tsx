@@ -57,6 +57,36 @@ const debtStatusLabels: Record<DebtFormValues["status"], string> = {
   ARCHIVED: "Archivada",
 };
 
+const debtRateModeLabels: Record<DebtFormValues["interestRateMode"], string> = {
+  FIXED: "Tasa fija",
+  VARIABLE: "Tasa variable",
+};
+
+const debtPaymentTypeLabels: Record<DebtFormValues["paymentAmountType"], string> = {
+  FIXED: "Pago fijo",
+  VARIABLE: "Pago variable",
+};
+
+const monthOptions = [
+  { value: "01", label: "Ene" },
+  { value: "02", label: "Feb" },
+  { value: "03", label: "Mar" },
+  { value: "04", label: "Abr" },
+  { value: "05", label: "May" },
+  { value: "06", label: "Jun" },
+  { value: "07", label: "Jul" },
+  { value: "08", label: "Ago" },
+  { value: "09", label: "Sep" },
+  { value: "10", label: "Oct" },
+  { value: "11", label: "Nov" },
+  { value: "12", label: "Dic" },
+] as const;
+
+const currentYear = new Date().getFullYear();
+const debtDateYearOptions = Array.from({ length: 61 }, (_, index) =>
+  String(currentYear - 10 + index),
+);
+
 const debtQuickPresets = [
   {
     key: "CREDIT_CARD",
@@ -66,7 +96,9 @@ const debtQuickPresets = [
       type: "CREDIT_CARD" as const,
       status: "CURRENT" as const,
       interestRateType: "ANNUAL" as const,
+      interestRateMode: "VARIABLE" as const,
       currency: "DOP" as const,
+      paymentAmountType: "VARIABLE" as const,
     },
   },
   {
@@ -77,7 +109,9 @@ const debtQuickPresets = [
       type: "PERSONAL_LOAN" as const,
       status: "CURRENT" as const,
       interestRateType: "ANNUAL" as const,
+      interestRateMode: "FIXED" as const,
       currency: "DOP" as const,
+      paymentAmountType: "FIXED" as const,
       creditLimit: undefined,
       statementDay: undefined,
     },
@@ -90,12 +124,36 @@ const debtQuickPresets = [
       type: "INFORMAL" as const,
       status: "CURRENT" as const,
       interestRateType: "MONTHLY" as const,
+      interestRateMode: "VARIABLE" as const,
       currency: "DOP" as const,
+      paymentAmountType: "VARIABLE" as const,
       creditLimit: undefined,
       statementDay: undefined,
     },
   },
 ] as const;
+
+const CUSTOM_CREDITOR_VALUE = "__OTHER_CREDITOR__";
+
+const rdCreditorOptions = [
+  "Banreservas",
+  "Banco Popular Dominicano",
+  "Banco BHD",
+  "Asociación Popular de Ahorros y Préstamos",
+  "Asociación Cibao de Ahorros y Préstamos",
+  "Scotiabank República Dominicana",
+  "Banco Santa Cruz",
+  "Banco Caribe",
+  "Banco Promerica",
+  "Banco Vimenca",
+  "Banco López de Haro",
+  "Asociación La Nacional de Ahorros y Préstamos",
+  "Asociación Duarte de Ahorros y Préstamos",
+  "Asociación Romana de Ahorros y Préstamos",
+  "Asociación Mocana de Ahorros y Préstamos",
+] as const;
+
+const rdCreditorOptionSet = new Set<string>(rdCreditorOptions);
 
 type DebtListFilter = "ALL" | "CURRENT" | "LATE";
 
@@ -109,7 +167,9 @@ type DebtFormValues = {
   creditLimit: number | undefined;
   interestRate: number;
   interestRateType: "ANNUAL" | "MONTHLY";
+  interestRateMode: "FIXED" | "VARIABLE";
   minimumPayment: number;
+  paymentAmountType: "FIXED" | "VARIABLE";
   statementDay: number | undefined;
   dueDay: number | undefined;
   nextDueDate: string | undefined;
@@ -140,6 +200,137 @@ function optionalDateValue(value: string) {
 function optionalNotesValue(value: string) {
   const sanitized = sanitizeMultilineText(value);
   return sanitized.length ? sanitized : undefined;
+}
+
+function padDateSegment(value: number | string) {
+  return String(value).padStart(2, "0");
+}
+
+function splitDateInput(value: string | undefined) {
+  if (!value) {
+    return {
+      year: "",
+      month: "",
+      day: "",
+    };
+  }
+
+  const [year = "", month = "", day = ""] = value.split("-");
+
+  return {
+    year,
+    month,
+    day,
+  };
+}
+
+function getDaysInMonth(year: string, month: string) {
+  const numericYear = Number(year);
+  const numericMonth = Number(month);
+
+  if (!Number.isFinite(numericYear) || !Number.isFinite(numericMonth) || numericMonth < 1 || numericMonth > 12) {
+    return 31;
+  }
+
+  return new Date(numericYear, numericMonth, 0).getDate();
+}
+
+function buildDateInputValue(input: {
+  currentValue?: string | undefined;
+  year?: string | undefined;
+  month?: string | undefined;
+  fallbackDay?: string | undefined;
+}) {
+  const current = splitDateInput(input.currentValue);
+  const year = input.year ?? current.year;
+  const month = input.month ?? current.month;
+
+  if (!year || !month) {
+    return undefined;
+  }
+
+  const currentDay = current.day || input.fallbackDay || "01";
+  const safeDay = Math.min(Number(currentDay) || 1, getDaysInMonth(year, month));
+
+  return `${year}-${month}-${padDateSegment(safeDay)}`;
+}
+
+function addYearsToDateInput(value: string | undefined, years: number, fallbackValue?: string | undefined) {
+  const baseValue = value || fallbackValue || new Date().toISOString().slice(0, 10);
+  const [year = "", month = "", day = "01"] = baseValue.split("-");
+
+  if (!year || !month) {
+    return baseValue;
+  }
+
+  const nextYear = String(Number(year) + years);
+  const safeDay = Math.min(Number(day) || 1, getDaysInMonth(nextYear, month));
+
+  return `${nextYear}-${month}-${padDateSegment(safeDay)}`;
+}
+
+function getInterestRateLabel(mode: DebtFormValues["interestRateMode"]) {
+  return mode === "VARIABLE" ? "Tasa actual de referencia" : "Tasa";
+}
+
+function getInterestRateSupport(mode: DebtFormValues["interestRateMode"]) {
+  return mode === "VARIABLE"
+    ? "Usa la tasa actual o la más reciente. Luego podrás actualizarla cuando cambie."
+    : "Introduce la tasa tal como aparece en el contrato o estado.";
+}
+
+function getPaymentAmountLabel(mode: DebtFormValues["paymentAmountType"]) {
+  return mode === "VARIABLE" ? "Pago actual de referencia" : "Pago mínimo";
+}
+
+function getPaymentAmountSupport(mode: DebtFormValues["paymentAmountType"]) {
+  return mode === "VARIABLE"
+    ? "Usa el pago más reciente o el monto que hoy te piden como referencia."
+    : "Esto ayuda a detectar cuándo una deuda se estanca solo pagando el mínimo.";
+}
+
+function getDebtStructureSummary(input: Pick<DebtItemDto, "interestRateMode" | "paymentAmountType">) {
+  return `${debtRateModeLabels[input.interestRateMode]} · ${debtPaymentTypeLabels[input.paymentAmountType]}`;
+}
+
+function formatDebtMoney(
+  value: number | string,
+  currency: DebtItemDto["currency"] | DebtFormValues["currency"],
+) {
+  return formatCurrency(value, currency);
+}
+
+function buildCurrencyBreakdown(debts: DebtItemDto[]) {
+  const totals = debts.reduce<
+    Record<
+      DebtItemDto["currency"],
+      {
+        balance: number;
+        minimumPayment: number;
+      }
+    >
+  >(
+    (acc, debt) => {
+      acc[debt.currency].balance += debt.effectiveBalance;
+      acc[debt.currency].minimumPayment += debt.minimumPayment;
+      return acc;
+    },
+    {
+      DOP: { balance: 0, minimumPayment: 0 },
+      USD: { balance: 0, minimumPayment: 0 },
+    },
+  );
+
+  return (["DOP", "USD"] as const)
+    .filter(
+      (currency) =>
+        totals[currency].balance > 0 || totals[currency].minimumPayment > 0,
+    )
+    .map((currency) => ({
+      currency,
+      balance: totals[currency].balance,
+      minimumPayment: totals[currency].minimumPayment,
+    }));
 }
 
 function buildRequiredTextValidation(maxLength: number) {
@@ -184,7 +375,9 @@ function buildMoneyValidation(
               formValues.lateFeeAmount +
               formValues.extraChargesAmount
         ) {
-          return "El pago mínimo no puede superar la deuda total actual.";
+          return formValues.paymentAmountType === "VARIABLE"
+            ? "El pago de referencia no puede superar la deuda total actual."
+            : "El pago mínimo no puede superar la deuda total actual.";
         }
 
         if (
@@ -307,7 +500,9 @@ function emptyDebtValues(): DebtFormValues {
     creditLimit: undefined,
     interestRate: 0,
     interestRateType: "ANNUAL",
+    interestRateMode: "FIXED",
     minimumPayment: 0,
+    paymentAmountType: "FIXED",
     statementDay: undefined,
     dueDay: undefined,
     nextDueDate: undefined,
@@ -331,7 +526,9 @@ function debtToFormValues(debt: DebtItemDto): DebtFormValues {
     creditLimit: debt.creditLimit ?? undefined,
     interestRate: debt.interestRate,
     interestRateType: debt.interestRateType as DebtFormValues["interestRateType"],
+    interestRateMode: debt.interestRateMode,
     minimumPayment: debt.minimumPayment,
+    paymentAmountType: debt.paymentAmountType,
     statementDay: debt.statementDay ?? undefined,
     dueDay: debt.dueDay ?? undefined,
     nextDueDate: toDateInput(debt.nextDueDate),
@@ -361,6 +558,44 @@ async function requestJson(url: string, init?: RequestInit) {
   return payload;
 }
 
+function getDebtPriorityLabel(
+  debt: DebtItemDto,
+  options: { isPriority: boolean },
+) {
+  if (debt.status === "LATE") {
+    return "Riesgo alto";
+  }
+
+  if (options.isPriority) {
+    return "Prioridad";
+  }
+
+  if (debt.nextDueDate) {
+    return "Por vencer";
+  }
+
+  return "Estable";
+}
+
+function getDebtPriorityVariant(
+  debt: DebtItemDto,
+  options: { isPriority: boolean },
+): "danger" | "warning" | "success" | "default" {
+  if (debt.status === "LATE") {
+    return "danger";
+  }
+
+  if (options.isPriority) {
+    return "warning";
+  }
+
+  if (debt.status === "CURRENT") {
+    return "success";
+  }
+
+  return "default";
+}
+
 export function DebtManager({
   debts,
   summary,
@@ -381,6 +616,7 @@ export function DebtManager({
   });
   const upgradeHref = `/planes?plan=${access.upgradeTargetTier}&source=deudas`;
   const [selectedDebt, setSelectedDebt] = useState<DebtItemDto | null>(null);
+  const [expandedDebtId, setExpandedDebtId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [listFilter, setListFilter] = useState<DebtListFilter>("ALL");
@@ -393,6 +629,7 @@ export function DebtManager({
   });
   const isOnboardingFlow = entryFlow === "onboarding";
   const watchedType = useWatch({ control: form.control, name: "type" }) ?? "CREDIT_CARD";
+  const watchedCreditorName = useWatch({ control: form.control, name: "creditorName" }) ?? "";
   const watchedCurrentBalance = Number(
     useWatch({ control: form.control, name: "currentBalance" }) ?? 0,
   );
@@ -413,7 +650,23 @@ export function DebtManager({
   );
   const watchedInterestRateType =
     useWatch({ control: form.control, name: "interestRateType" }) ?? "ANNUAL";
+  const watchedInterestRateMode =
+    useWatch({ control: form.control, name: "interestRateMode" }) ?? "FIXED";
+  const watchedPaymentAmountType =
+    useWatch({ control: form.control, name: "paymentAmountType" }) ?? "FIXED";
+  const watchedCurrency =
+    useWatch({ control: form.control, name: "currency" }) ?? "DOP";
+  const watchedNextDueDate = useWatch({ control: form.control, name: "nextDueDate" }) ?? "";
+  const watchedStartedAt = useWatch({ control: form.control, name: "startedAt" }) ?? "";
+  const watchedEstimatedEndAt =
+    useWatch({ control: form.control, name: "estimatedEndAt" }) ?? "";
   const isCreditCard = watchedType === "CREDIT_CARD";
+  const isPresetCreditor = rdCreditorOptionSet.has(watchedCreditorName);
+  const creditorSelectValue = watchedCreditorName
+    ? isPresetCreditor
+      ? watchedCreditorName
+      : CUSTOM_CREDITOR_VALUE
+    : "";
   const filteredDebts = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
 
@@ -462,16 +715,38 @@ export function DebtManager({
     activeDebts.length >= access.maxActiveDebts && !selectedDebt;
   const hiddenDebtCount = Math.max(0, activeDebts.length - access.maxActiveDebts);
   const debtLimitNotes = getDebtLimitUpgradeNotes();
+  const hasVariablePaymentDebt = activeDebts.some(
+    (debt) => debt.paymentAmountType === "VARIABLE",
+  );
+  const currencyBreakdown = useMemo(
+    () => buildCurrencyBreakdown(activeDebts),
+    [activeDebts],
+  );
+  const hasMixedCurrencies = currencyBreakdown.length > 1;
+  const totalBalanceDisplay = hasMixedCurrencies
+    ? currencyBreakdown
+        .map((item) => formatDebtMoney(item.balance, item.currency))
+        .join(" · ")
+    : formatCurrency(summary.totalBalance);
+  const totalMinimumPaymentDisplay = hasMixedCurrencies
+    ? currencyBreakdown
+        .map((item) => formatDebtMoney(item.minimumPayment, item.currency))
+        .join(" · ")
+    : formatCurrency(summary.totalMinimumPayment);
+  const mixedCurrencySupport = hasMixedCurrencies
+    ? "Separado por moneda para que RD$ y USD no se mezclen en un mismo total."
+    : null;
   const debtSummaryItems: ExecutiveSummaryItem[] = [
     {
-      label: "Saldo total",
-      value: formatCurrency(summary.totalBalance),
+      label: hasMixedCurrencies ? "Saldo visible por moneda" : "Saldo total",
+      value: totalBalanceDisplay,
       support: activeDebts.length
-        ? "Lo que hoy necesitas ordenar para recuperar control."
+        ? mixedCurrencySupport ?? "Lo que hoy necesitas ordenar para recuperar control."
         : "Aquí aparecerá tu panorama apenas registres la primera deuda.",
       badgeLabel: activeDebts.length ? "Panorama real" : "Empieza aquí",
       badgeVariant: activeDebts.length ? ("success" as const) : ("default" as const),
       featured: true,
+      valueKind: hasMixedCurrencies ? ("text" as const) : undefined,
     },
     {
       label: "Deudas activas",
@@ -482,9 +757,16 @@ export function DebtManager({
       valueKind: "text" as const,
     },
     {
-      label: "Pago mínimo total",
-      value: formatCurrency(summary.totalMinimumPayment),
-      support: "Lo mínimo para sostenerte al día este mes.",
+      label:
+        hasVariablePaymentDebt || hasMixedCurrencies
+          ? "Pago base visible"
+          : "Pago mínimo total",
+      value: totalMinimumPaymentDisplay,
+      support: hasVariablePaymentDebt
+        ? mixedCurrencySupport ??
+          "Incluye mínimos fijos y montos de referencia para deudas variables."
+        : mixedCurrencySupport ?? "Lo mínimo para sostenerte al día este mes.",
+      valueKind: hasMixedCurrencies ? ("text" as const) : undefined,
     },
     {
       label: "Más presión hoy",
@@ -536,8 +818,36 @@ export function DebtManager({
     }
   }, [form, isCreditCard]);
 
+  const updateDateAssist = (
+    fieldName: "nextDueDate" | "startedAt" | "estimatedEndAt",
+    part: "month" | "year",
+    value: string,
+  ) => {
+    const currentValue = form.getValues(fieldName);
+    const currentDateParts = splitDateInput(currentValue);
+    const today = new Date();
+    const nextValue = buildDateInputValue({
+      currentValue,
+      year:
+        part === "year"
+          ? value
+          : currentDateParts.year || String(today.getFullYear()),
+      month:
+        part === "month"
+          ? value
+          : currentDateParts.month || padDateSegment(today.getMonth() + 1),
+      fallbackDay: fieldName === "nextDueDate" ? "15" : "01",
+    });
+
+    form.setValue(fieldName, nextValue, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  };
+
   const resetForm = () => {
     setSelectedDebt(null);
+    setExpandedDebtId(null);
     form.reset(emptyDebtValues());
   };
 
@@ -564,7 +874,14 @@ export function DebtManager({
 
   const startEditingDebt = (debt: DebtItemDto) => {
     setSelectedDebt(debt);
+    setExpandedDebtId(debt.id);
     form.reset(debtToFormValues(debt));
+    window.requestAnimationFrame(() => {
+      document.getElementById("debt-form-card")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
   };
 
   const submit = form.handleSubmit(async (values) => {
@@ -665,8 +982,8 @@ export function DebtManager({
 
       <ModuleSectionHeader
         kicker="Deudas"
-        title="Ordena tus deudas y detecta cuál necesita atención primero."
-        description="Arriba ves el panorama, luego una recomendación directa. El listado va primero para que entiendas tu realidad antes de editar."
+        title="Ordena tus deudas y detecta la prioridad de hoy."
+        description="Mira qué cuenta presiona más y actúa sin ruido."
         action={
           debtLimitReached ? (
             <Button className="w-full sm:w-auto" onClick={() => router.push(upgradeHref as never)}>
@@ -681,7 +998,7 @@ export function DebtManager({
       />
 
       {access.isBase ? (
-        <div className="rounded-[1.6rem] border border-dashed border-primary/18 bg-[rgba(255,248,241,0.82)] px-4 py-4 sm:px-5">
+        <div className="hidden rounded-[1.6rem] border border-dashed border-primary/18 bg-[rgba(255,248,241,0.82)] px-4 py-4 sm:px-5 lg:block">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0 max-w-3xl">
               <p className="text-primary text-sm font-semibold tracking-[0.16em] uppercase">
@@ -713,59 +1030,133 @@ export function DebtManager({
         </div>
       ) : null}
 
-      <ExecutiveSummaryStrip items={debtSummaryItems} />
+      <section className="-mx-1 grid gap-3 lg:hidden">
+        <div className="rounded-2xl border border-border bg-white/92 p-4 shadow-soft">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="min-w-0 rounded-[1.2rem] border border-border/70 bg-secondary/45 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+                Saldo visible
+              </p>
+              <p className="value-stable mt-1 text-lg font-semibold text-foreground">
+                {totalBalanceDisplay}
+              </p>
+              {mixedCurrencySupport ? (
+                <p className="mt-1 text-xs leading-5 text-muted">{mixedCurrencySupport}</p>
+              ) : null}
+            </div>
+            <div className="min-w-0 rounded-[1.2rem] border border-border/70 bg-secondary/45 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+                Próxima atención
+              </p>
+              <p className="mt-1 text-sm font-semibold leading-5 text-foreground">
+                {priorityDebt?.name ?? "Registra una deuda"}
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                {priorityDebt?.nextDueDate
+                  ? formatDate(priorityDebt.nextDueDate)
+                  : priorityDebt
+                    ? debtStatusLabels[priorityDebt.status as DebtFormValues["status"]]
+                    : "Activa tu primer panorama"}
+              </p>
+            </div>
+            <div className="min-w-0 rounded-[1.2rem] border border-border/70 bg-secondary/45 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+                Riesgo actual
+              </p>
+              <p className="mt-1 text-sm font-semibold leading-5 text-foreground">
+                {priorityDebt?.status === "LATE"
+                  ? "Alto"
+                  : activeDebts.length > 1
+                    ? "Medio"
+                    : activeDebts.length
+                      ? "Controlado"
+                      : "Sin datos"}
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                {priorityDebt?.status === "LATE"
+                  ? "Hay una deuda que ya requiere acción."
+                  : "Usa la lista para decidir qué revisar ahora."}
+              </p>
+            </div>
+          </div>
+        </div>
 
-      <PrimaryActionCard
-        eyebrow="Lo que más te conviene hoy"
-        title={
-          priorityDebt
-            ? `Tu deuda más sensible hoy es ${priorityDebt.name}.`
-            : "Registra tu primera deuda para activar una prioridad real."
-        }
-        description={
-          priorityDebt
-            ? priorityDebt.status === "LATE"
-              ? "Ya viene atrasada. Si la atiendes primero, reduces presión y evitas que la mora siga ganando terreno."
-              : priorityDebt.nextDueDate
-                ? "Es la que más conviene proteger ahora por vencimiento, interés o presión sobre el flujo."
-                : "Hoy es la que más conviene revisar antes de repartir dinero entre varias cuentas."
-            : "Con una sola deuda ya podemos mostrarte costo mensual, riesgo y qué conviene atacar primero."
-        }
-        badgeLabel={priorityDebt?.status === "LATE" ? "Urgente" : "Siguiente mejor paso"}
-        badgeVariant={priorityDebt?.status === "LATE" ? "danger" : "default"}
-        primaryAction={{
-          label: priorityDebt ? "Registrar deuda / editar prioridad" : "Registrar deuda",
-          onClick: () => form.setFocus(priorityDebt ? "name" : "name"),
-        }}
-        secondaryAction={
-          activeDebts.length
-            ? {
-                label: "Ir a pagos",
-                onClick: () => router.push("/pagos"),
-                variant: "secondary",
-              }
-            : undefined
-        }
-        notes={
-          priorityDebt
-            ? [
-                `Saldo visible: ${formatCurrency(priorityDebt.effectiveBalance)}.`,
-                `Pago mínimo: ${formatCurrency(priorityDebt.minimumPayment)}.`,
-              ]
-            : [
-                "Empieza por saldo, pago mínimo y vencimiento.",
-                "Luego la app te ayuda con prioridad y alertas.",
-              ]
-        }
-        tone={priorityDebt?.status === "LATE" ? "warning" : "default"}
-      />
+        {access.isBase ? (
+          <div className="rounded-2xl border border-dashed border-primary/18 bg-[rgba(255,248,241,0.82)] p-4">
+            <p className="text-sm font-semibold text-foreground">
+              Base te deja organizar hasta {access.maxActiveDebts} deudas activas.
+            </p>
+            <p className="mt-2 text-sm text-muted">
+              Si necesitas ver el panorama completo, pasa a Premium.
+            </p>
+            <Button
+              className="mt-3 w-full"
+              variant="secondary"
+              onClick={() => router.push(upgradeHref as never)}
+            >
+              Desbloquear más deudas
+            </Button>
+          </div>
+        ) : null}
+      </section>
+
+      <div className="hidden lg:block">
+        <ExecutiveSummaryStrip items={debtSummaryItems} />
+      </div>
+
+      <div className="hidden lg:block">
+        <PrimaryActionCard
+          eyebrow="Lo que más te conviene hoy"
+          title={
+            priorityDebt
+              ? `Tu deuda más sensible hoy es ${priorityDebt.name}.`
+              : "Registra tu primera deuda para activar una prioridad real."
+          }
+          description={
+            priorityDebt
+              ? priorityDebt.status === "LATE"
+                ? "Ya viene atrasada. Si la atiendes primero, reduces presión y evitas que la mora siga ganando terreno."
+                : priorityDebt.nextDueDate
+                  ? "Es la que más conviene proteger ahora por vencimiento, interés o presión sobre el flujo."
+                  : "Hoy es la que más conviene revisar antes de repartir dinero entre varias cuentas."
+              : "Con una sola deuda ya podemos mostrarte costo mensual, riesgo y qué conviene atacar primero."
+          }
+          badgeLabel={priorityDebt?.status === "LATE" ? "Urgente" : "Siguiente mejor paso"}
+          badgeVariant={priorityDebt?.status === "LATE" ? "danger" : "default"}
+          primaryAction={{
+            label: priorityDebt ? "Registrar deuda / editar prioridad" : "Registrar deuda",
+            onClick: () => form.setFocus(priorityDebt ? "name" : "name"),
+          }}
+          secondaryAction={
+            activeDebts.length
+              ? {
+                  label: "Ir a pagos",
+                  onClick: () => router.push("/pagos"),
+                  variant: "secondary",
+                }
+              : undefined
+          }
+          notes={
+            priorityDebt
+              ? [
+                  `Saldo visible: ${formatDebtMoney(priorityDebt.effectiveBalance, priorityDebt.currency)}.`,
+                  `${priorityDebt.paymentAmountType === "VARIABLE" ? "Pago de referencia" : "Pago mínimo"}: ${formatDebtMoney(priorityDebt.minimumPayment, priorityDebt.currency)}.`,
+                ]
+              : [
+                  "Empieza por saldo, pago base y vencimiento.",
+                  "Luego la app te ayuda con prioridad y alertas.",
+                ]
+          }
+          tone={priorityDebt?.status === "LATE" ? "warning" : "default"}
+        />
+      </div>
 
       <section className="grid gap-5 sm:gap-6 xl:grid-cols-[1.08fr_0.92fr]">
-        <Card className="order-2 -mx-1 min-w-0 p-4 sm:mx-0 sm:p-6 xl:order-2">
+        <Card id="debt-form-card" className="order-2 -mx-1 min-w-0 p-4 sm:mx-0 sm:p-6 xl:order-2">
           <CardHeader>
             <CardTitle>{selectedDebt ? "Editar deuda" : "Registrar deuda"}</CardTitle>
             <CardDescription>
-              Captura saldo real, tasa, pagos mínimos, mora y fechas clave para que el sistema pueda priorizar bien.
+              Registra saldo, tasa, pago y fechas clave sin forzar que todo sea fijo.
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-4">
@@ -780,8 +1171,8 @@ export function DebtManager({
                   </p>
                   <p className="mt-2 text-sm text-muted">
                     {selectedDebt
-                      ? "Estás editando una deuda existente. Si quieres registrar otra distinta, limpia el formulario o usa un preset."
-                      : "Usa un preset para reducir pasos. Luego ajusta saldo, pago mínimo y vencimiento."}
+                      ? "Estás editando una deuda existente."
+                      : "Usa un preset y luego ajusta saldo, tasa, pago y vencimiento."}
                   </p>
                 </div>
 
@@ -804,9 +1195,9 @@ export function DebtManager({
                 </div>
               </div>
 
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <div className="mt-4 hidden gap-3 md:grid-cols-3 lg:grid">
                 {debtQuickPresets.map((preset) => (
-                  <div key={preset.key} className="min-w-0 rounded-3xl border border-white/70 bg-white/80 p-4">
+                  <div key={preset.key} className="min-w-0 rounded-2xl border border-border/50 bg-white/80 p-4">
                     <p className="break-words text-sm font-semibold text-foreground">{preset.label}</p>
                     <p className="mt-1 break-words text-sm text-muted">{preset.description}</p>
                   </div>
@@ -838,7 +1229,7 @@ export function DebtManager({
                   {debtLimitNotes.map((note) => (
                     <div
                       key={note}
-                      className="rounded-3xl border border-white/70 bg-white/85 px-4 py-4 text-sm font-medium text-foreground"
+                      className="rounded-2xl border border-border/50 bg-white/85 px-4 py-4 text-sm font-medium text-foreground"
                     >
                       {note}
                     </div>
@@ -872,37 +1263,41 @@ export function DebtManager({
               </div>
             ) : null}
 
-            <div className="mb-6 grid gap-4 md:grid-cols-3">
-              <div className="min-w-0 rounded-3xl border border-border bg-secondary/60 p-4">
+            <div className="mb-6 hidden gap-4 md:grid-cols-3 lg:grid">
+              <div className="min-w-0 rounded-2xl border border-border bg-secondary/60 p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted">Deuda real estimada</p>
                 <p className="value-stable mt-2 text-[clamp(1rem,2.7vw,1.35rem)] font-semibold leading-tight text-foreground">
-                  {formatCurrency(livePreview.effectiveBalance)}
+                  {formatDebtMoney(livePreview.effectiveBalance, watchedCurrency)}
                 </p>
                 <p className="mt-2 text-sm text-muted">
                   Incluye saldo, mora y cargos extra registrados.
                 </p>
               </div>
-              <div className="min-w-0 rounded-3xl border border-border bg-secondary/60 p-4">
+              <div className="min-w-0 rounded-2xl border border-border bg-secondary/60 p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted">Interés estimado del mes</p>
                 <p className="value-stable mt-2 text-[clamp(1rem,2.7vw,1.35rem)] font-semibold leading-tight text-foreground">
-                  {formatCurrency(livePreview.monthlyInterestEstimate)}
+                  {formatDebtMoney(livePreview.monthlyInterestEstimate, watchedCurrency)}
                 </p>
                 <p className="mt-2 text-sm text-muted">
                   Calculado con la tasa y el saldo actual que has escrito.
                 </p>
               </div>
-              <div className="min-w-0 rounded-3xl border border-border bg-secondary/60 p-4">
+              <div className="min-w-0 rounded-2xl border border-border bg-secondary/60 p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted">Lectura rápida</p>
                 <p className="mt-2 break-words text-lg font-semibold text-foreground">
                   {livePreview.minimumPaymentRisk
-                    ? "El mínimo está demasiado justo"
+                    ? watchedPaymentAmountType === "VARIABLE"
+                      ? "La referencia de pago está demasiado justa"
+                      : "El mínimo está demasiado justo"
                     : livePreview.utilizationPct !== null
                       ? `${livePreview.utilizationPct}% de uso`
                       : "Registro listo para evaluar"}
                 </p>
                 <p className="mt-2 text-sm text-muted">
                   {livePreview.minimumPaymentRisk
-                    ? "Si solo pagas mínimos, esta deuda puede tardar demasiado en bajar."
+                    ? watchedPaymentAmountType === "VARIABLE"
+                      ? "Si la referencia de pago sigue tan baja, esta deuda puede tardar demasiado en bajar."
+                      : "Si solo pagas mínimos, esta deuda puede tardar demasiado en bajar."
                     : livePreview.utilizationPct !== null
                       ? "En tarjetas, el uso alto suele aumentar presión e intereses."
                       : "Completa fechas y montos para una recomendación más precisa."}
@@ -922,11 +1317,47 @@ export function DebtManager({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="creditorName">Institución / acreedor</Label>
-                <Input
+                <select
                   id="creditorName"
-                  placeholder="Ej. Banco Popular"
-                  {...form.register("creditorName", creditorNameValidation)}
-                />
+                  className="min-h-12 min-w-0 w-full rounded-2xl border border-border bg-white px-4 text-base text-foreground outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10 sm:text-sm"
+                  value={creditorSelectValue}
+                  onChange={(event) => {
+                    const nextValue = event.target.value;
+
+                    if (nextValue === CUSTOM_CREDITOR_VALUE) {
+                      if (!watchedCreditorName || isPresetCreditor) {
+                        form.setValue("creditorName", "", {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        });
+                      }
+                      return;
+                    }
+
+                    form.setValue("creditorName", sanitizeText(nextValue), {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                  }}
+                >
+                  <option value="">Selecciona un banco o acreedor</option>
+                  {rdCreditorOptions.map((creditor) => (
+                    <option key={creditor} value={creditor}>
+                      {creditor}
+                    </option>
+                  ))}
+                  <option value={CUSTOM_CREDITOR_VALUE}>Otro acreedor</option>
+                </select>
+                {creditorSelectValue === CUSTOM_CREDITOR_VALUE ? (
+                  <Input
+                    id="creditorNameCustom"
+                    placeholder="Escribe el banco, cooperativa o acreedor"
+                    {...form.register("creditorName", creditorNameValidation)}
+                  />
+                ) : null}
+                <p className="text-xs text-muted">
+                  Incluye bancos y asociaciones grandes de RD, con salida manual para otros acreedores.
+                </p>
                 <p className="text-sm text-rose-600">{form.formState.errors.creditorName?.message}</p>
               </div>
 
@@ -989,7 +1420,7 @@ export function DebtManager({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="interestRate">Tasa</Label>
+                <Label htmlFor="interestRate">{getInterestRateLabel(watchedInterestRateMode)}</Label>
                 <Input
                   id="interestRate"
                   type="number"
@@ -998,7 +1429,7 @@ export function DebtManager({
                   {...form.register("interestRate", interestRateValidation)}
                 />
                 <p className="text-xs text-muted">
-                  Introduce la tasa tal como aparece en el contrato o estado.
+                  {getInterestRateSupport(watchedInterestRateMode)}
                 </p>
                 <p className="text-sm text-rose-600">{form.formState.errors.interestRate?.message}</p>
               </div>
@@ -1015,7 +1446,22 @@ export function DebtManager({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="minimumPayment">Pago mínimo</Label>
+                <Label htmlFor="interestRateMode">Comportamiento de tasa</Label>
+                <select
+                  id="interestRateMode"
+                  className="min-h-12 min-w-0 w-full rounded-2xl border border-border bg-white px-4 text-base text-foreground outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10 sm:text-sm"
+                  {...form.register("interestRateMode")}
+                >
+                  <option value="FIXED">Fija</option>
+                  <option value="VARIABLE">Variable</option>
+                </select>
+                <p className="text-xs text-muted">
+                  Marca variable si el banco puede cambiar la tasa o si hoy solo tienes una referencia actual.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="minimumPayment">{getPaymentAmountLabel(watchedPaymentAmountType)}</Label>
                 <Input
                   id="minimumPayment"
                   type="number"
@@ -1024,10 +1470,25 @@ export function DebtManager({
                   {...form.register("minimumPayment", minimumPaymentValidation)}
                 />
                 <p className="text-xs text-muted">
-                  Esto ayuda a detectar cuándo una deuda se estanca solo pagando el mínimo.
+                  {getPaymentAmountSupport(watchedPaymentAmountType)}
                 </p>
                 <p className="text-sm text-rose-600">{form.formState.errors.minimumPayment?.message}</p>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="paymentAmountType">Tipo de pago</Label>
+                <select
+                  id="paymentAmountType"
+                  className="min-h-12 min-w-0 w-full rounded-2xl border border-border bg-white px-4 text-base text-foreground outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10 sm:text-sm"
+                  {...form.register("paymentAmountType")}
+                >
+                  <option value="FIXED">Fijo</option>
+                  <option value="VARIABLE">Variable</option>
+                </select>
+                <p className="text-xs text-muted">
+                  Úsalo si la cuota cambia mes a mes y aquí solo quieres guardar la referencia más reciente.
+                </p>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="currency">Moneda</Label>
                 <select
@@ -1076,6 +1537,34 @@ export function DebtManager({
                 <p className="text-xs text-muted">
                   Si todavía no manejas el día mensual exacto, usa esta fecha como próxima referencia.
                 </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    id="nextDueDateMonth"
+                    className="min-h-11 min-w-0 w-full rounded-2xl border border-border bg-white px-4 text-sm text-foreground outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
+                    value={splitDateInput(watchedNextDueDate).month}
+                    onChange={(event) => updateDateAssist("nextDueDate", "month", event.target.value)}
+                  >
+                    <option value="">Mes rápido</option>
+                    {monthOptions.map((month) => (
+                      <option key={month.value} value={month.value}>
+                        {month.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    id="nextDueDateYear"
+                    className="min-h-11 min-w-0 w-full rounded-2xl border border-border bg-white px-4 text-sm text-foreground outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
+                    value={splitDateInput(watchedNextDueDate).year}
+                    onChange={(event) => updateDateAssist("nextDueDate", "year", event.target.value)}
+                  >
+                    <option value="">Año rápido</option>
+                    {debtDateYearOptions.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="startedAt">Fecha de inicio</Label>
@@ -1084,6 +1573,37 @@ export function DebtManager({
                   type="date"
                   {...form.register("startedAt", optionalDateValidation)}
                 />
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    id="startedAtMonth"
+                    className="min-h-11 min-w-0 w-full rounded-2xl border border-border bg-white px-4 text-sm text-foreground outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
+                    value={splitDateInput(watchedStartedAt).month}
+                    onChange={(event) => updateDateAssist("startedAt", "month", event.target.value)}
+                  >
+                    <option value="">Mes rápido</option>
+                    {monthOptions.map((month) => (
+                      <option key={month.value} value={month.value}>
+                        {month.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    id="startedAtYear"
+                    className="min-h-11 min-w-0 w-full rounded-2xl border border-border bg-white px-4 text-sm text-foreground outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
+                    value={splitDateInput(watchedStartedAt).year}
+                    onChange={(event) => updateDateAssist("startedAt", "year", event.target.value)}
+                  >
+                    <option value="">Año rápido</option>
+                    {debtDateYearOptions.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-xs text-muted">
+                  Usa mes y año para saltar rápido sin tener que avanzar mes por mes.
+                </p>
               </div>
 
               <label className="flex items-start gap-3 rounded-2xl border border-border bg-secondary/60 p-4 md:col-span-2">
@@ -1130,6 +1650,77 @@ export function DebtManager({
                   type="date"
                   {...form.register("estimatedEndAt", estimatedEndAtValidation)}
                 />
+                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                  <select
+                    id="estimatedEndAtMonth"
+                    className="min-h-11 min-w-0 w-full rounded-2xl border border-border bg-white px-4 text-sm text-foreground outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
+                    value={splitDateInput(watchedEstimatedEndAt).month}
+                    onChange={(event) => updateDateAssist("estimatedEndAt", "month", event.target.value)}
+                  >
+                    <option value="">Mes rápido</option>
+                    {monthOptions.map((month) => (
+                      <option key={month.value} value={month.value}>
+                        {month.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    id="estimatedEndAtYear"
+                    className="min-h-11 min-w-0 w-full rounded-2xl border border-border bg-white px-4 text-sm text-foreground outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
+                    value={splitDateInput(watchedEstimatedEndAt).year}
+                    onChange={(event) => updateDateAssist("estimatedEndAt", "year", event.target.value)}
+                  >
+                    <option value="">Año rápido</option>
+                    {debtDateYearOptions.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="min-h-11 w-full sm:w-auto"
+                    onClick={() =>
+                      form.setValue(
+                        "estimatedEndAt",
+                        addYearsToDateInput(watchedEstimatedEndAt, 4, watchedStartedAt),
+                        {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        },
+                      )
+                    }
+                  >
+                    +4 años
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[1, 2, 3, 5].map((years) => (
+                    <Button
+                      key={years}
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="min-h-10"
+                      onClick={() =>
+                        form.setValue(
+                          "estimatedEndAt",
+                          addYearsToDateInput(watchedEstimatedEndAt, years, watchedStartedAt),
+                          {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          },
+                        )
+                      }
+                    >
+                      +{years} {years === 1 ? "año" : "años"}
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted">
+                  Para préstamos largos, usa mes, año o atajos de duración en vez de avanzar el calendario una y otra vez.
+                </p>
               </div>
 
               <div className="space-y-2 md:col-span-2">
@@ -1153,7 +1744,7 @@ export function DebtManager({
           <CardHeader>
             <CardTitle>Tus deudas</CardTitle>
             <CardDescription>
-              Primero mira cuál presiona más. Luego edita, archiva o registra la siguiente acción.
+              Revisa la que más presiona y actúa.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-4">
@@ -1162,10 +1753,10 @@ export function DebtManager({
                 <Input
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Busca por nombre, acreedor o nota"
+                  placeholder="Busca una deuda"
                 />
 
-                <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
                   {[
                     { value: "ALL" as const, label: `Todas (${debts.length})` },
                     { value: "CURRENT" as const, label: `Al día (${debts.filter((debt) => debt.status === "CURRENT").length})` },
@@ -1188,109 +1779,236 @@ export function DebtManager({
 
             {filteredDebts.length ? (
               filteredDebts.map((debt) => (
-                <div
-                  key={debt.id}
-                  className="min-w-0 rounded-[1.65rem] border border-border bg-secondary/50 p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:rounded-[1.9rem] sm:p-6"
-                >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex min-w-0 flex-wrap items-center gap-3">
-                        <p className="min-w-0 break-words text-lg font-semibold text-foreground">{debt.name}</p>
-                        <Badge
-                          variant={
-                            debt.status === "LATE"
-                              ? "danger"
-                              : debt.status === "PAID"
-                                ? "success"
-                                : "default"
-                          }
-                        >
-                          {debtStatusLabels[debt.status as DebtFormValues["status"]] ?? debt.status}
-                        </Badge>
-                        <Badge variant="default">{debtTypeLabels[debt.type as DebtFormValues["type"]] ?? debt.type}</Badge>
-                        {priorityDebt?.id === debt.id ? (
-                          <Badge variant="warning">Más presión hoy</Badge>
-                        ) : null}
-                      </div>
-                      <p className="mt-2 break-words text-sm text-muted">{debt.creditorName}</p>
-                      {debt.notes ? (
-                        <p className="mt-3 break-words text-sm leading-6 text-muted">
-                          {debt.notes}
+                <div key={debt.id}>
+                  <div className="rounded-[1.65rem] border border-border bg-secondary/45 p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] lg:hidden">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="break-words text-base font-semibold text-foreground">
+                          {debt.name}
                         </p>
-                      ) : null}
+                        <p className="mt-1 break-words text-sm text-muted">
+                          {debt.creditorName}
+                        </p>
+                        <p className="mt-1 text-xs font-medium text-muted">
+                          {getDebtStructureSummary(debt)}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={getDebtPriorityVariant(debt, {
+                          isPriority: priorityDebt?.id === debt.id,
+                        })}
+                      >
+                        {getDebtPriorityLabel(debt, {
+                          isPriority: priorityDebt?.id === debt.id,
+                        })}
+                      </Badge>
                     </div>
 
-                    <div className="grid w-full grid-cols-2 gap-2 lg:flex lg:w-auto lg:flex-wrap">
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      <div className="rounded-[1.15rem] border border-border/50 bg-white/88 p-3">
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
+                          Balance actual
+                        </p>
+                        <p className="value-stable mt-1 text-base font-semibold text-foreground">
+                          {formatDebtMoney(debt.effectiveBalance, debt.currency)}
+                        </p>
+                      </div>
+                      <div className="rounded-[1.15rem] border border-border/50 bg-white/88 p-3">
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
+                          {debt.nextDueDate ? "Próximo pago" : "Estado"}
+                        </p>
+                        <p className="mt-1 text-sm font-semibold leading-5 text-foreground">
+                          {debt.nextDueDate
+                            ? formatDate(debt.nextDueDate)
+                            : debtStatusLabels[debt.status as DebtFormValues["status"]] ?? debt.status}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <Badge
+                        variant={
+                          debt.status === "LATE"
+                            ? "danger"
+                            : debt.status === "PAID"
+                              ? "success"
+                              : "default"
+                        }
+                      >
+                        {debtStatusLabels[debt.status as DebtFormValues["status"]] ?? debt.status}
+                      </Badge>
+                      <span className="text-xs font-medium text-muted">
+                        {debtTypeLabels[debt.type as DebtFormValues["type"]] ?? debt.type}
+                      </span>
+                    </div>
+
+                    {expandedDebtId === debt.id ? (
+                      <div className="mt-4 rounded-[1.2rem] border border-border/80 bg-white/90 p-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
+                              {debt.paymentAmountType === "VARIABLE" ? "Pago referencia" : "Pago mínimo"}
+                            </p>
+                            <p className="value-stable mt-1 text-sm font-semibold text-foreground">
+                              {formatDebtMoney(debt.minimumPayment, debt.currency)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] uppercase tracking-[0.16em] text-muted">
+                              Interés estimado
+                            </p>
+                            <p className="value-stable mt-1 text-sm font-semibold text-foreground">
+                              {formatDebtMoney(debt.monthlyInterestEstimate, debt.currency)}
+                            </p>
+                          </div>
+                        </div>
+                        {debt.notes ? (
+                          <p className="mt-3 text-sm leading-6 text-muted">{debt.notes}</p>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="min-h-11 w-full justify-center"
+                        onClick={() =>
+                          setExpandedDebtId((current) =>
+                            current === debt.id ? null : debt.id,
+                          )
+                        }
+                      >
+                        Ver detalle
+                      </Button>
                       <Button
                         variant="secondary"
                         size="sm"
                         className="min-h-11 w-full justify-center"
                         onClick={() => router.push(`/pagos?debtId=${debt.id}`)}
                       >
-                        Ir a pagos
+                        Registrar pago
                       </Button>
                       <Button
-                        variant="secondary"
+                        variant="ghost"
                         size="sm"
-                        className="min-h-11 w-full justify-center"
+                        className="col-span-2 min-h-11 w-full justify-center"
                         onClick={() => startEditingDebt(debt)}
                       >
                         <Pencil className="mr-2 size-4" />
                         Editar
                       </Button>
-                      {debt.status !== "ARCHIVED" ? (
+                    </div>
+                  </div>
+
+                  <div className="hidden min-w-0 rounded-[1.65rem] border border-border bg-secondary/50 p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:rounded-[1.9rem] sm:p-6 lg:block">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-center gap-3">
+                          <p className="min-w-0 break-words text-lg font-semibold text-foreground">{debt.name}</p>
+                          <Badge
+                            variant={
+                              debt.status === "LATE"
+                                ? "danger"
+                                : debt.status === "PAID"
+                                  ? "success"
+                                  : "default"
+                            }
+                          >
+                            {debtStatusLabels[debt.status as DebtFormValues["status"]] ?? debt.status}
+                          </Badge>
+                          <Badge variant="default">{debtTypeLabels[debt.type as DebtFormValues["type"]] ?? debt.type}</Badge>
+                          {priorityDebt?.id === debt.id ? (
+                            <Badge variant="warning">Más presión hoy</Badge>
+                          ) : null}
+                        </div>
+                        <p className="mt-2 break-words text-sm text-muted">{debt.creditorName}</p>
+                        <p className="mt-2 text-xs font-medium text-muted">
+                          {getDebtStructureSummary(debt)}
+                        </p>
+                        {debt.notes ? (
+                          <p className="mt-3 break-words text-sm leading-6 text-muted">
+                            {debt.notes}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <div className="grid w-full grid-cols-2 gap-2 lg:flex lg:w-auto lg:flex-wrap">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="min-h-11 w-full justify-center"
+                          onClick={() => router.push(`/pagos?debtId=${debt.id}`)}
+                        >
+                          Ir a pagos
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="min-h-11 w-full justify-center"
+                          onClick={() => startEditingDebt(debt)}
+                        >
+                          <Pencil className="mr-2 size-4" />
+                          Editar
+                        </Button>
+                        {debt.status !== "ARCHIVED" ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="min-h-11 w-full justify-center"
+                            onClick={() => handleArchive(debt)}
+                          >
+                            <Archive className="mr-2 size-4" />
+                            Archivar
+                          </Button>
+                        ) : null}
                         <Button
                           variant="ghost"
                           size="sm"
                           className="min-h-11 w-full justify-center"
-                          onClick={() => handleArchive(debt)}
+                          onClick={() => handleDelete(debt.id)}
                         >
-                          <Archive className="mr-2 size-4" />
-                          Archivar
+                          <Trash2 className="mr-2 size-4" />
+                          Eliminar
                         </Button>
-                      ) : null}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="min-h-11 w-full justify-center"
-                        onClick={() => handleDelete(debt.id)}
-                      >
-                        <Trash2 className="mr-2 size-4" />
-                        Eliminar
-                      </Button>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="mt-5 grid gap-4 md:grid-cols-2">
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.18em] text-muted">Saldo real</p>
-                      <p className="value-stable mt-1 font-semibold text-foreground">
-                        {formatCurrency(debt.effectiveBalance)}
-                      </p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.18em] text-muted">Pago mínimo</p>
-                      <p className="value-stable mt-1 font-semibold text-foreground">
-                        {formatCurrency(debt.minimumPayment)}
-                      </p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.18em] text-muted">Interés estimado</p>
-                      <p className="value-stable mt-1 font-semibold text-foreground">
-                        {formatCurrency(debt.monthlyInterestEstimate)}
-                      </p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.18em] text-muted">Próximo vencimiento</p>
-                      <p className="date-stable mt-1 font-semibold text-foreground">
-                        {debt.nextDueDate ? formatDate(debt.nextDueDate) : "Sin fecha"}
-                      </p>
+                    <div className="mt-5 grid gap-4 md:grid-cols-2">
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-[0.18em] text-muted">Saldo real</p>
+                        <p className="value-stable mt-1 font-semibold text-foreground">
+                          {formatDebtMoney(debt.effectiveBalance, debt.currency)}
+                        </p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-[0.18em] text-muted">
+                          {debt.paymentAmountType === "VARIABLE" ? "Pago referencia" : "Pago mínimo"}
+                        </p>
+                        <p className="value-stable mt-1 font-semibold text-foreground">
+                          {formatDebtMoney(debt.minimumPayment, debt.currency)}
+                        </p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-[0.18em] text-muted">
+                          {debt.interestRateMode === "VARIABLE" ? "Interés ref. mes" : "Interés estimado"}
+                        </p>
+                        <p className="value-stable mt-1 font-semibold text-foreground">
+                          {formatDebtMoney(debt.monthlyInterestEstimate, debt.currency)}
+                        </p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-[0.18em] text-muted">Próximo vencimiento</p>
+                        <p className="date-stable mt-1 font-semibold text-foreground">
+                          {debt.nextDueDate ? formatDate(debt.nextDueDate) : "Sin fecha"}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
               ))
             ) : debts.length ? (
-              <div className="rounded-3xl border border-dashed border-border p-8 text-center">
+              <div className="rounded-2xl border border-dashed border-border p-8 text-center">
                 <p className="text-base font-semibold text-foreground">
                   No encontramos deudas con ese filtro.
                 </p>
@@ -1307,7 +2025,7 @@ export function DebtManager({
                 </div>
               </div>
             ) : (
-              <div className="rounded-3xl border border-dashed border-border p-8 text-center">
+              <div className="rounded-2xl border border-dashed border-border p-8 text-center">
                 <p className="text-base font-semibold text-foreground">
                   Todavía no has registrado deudas.
                 </p>

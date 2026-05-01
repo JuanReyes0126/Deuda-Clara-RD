@@ -5,18 +5,12 @@ import {
   AlertTriangle,
   ArrowRight,
   CalendarClock,
-  CircleCheck,
   CircleDollarSign,
-  CreditCard,
-  Crown,
   LockKeyhole,
   Sparkles,
-  Wallet,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { LockedCard } from "@/components/membership/locked-card";
-import { UpgradeCTA } from "@/components/membership/upgrade-cta";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,19 +22,47 @@ import {
 } from "@/components/ui/card";
 import {
   ExecutiveSummaryStrip,
-  type ExecutiveSummaryItem,
 } from "@/components/shared/executive-summary-strip";
 import { ModuleSectionHeader } from "@/components/shared/module-section-header";
 import { NarrativeInsightCard } from "@/components/shared/narrative-insight-card";
 import { PrimaryActionCard } from "@/components/shared/primary-action-card";
 import { TrustInlineNote } from "@/components/shared/trust-inline-note";
 import {
+  MEMBERSHIP_COMMERCIAL_COPY,
   getCommercialUpgradeCta,
 } from "@/config/membership-commercial-copy";
 import { UPGRADE_MESSAGES } from "@/config/upgrade-messages";
+import { useSessionUpgradePrompt } from "@/lib/membership/use-session-upgrade-prompt";
+import { DailyMissionCard } from "./daily-mission-card";
+import { PaydownChallengeCard } from "./paydown-challenge-card";
+import { DashboardAssistantChat } from "./dashboard-assistant-chat";
+import { usePremiumActivation } from "./use-premium-activation";
+import {
+  buildPremiumActivationSteps,
+  getActivationProgress,
+} from "./dashboard-premium-activation-steps";
+import { buildDashboardSummaryItems } from "./dashboard-summary-items";
+import {
+  buildDashboardQuickActions,
+  buildMobileActionButtons,
+} from "./dashboard-actions";
+import {
+  dashboardStatCards,
+  getDashboardStatCardValue,
+} from "./dashboard-stat-cards";
+import {
+  getMobileProgressLabel,
+  getMobileRiskLabel,
+  getMobileRiskSupport,
+  getPlanStatusCopy,
+} from "./dashboard-derived-copy";
+import { formatMonthsLabel } from "./dashboard-formatters";
+import { getPlanSupportText } from "./dashboard-plan-copy";
+import { getPriorityReasonMeta } from "./dashboard-priority-reason";
+import { getLockedUpgradeContext } from "./dashboard-upgrade-locked-context";
+import { getMomentumSummary, getProgressMilestones } from "./dashboard-momentum";
 import type {
   DashboardDto,
-  DashboardPlanSnapshotDto,
   MembershipConversionSnapshotDto,
 } from "@/lib/types/app";
 import { useAppNavigation } from "@/lib/navigation/use-app-navigation";
@@ -48,17 +70,30 @@ import { trackPlanEvent } from "@/lib/telemetry/plan-events";
 import { formatCurrency } from "@/lib/utils/currency";
 import { formatDate, formatRelativeDistance } from "@/lib/utils/date";
 
+function ChartLoadingPlaceholder() {
+  return (
+    <div className="bg-secondary/35 flex h-full flex-col justify-end rounded-2xl p-6">
+      <div className="space-y-3">
+        <div className="h-3 w-28 rounded-full bg-white/80" />
+        <div className="grid grid-cols-5 items-end gap-3">
+          <div className="h-16 rounded-2xl bg-white/75" />
+          <div className="h-24 rounded-2xl bg-white/80" />
+          <div className="h-20 rounded-2xl bg-white/75" />
+          <div className="h-32 rounded-2xl bg-white/85" />
+          <div className="h-28 rounded-2xl bg-white/75" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const DashboardBalanceHistoryChart = dynamic(
   () =>
     import("./dashboard-balance-history-chart").then(
       (module) => module.DashboardBalanceHistoryChart,
     ),
   {
-    loading: () => (
-      <div className="bg-secondary/40 text-muted flex h-full items-center justify-center rounded-3xl text-sm">
-        Preparando visualización...
-      </div>
-    ),
+    loading: () => <ChartLoadingPlaceholder />,
   },
 );
 
@@ -68,563 +103,29 @@ const DashboardDebtBreakdownChart = dynamic(
       (module) => module.DashboardDebtBreakdownChart,
     ),
   {
-    loading: () => (
-      <div className="bg-secondary/40 text-muted flex h-full items-center justify-center rounded-3xl text-sm">
-        Preparando visualización...
-      </div>
-    ),
+    loading: () => <ChartLoadingPlaceholder />,
   },
 );
-
-const statCards = [
-  {
-    key: "totalDebt",
-    label: "Deuda total real",
-    icon: CircleDollarSign,
-    description: "Incluye saldo, mora y cargos adicionales.",
-  },
-  {
-    key: "totalMinimumPayment",
-    label: "Pago mínimo del mes",
-    icon: CalendarClock,
-    description: "Lo que necesitas cubrir para mantenerte al día.",
-  },
-  {
-    key: "estimatedMonthlyInterest",
-    label: "Interés estimado del mes",
-    icon: AlertTriangle,
-    description: "Lo que te cuesta seguir cargando esta estructura.",
-  },
-  {
-    key: "interestSavings",
-    label: "Ahorro potencial",
-    icon: Sparkles,
-    description: "Lo que podrías ahorrar con el plan recomendado.",
-  },
-] as const;
-
-const planReasonLabels: Record<string, string> = {
-  budget_below_minimum:
-    "El presupuesto actual no cubre los mínimos necesarios.",
-  non_amortizing: "A este ritmo, la deuda no baja de forma sostenible.",
-  max_months_reached: "La proyección supera el horizonte razonable de cálculo.",
-};
-
-const premiumActivationStorageKey = "deuda-clara-rd-premium-activation";
-const premiumActivationWindowMs = 5 * 60 * 1000;
-
-type PremiumActivationState = {
-  startedAt: number;
-  completed: string[];
-};
-
-type RecommendedDebtPriorityItem = DashboardDto["recommendedOrder"][number];
 
 type DashboardOverviewProps = {
   data: DashboardDto;
   conversionSnapshot?: MembershipConversionSnapshotDto | null;
   premiumWelcome?: boolean;
   initialShowOptimization?: boolean;
+  /** Clave para persistir el chat de Clara en este dispositivo (p. ej. id de usuario). */
+  claraStorageKey?: string;
 };
-
-function formatMonthsLabel(months: number | null) {
-  if (months === null) {
-    return "Sin salida clara";
-  }
-
-  if (months === 0) {
-    return "Sin deuda activa";
-  }
-
-  return `${months} ${months === 1 ? "mes" : "meses"}`;
-}
-
-function getPlanSupportText(plan: DashboardPlanSnapshotDto) {
-  if (!plan.feasible) {
-    return plan.reason
-      ? planReasonLabels[plan.reason]
-      : "Faltan datos para proyectar esta ruta.";
-  }
-
-  if (plan.monthsToDebtFree === 0) {
-    return "No quedan saldos activos pendientes.";
-  }
-
-  return `Presupuesto mensual estimado: ${formatCurrency(plan.monthlyBudget)}`;
-}
-
-function getPriorityReasonMeta({
-  data,
-  item,
-}: {
-  data: DashboardDto;
-  item: RecommendedDebtPriorityItem;
-}) {
-  const dueSoonDebt = data.dueSoonDebts.find((debt) => debt.id === item.id);
-  const isUrgentDebt = data.urgentDebt?.id === item.id;
-
-  if (isUrgentDebt && data.urgentDebt?.status === "LATE") {
-    return {
-      badgeVariant: "danger" as const,
-      badgeLabel: "Evita más mora",
-      support:
-        "Ya viene atrasada. Frenarla primero evita que siga absorbiendo flujo con cargos y presión extra.",
-    };
-  }
-
-  if (dueSoonDebt?.nextDueDate) {
-    return {
-      badgeVariant: "warning" as const,
-      badgeLabel: "Vencimiento primero",
-      support: `Está demasiado cerca del corte. Si la cubres antes de ${formatRelativeDistance(dueSoonDebt.nextDueDate)}, mantienes el resto del plan respirando.`,
-    };
-  }
-
-  if (item.monthlyRatePct >= 4) {
-    return {
-      badgeVariant: "warning" as const,
-      badgeLabel: "Sube al frente por tasa alta",
-      support:
-        "Está consumiendo más interés que el resto. Cada semana que se queda atrás le cuesta más a tu flujo.",
-    };
-  }
-
-  if (item.monthlyRatePct >= 2) {
-    return {
-      badgeVariant: "warning" as const,
-      badgeLabel: "Está consumiendo más interés",
-      support:
-        "Aunque no esté vencida, esta deuda ya compite fuerte por el dinero del mes y conviene concentrar el excedente aquí.",
-    };
-  }
-
-  return {
-    badgeVariant: "default" as const,
-    badgeLabel: "Compite por el mismo flujo",
-    support:
-      "Hoy rinde más poner el excedente aquí que repartirlo. Así el plan gana tracción más rápido.",
-  };
-}
-
-function readPremiumActivationState() {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const raw = window.localStorage.getItem(premiumActivationStorageKey);
-
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as PremiumActivationState;
-
-    if (!parsed.startedAt || !Array.isArray(parsed.completed)) {
-      return null;
-    }
-
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function persistPremiumActivationState(
-  nextState: PremiumActivationState | null,
-) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  if (!nextState) {
-    window.localStorage.removeItem(premiumActivationStorageKey);
-    return;
-  }
-
-  window.localStorage.setItem(
-    premiumActivationStorageKey,
-    JSON.stringify(nextState),
-  );
-}
-
-function getLockedUpgradeContext({
-  data,
-  conversionSnapshot,
-}: {
-  data: DashboardDto;
-  conversionSnapshot: MembershipConversionSnapshotDto | null;
-}) {
-  if (!conversionSnapshot?.hasDebts) {
-    return {
-      eyebrow: "Desbloqueo premium",
-      title: "Primero necesitamos una deuda activa para optimizar de verdad.",
-      description:
-        "En cuanto registres una deuda, Premium podrá comparar tu ritmo actual contra una salida más rápida y convertirlo en un plan accionable.",
-      primaryCtaLabel: "Ir a deudas",
-      primaryHref: "/deudas",
-      secondaryCtaLabel: "Ver planes",
-      secondaryHref: "/planes?plan=NORMAL&source=dashboard",
-      badges: [],
-    };
-  }
-
-  const monthsSaved = conversionSnapshot.monthsSaved;
-  const interestSavings = conversionSnapshot.interestSavings;
-  const badges = [
-    monthsSaved !== null && monthsSaved > 0
-      ? `${monthsSaved} meses menos`
-      : null,
-    interestSavings !== null && interestSavings > 0
-      ? `${formatCurrency(interestSavings)} evitables`
-      : null,
-    conversionSnapshot.urgentDebtName
-      ? `Prioridad: ${conversionSnapshot.urgentDebtName}`
-      : null,
-  ].filter(Boolean) as string[];
-
-  if (
-    conversionSnapshot.riskAlertCount > 0 &&
-    conversionSnapshot.dueSoonCount > 0
-  ) {
-    return {
-      eyebrow: "Presión detectada",
-      title:
-        "Ya tienes intereses caros y vencimientos compitiendo por tu flujo.",
-      description: `Hoy mismo tienes ${conversionSnapshot.riskAlertCount} alerta${
-        conversionSnapshot.riskAlertCount === 1 ? "" : "s"
-      } de riesgo y ${conversionSnapshot.dueSoonCount} vencimiento${
-        conversionSnapshot.dueSoonCount === 1 ? "" : "s"
-      } cercano${conversionSnapshot.dueSoonCount === 1 ? "" : "s"}. Premium te devuelve una sola prioridad clara para que no sigas decidiendo a ciegas.`,
-      primaryCtaLabel: "Desbloquear prioridad",
-      primaryHref: "/planes?plan=NORMAL&source=dashboard",
-      secondaryCtaLabel: "Ver alertas",
-      secondaryHref: "/notificaciones",
-      badges,
-    };
-  }
-
-  if (monthsSaved !== null && monthsSaved > 0) {
-    return {
-      eyebrow: "Tiempo recuperable",
-      title: `Tu ritmo actual podría recortarse en ${monthsSaved} ${
-        monthsSaved === 1 ? "mes" : "meses"
-      }.`,
-      description: `${conversionSnapshot.immediateAction} Premium toma esa oportunidad y la convierte en una ruta clara para los próximos 6 meses, sin tener que comparar escenarios manualmente.`,
-      primaryCtaLabel: "Ver cómo salir antes",
-      primaryHref: "/planes?plan=NORMAL&source=dashboard",
-      secondaryCtaLabel: "Abrir simulador",
-      secondaryHref: "/simulador",
-      badges,
-    };
-  }
-
-  if (data.summary.estimatedMonthlyInterest > 0) {
-    return {
-      eyebrow: "Costo mensual visible",
-      title: `Ahora mismo estás cargando ${formatCurrency(data.summary.estimatedMonthlyInterest)} al mes en intereses estimados.`,
-      description:
-        "El módulo premium no solo te muestra el problema: te dice qué deuda atacar primero, con qué presupuesto, y qué tanto recortas si sostienes el plan recomendado.",
-      primaryCtaLabel: "Desbloquear mi mejor estrategia",
-      primaryHref: "/planes?plan=NORMAL&source=dashboard",
-      secondaryCtaLabel: "Revisar deudas",
-      secondaryHref: "/deudas",
-      badges,
-    };
-  }
-
-  return {
-    eyebrow: "Desbloqueo premium",
-    title:
-      "Ya tienes suficiente información para pasar de control a estrategia.",
-    description:
-      "Premium convierte tus deudas actuales en un orden de pago optimizado, con ahorro estimado, horizonte de salida y una guía más clara para sostener el plan.",
-    primaryCtaLabel: "Desbloquear mi mejor estrategia",
-    primaryHref: "/planes?plan=NORMAL&source=dashboard",
-    secondaryCtaLabel: "Abrir simulador",
-    secondaryHref: "/simulador",
-    badges,
-  };
-}
-
-function getDailyFocus({
-  data,
-  isPremiumUnlocked,
-  upgradePlanHref,
-  paymentHref,
-}: {
-  data: DashboardDto;
-  isPremiumUnlocked: boolean;
-  upgradePlanHref: string;
-  paymentHref: string;
-}) {
-  if (data.summary.totalDebt <= 0) {
-    return {
-      eyebrow: "Siguiente mejor acción",
-      title: "Registra tu primera deuda para activar una prioridad real.",
-      description:
-        "Con una sola deuda ya podemos medir urgencia, costo mensual e identificar el siguiente paso más útil.",
-      primaryLabel: "Ir a deudas",
-      primaryHref: "/deudas",
-      badgeVariant: "default" as const,
-      badgeLabel: "Activación inicial",
-      notes: [
-        "Te toma menos de dos minutos.",
-        "Activa alertas y cálculo de salida.",
-      ],
-    };
-  }
-
-  if (data.urgentDebt?.status === "LATE") {
-    return {
-      eyebrow: "Siguiente mejor acción",
-      title: `Cubrir al menos ${formatCurrency(data.urgentDebt.minimumPayment)} de ${data.urgentDebt.name}.`,
-      description:
-        "Esa deuda ya está atrasada. Moverla primero reduce mora, evita más presión y te devuelve control más rápido.",
-      primaryLabel: "Registrar pago",
-      primaryHref: paymentHref,
-      badgeVariant: "danger" as const,
-      badgeLabel: "Urgente hoy",
-      notes: [
-        `Saldo presionando: ${formatCurrency(data.urgentDebt.effectiveBalance)}`,
-        "Evitas que se sigan acumulando cargos.",
-      ],
-    };
-  }
-
-  const nextDueDebt = data.dueSoonDebts[0];
-
-  if (nextDueDebt) {
-    return {
-      eyebrow: "Siguiente mejor acción",
-      title: `Protege el vencimiento de ${nextDueDebt.name}.`,
-      description: nextDueDebt.nextDueDate
-        ? `Si cubres al menos ${formatCurrency(nextDueDebt.minimumPayment)} antes de ${formatRelativeDistance(nextDueDebt.nextDueDate)}, mantienes el plan respirando sin abrir otro frente.`
-        : `Cubre al menos ${formatCurrency(nextDueDebt.minimumPayment)} para evitar que el siguiente vencimiento te agarre sin espacio.`,
-      primaryLabel: "Registrar pago",
-      primaryHref: paymentHref,
-      badgeVariant: "warning" as const,
-      badgeLabel: "Vence pronto",
-      notes: [
-        `Minimo sugerido: ${formatCurrency(nextDueDebt.minimumPayment)}`,
-        data.dueSoonDebts.length > 1
-          ? `${data.dueSoonDebts.length} vencimientos compiten esta semana.`
-          : "Conviene resolverlo antes de mover excedente.",
-      ],
-    };
-  }
-
-  if (isPremiumUnlocked && data.summary.recommendedDebtName) {
-    return {
-      eyebrow: "Siguiente mejor acción",
-      title: `Enviar el excedente a ${data.summary.recommendedDebtName}.`,
-      description:
-        data.planComparison?.immediateAction ??
-        "Tu plan ya detectó una prioridad. Sostenerla hoy mejora la velocidad de salida.",
-      primaryLabel: "Registrar pago a prioridad 1",
-      primaryHref: paymentHref,
-      badgeVariant: "success" as const,
-      badgeLabel: "Accion del dia",
-      notes: [
-        data.planComparison?.monthsSaved
-          ? `${data.planComparison.monthsSaved} meses recortables si sostienes la prioridad.`
-          : "La prioridad ya está definida.",
-        data.planComparison?.interestSavings
-          ? `${formatCurrency(data.planComparison.interestSavings)} en intereses evitables.`
-          : "Cada pago extra aquí rinde mejor.",
-      ],
-    };
-  }
-
-  if (data.riskAlerts.length > 0) {
-    return {
-      eyebrow: "Siguiente mejor acción",
-      title: "Revisar el riesgo de seguir pagando solo minimos.",
-      description:
-        "Hay señales de que parte del flujo se está yendo en intereses sin mover suficiente capital. Una revisión hoy puede corregir eso rápido.",
-      primaryLabel: "Abrir simulador",
-      primaryHref: "/simulador",
-      badgeVariant: "warning" as const,
-      badgeLabel: "Riesgo visible",
-      notes: [
-        `${data.riskAlerts.length} alerta${data.riskAlerts.length === 1 ? "" : "s"} activa${data.riskAlerts.length === 1 ? "" : "s"}.`,
-        "Conviene concentrar mejor el flujo del mes.",
-      ],
-    };
-  }
-
-  if (data.recentPayments.length === 0) {
-    return {
-      eyebrow: "Siguiente mejor acción",
-      title: "Registrar tu primer pago para medir avance real.",
-      description:
-        "Sin un pago registrado todavía no podemos confirmar si el plan está bajando capital o solo manteniendo deudas vivas.",
-      primaryLabel: "Ir a pagos",
-      primaryHref: paymentHref,
-      badgeVariant: "default" as const,
-      badgeLabel: "Primer avance",
-      notes: [
-        "Activa reportes y comparaciones reales.",
-        "Te ayuda a construir habito semanal.",
-      ],
-    };
-  }
-
-  return {
-    eyebrow: "Siguiente mejor acción",
-    title: "Revisar tu plan y sostener el ritmo de esta semana.",
-    description:
-      "Tu panel ya tiene suficiente contexto. El mayor valor ahora está en mantener foco, revisar alertas y no repartir el excedente sin criterio.",
-    primaryLabel: isPremiumUnlocked ? "Revisar plan" : "Ver Premium",
-    primaryHref: isPremiumUnlocked
-      ? "/dashboard?focus=optimization"
-      : upgradePlanHref,
-    badgeVariant: "success" as const,
-    badgeLabel: "Ritmo activo",
-    notes: [
-      `${formatCurrency(data.summary.currentMonthlyBudget)} de presupuesto mensual registrado.`,
-      "Una revision semanal suele ser suficiente para no perder traccion.",
-    ],
-  };
-}
-
-function getMomentumSummary({
-  data,
-  isPremiumUnlocked,
-}: {
-  data: DashboardDto;
-  isPremiumUnlocked: boolean;
-}) {
-  const progressPct = Math.max(
-    0,
-    Math.min(100, Math.round(data.summary.paidVsPendingPercentage)),
-  );
-
-  if (data.summary.totalDebt <= 0) {
-    return {
-      badgeVariant: "default" as const,
-      badgeLabel: "Pendiente de activar",
-      title: "Primero necesitamos una deuda para construir progreso real.",
-      description:
-        "En cuanto registres tu primera deuda, este bloque te mostrará avance, hitos y señales de ritmo.",
-      progressLabel: "Sin progreso medible todavía",
-    };
-  }
-
-  if (data.urgentDebt?.status === "LATE") {
-    return {
-      badgeVariant: "danger" as const,
-      badgeLabel: "Riesgo de estancarte",
-      title: "Hay presión real sobre tu flujo y conviene corregirla hoy.",
-      description:
-        "Tienes al menos una deuda atrasada. Resolver ese frente primero vale más que repartir dinero sin prioridad.",
-      progressLabel: `${progressPct}% del camino visible entre pagado y pendiente`,
-    };
-  }
-
-  if (data.riskAlerts.length > 0) {
-    return {
-      badgeVariant: "warning" as const,
-      badgeLabel: "Ritmo bajo presión",
-      title: "Todavía estás pagando, pero parte del flujo se sigue diluyendo.",
-      description:
-        "Las alertas de pago mínimo indican que el dinero no está bajando capital tan rápido como debería.",
-      progressLabel: `${progressPct}% de avance visible`,
-    };
-  }
-
-  if (data.recentPayments.length === 0) {
-    return {
-      badgeVariant: "default" as const,
-      badgeLabel: "Primer avance pendiente",
-      title: "Ya hay deudas cargadas. Falta convertir eso en movimiento.",
-      description:
-        "El siguiente salto es registrar el primer pago para que el sistema pueda medir si tu plan empieza a rendir mejor.",
-      progressLabel: `${progressPct}% del recorrido registrado`,
-    };
-  }
-
-  if (isPremiumUnlocked && (data.planComparison?.monthsSaved ?? 0) > 0) {
-    return {
-      badgeVariant: "success" as const,
-      badgeLabel: "Vas mejorando",
-      title: "Tu estructura ya muestra una salida más eficiente que la actual.",
-      description: data.planComparison?.interestSavings
-        ? `El plan premium detecta ${formatCurrency(data.planComparison.interestSavings)} evitables y una ruta más corta si sostienes la prioridad.`
-        : "La prioridad actual ya está trabajando a favor de una salida más corta.",
-      progressLabel: `${progressPct}% de avance visible con ruta optimizada`,
-    };
-  }
-
-  if (progressPct >= 35) {
-    return {
-      badgeVariant: "success" as const,
-      badgeLabel: "Primer avance importante",
-      title: "Ya hay suficiente movimiento para que el plan se sienta real.",
-      description:
-        "Todavía queda camino, pero tu historial ya muestra señales claras de avance y mejor lectura del flujo.",
-      progressLabel: `${progressPct}% de avance visible`,
-    };
-  }
-
-  return {
-    badgeVariant: "warning" as const,
-    badgeLabel: "Ritmo estable",
-    title: "La base ya está montada; ahora toca sostener una sola prioridad.",
-    description:
-      "No parece haber una caída fuerte, pero todavía hay espacio para que el dinero rinda mejor y la salida se acorte.",
-    progressLabel: `${progressPct}% del recorrido registrado`,
-  };
-}
-
-function getProgressMilestones({
-  data,
-  isPremiumUnlocked,
-}: {
-  data: DashboardDto;
-  isPremiumUnlocked: boolean;
-}) {
-  return [
-    {
-      label: "Primera deuda",
-      complete: data.summary.totalDebt > 0,
-      detail: "Ya hay base para proyectar.",
-    },
-    {
-      label: "Primer pago",
-      complete: data.recentPayments.length > 0,
-      detail: "Activa lectura real del avance.",
-    },
-    {
-      label: "Prioridad visible",
-      complete: Boolean(data.summary.recommendedDebtName || data.urgentDebt),
-      detail: "Ya sabes que deuda mirar primero.",
-    },
-    {
-      label: "Plan premium",
-      complete: isPremiumUnlocked,
-      detail: "Desbloquea ahorro y orden optimizado.",
-    },
-  ];
-}
 
 export function DashboardOverview({
   data,
   conversionSnapshot = null,
   premiumWelcome = false,
   initialShowOptimization = false,
+  claraStorageKey = "local-clara",
 }: DashboardOverviewProps) {
   const { navigate } = useAppNavigation();
   const navigateTo = (path: string) => navigate(path);
   const [chartsReady, setChartsReady] = useState(false);
-  const [showOptimization, setShowOptimization] = useState(
-    initialShowOptimization,
-  );
-  const [showPremiumWelcome, setShowPremiumWelcome] = useState(premiumWelcome);
-  const [activationCompletedSteps, setActivationCompletedSteps] = useState<
-    string[]
-  >([]);
-  const [activationRemainingMs, setActivationRemainingMs] = useState(0);
   const optimizationRef = useRef<HTMLElement | null>(null);
   const isPremiumUnlocked =
     data.membership.recommendationUnlocked && data.planComparison !== null;
@@ -645,12 +146,6 @@ export function DashboardOverview({
   const paymentPriorityHref = preferredActionDebtId
     ? `/pagos?debtId=${preferredActionDebtId}&from=dashboard`
     : "/pagos?from=dashboard";
-  const dailyFocus = getDailyFocus({
-    data,
-    isPremiumUnlocked,
-    upgradePlanHref,
-    paymentHref: paymentPriorityHref,
-  });
   const momentumSummary = getMomentumSummary({
     data,
     isPremiumUnlocked,
@@ -671,6 +166,19 @@ export function DashboardOverview({
         : "Tu estructura actual todavía no está bien optimizada."
     : null;
   const hasDebts = data.summary.totalDebt > 0;
+  const dashboardPromptIntent = !isPremiumUnlocked
+    ? data.analysisScope.partialAnalysis
+      ? "partial"
+      : hasDebts && data.summary.estimatedMonthlyInterest > 0
+        ? "interest"
+        : data.riskAlerts.length > 0
+          ? "risk"
+          : null
+    : null;
+  const showDashboardPremiumPrompt = useSessionUpgradePrompt({
+    id: `dashboard:${dashboardPromptIntent ?? "idle"}`,
+    active: Boolean(dashboardPromptIntent),
+  });
   const hasHistory = data.balanceHistory.length > 0;
   const hasBreakdown = data.debtBreakdown.length > 0;
   const hasRecommendedOrder = data.recommendedOrder.length > 0;
@@ -679,74 +187,18 @@ export function DashboardOverview({
     data.membership.cancelAtPeriodEnd;
   const isProUnlocked =
     data.membership.tier === "PRO" && data.membership.billingStatus === "ACTIVE";
-  const quickActions = [
-    !hasDebts
-      ? {
-          title: "Carga tu primera deuda",
-          description:
-            "Sin deudas registradas todavía no podemos construir una ruta real ni alertarte a tiempo.",
-          actionLabel: "Ir a deudas",
-          href: "/deudas",
-          icon: CreditCard,
-        }
-      : null,
-    hasDebts && data.recentPayments.length === 0
-      ? {
-          title: "Registra tu primer pago",
-          description:
-            "Con un pago registrado el sistema ya empieza a medir avance real y presión mensual.",
-          actionLabel: "Ir a pagos",
-          href: "/pagos",
-          icon: Wallet,
-        }
-      : null,
-    !isPremiumUnlocked && data.membership.billingStatus === "FREE"
-      ? {
-          title: "Desbloquea el plan recomendado",
-          description:
-            "Premium te guía por 6 meses para dejar de perder dinero y mostrar cuánto tiempo podrías recortar.",
-          actionLabel: getCommercialUpgradeCta("Premium"),
-          href: upgradePlanHref,
-          icon: Crown,
-        }
-      : null,
-    data.membership.billingStatus === "PAST_DUE"
-      ? {
-          title: "Tu plan premium necesita atención",
-          description:
-            "Actualiza la facturación para no perder el módulo recomendado ni el seguimiento.",
-          actionLabel: "Revisar facturación",
-          href: managePlanHref,
-          icon: AlertTriangle,
-        }
-      : null,
-    data.membership.cancelAtPeriodEnd
-      ? {
-          title: "Tu plan terminará al cierre del período",
-          description:
-            "Si quieres mantener la guía premium y el orden optimizado, reactívalo antes del corte.",
-          actionLabel: "Gestionar plan",
-          href: managePlanHref,
-          icon: CircleCheck,
-        }
-      : null,
-    hasDebts && data.riskAlerts.length > 0
-      ? {
-          title: "Hay señales de pago mínimo riesgoso",
-          description:
-            "Revisar esto ahora puede evitar que sigas pagando intereses sin bajar el saldo.",
-          actionLabel: "Revisar deudas",
-          href: "/deudas",
-          icon: Sparkles,
-        }
-      : null,
-  ].filter(Boolean) as Array<{
-    title: string;
-    description: string;
-    actionLabel: string;
-    href: string;
-    icon: typeof AlertTriangle;
-  }>;
+  const nextTimelineItem = data.upcomingTimeline.items[0] ?? null;
+  const mobileRiskLabel = getMobileRiskLabel(data);
+  const mobileRiskSupport = getMobileRiskSupport(data);
+  const mobileProgressLabel = getMobileProgressLabel({ data });
+  const mobileActionButtons = buildMobileActionButtons(paymentPriorityHref);
+  const quickActions = buildDashboardQuickActions({
+    data,
+    hasDebts,
+    isPremiumUnlocked,
+    upgradePlanHref,
+    managePlanHref,
+  });
   const secondaryQuickActions = quickActions.slice(0, 2);
   const priorityOne =
     data.recommendedOrder.find((item) => item.priorityRank === 1) ?? null;
@@ -756,70 +208,27 @@ export function DashboardOverview({
   const priorityReason = priorityOne
     ? getPriorityReasonMeta({ data, item: priorityOne })
     : null;
-  const planStatusCopy = data.membership.cancelAtPeriodEnd
-    ? `Tu plan terminará al cierre actual${data.membership.currentPeriodEnd ? `, el ${formatDate(data.membership.currentPeriodEnd)}` : ""}.`
-    : data.membership.billingStatus === "ACTIVE"
-      ? data.membership.currentPeriodEnd
-        ? `Tu membresía premium está activa hasta ${formatDate(data.membership.currentPeriodEnd)}.`
-        : "Tu membresía premium está activa y desbloqueada."
-      : data.membership.billingStatus === "PAST_DUE"
-        ? "Tu membresía premium tiene un pago pendiente. Conviene regularizarla para no perder acceso."
-        : data.membership.label === "Base"
-          ? "Estás viendo el modo Base. Aquí ya tienes control y simulación simple, pero el plan recomendado sigue bloqueado."
-          : data.membership.description;
-  const activationSteps = [
-    {
-      id: "optimization",
-      title: "Abrir plan inteligente",
-      description: "Mira la comparación entre tu plan actual y el optimizado.",
-      actionLabel: "Abrir plan",
-      actionTarget: "optimization" as const,
-    },
-    {
-      id: "priority",
-      title: data.summary.recommendedDebtName
-        ? `Confirmar foco en ${data.summary.recommendedDebtName}`
-        : "Confirmar la deuda prioritaria",
-      description: data.summary.recommendedDebtName
-        ? `Asegúrate de que ${data.summary.recommendedDebtName} siga siendo la deuda a la que enviarás el excedente.`
-        : "Revisa cuál deuda quedó primero antes de mover más dinero.",
-      actionLabel: "Revisar prioridad",
-      actionTarget: "debts" as const,
-    },
-    {
-      id: "follow-up",
-      title:
-        data.dueSoonDebts.length > 0
-          ? "Cubrir próximos vencimientos"
-          : data.recentPayments.length === 0
-            ? "Registrar tu primer avance"
-            : "Mirar alertas y siguiente paso",
-      description:
-        data.dueSoonDebts.length > 0
-          ? `Tienes ${data.dueSoonDebts.length} vencimiento${data.dueSoonDebts.length === 1 ? "" : "s"} cercano${data.dueSoonDebts.length === 1 ? "" : "s"} que conviene dejar alineado${data.dueSoonDebts.length === 1 ? "" : "s"}.`
-          : data.recentPayments.length === 0
-            ? "Registrar un pago te ayuda a convertir el plan en movimiento real desde hoy."
-            : "Tus alertas y recomendaciones ya tienen suficiente contexto para una primera revisión semanal.",
-      actionLabel:
-        data.dueSoonDebts.length > 0
-          ? "Ver vencimientos"
-          : data.recentPayments.length === 0
-            ? "Ir a pagos"
-            : "Abrir alertas",
-      actionTarget:
-        data.dueSoonDebts.length > 0
-          ? ("debts" as const)
-          : data.recentPayments.length === 0
-            ? ("payments" as const)
-            : ("notifications" as const),
-    },
-  ];
-  const activationCompletedCount = activationSteps.filter((step) =>
-    activationCompletedSteps.includes(step.id),
-  ).length;
-  const activationProgressPct = Math.round(
-    (activationCompletedCount / activationSteps.length) * 100,
-  );
+  const planStatusCopy = getPlanStatusCopy(data);
+  const activationSteps = buildPremiumActivationSteps(data);
+  const {
+    showOptimization,
+    showPremiumWelcome,
+    activationCompletedSteps,
+    activationRemainingMs,
+    revealOptimization,
+    completeActivationStep,
+    dismissPremiumWelcome,
+    runActivationStepAction,
+  } = usePremiumActivation({
+    isPremiumUnlocked,
+    premiumWelcome,
+    initialShowOptimization,
+    upgradePlanHref,
+    navigateTo,
+    optimizationRef,
+  });
+  const { completedCount: activationCompletedCount, progressPct: activationProgressPct } =
+    getActivationProgress(activationSteps, activationCompletedSteps);
   const activationMinutesRemaining = Math.max(
     1,
     Math.ceil(activationRemainingMs / 60000),
@@ -833,283 +242,167 @@ export function DashboardOverview({
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
-  useEffect(() => {
-    if (!initialShowOptimization || !isPremiumUnlocked) {
-      return;
-    }
-
-    window.requestAnimationFrame(() => {
-      optimizationRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    });
-  }, [initialShowOptimization, isPremiumUnlocked]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const frame = window.requestAnimationFrame(() => {
-      if (!isPremiumUnlocked) {
-        setShowPremiumWelcome(false);
-        setActivationCompletedSteps([]);
-        setActivationRemainingMs(0);
-        return;
-      }
-
-      const now = Date.now();
-      let nextState = readPremiumActivationState();
-
-      if (premiumWelcome) {
-        nextState = {
-          startedAt: now,
-          completed: [],
-        };
-        persistPremiumActivationState(nextState);
-      }
-
-      if (!nextState) {
-        setShowPremiumWelcome(false);
-        setActivationCompletedSteps([]);
-        setActivationRemainingMs(0);
-        return;
-      }
-
-      const elapsed = now - nextState.startedAt;
-
-      if (elapsed >= premiumActivationWindowMs) {
-        persistPremiumActivationState(null);
-        setShowPremiumWelcome(false);
-        setActivationCompletedSteps([]);
-        setActivationRemainingMs(0);
-        return;
-      }
-
-      setShowPremiumWelcome(true);
-      setActivationCompletedSteps(nextState.completed);
-      setActivationRemainingMs(premiumActivationWindowMs - elapsed);
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [isPremiumUnlocked, premiumWelcome]);
-
-  useEffect(() => {
-    if (!showPremiumWelcome || typeof window === "undefined") {
-      return;
-    }
-
-    const interval = window.setInterval(() => {
-      const currentState = readPremiumActivationState();
-
-      if (!currentState) {
-        setShowPremiumWelcome(false);
-        setActivationCompletedSteps([]);
-        setActivationRemainingMs(0);
-        window.clearInterval(interval);
-        return;
-      }
-
-      const remaining =
-        premiumActivationWindowMs - (Date.now() - currentState.startedAt);
-
-      if (remaining <= 0) {
-        persistPremiumActivationState(null);
-        setShowPremiumWelcome(false);
-        setActivationCompletedSteps([]);
-        setActivationRemainingMs(0);
-        window.clearInterval(interval);
-        return;
-      }
-
-      setActivationRemainingMs(remaining);
-    }, 15000);
-
-    return () => window.clearInterval(interval);
-  }, [showPremiumWelcome]);
-
-  const revealOptimization = () => {
-    if (!isPremiumUnlocked) {
-      navigateTo(upgradePlanHref);
-      return;
-    }
-
-    setShowOptimization(true);
-    window.requestAnimationFrame(() => {
-      optimizationRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    });
-  };
-
-  const completeActivationStep = (stepId: string) => {
-    setActivationCompletedSteps((current) => {
-      if (current.includes(stepId)) {
-        return current;
-      }
-
-      const nextCompleted = [...current, stepId];
-      const currentState = readPremiumActivationState();
-
-      if (currentState) {
-        persistPremiumActivationState({
-          ...currentState,
-          completed: nextCompleted,
-        });
-      }
-
-      return nextCompleted;
-    });
-  };
-
-  const dismissPremiumWelcome = () => {
-    persistPremiumActivationState(null);
-    setActivationCompletedSteps([]);
-    setActivationRemainingMs(0);
-    setShowPremiumWelcome(false);
-  };
-
-  const runActivationStepAction = (
-    actionTarget: "optimization" | "debts" | "payments" | "notifications",
-  ) => {
-    if (actionTarget === "optimization") {
-      revealOptimization();
-      return;
-    }
-
-    if (actionTarget === "debts") {
-      navigateTo("/deudas");
-      return;
-    }
-
-    if (actionTarget === "payments") {
-      navigateTo("/pagos");
-      return;
-    }
-
-    navigateTo("/notificaciones");
-  };
-
-  const featuredStatCard = statCards[0];
-  const secondaryStatCards = statCards.slice(1);
+  const featuredStatCard = dashboardStatCards[0];
+  const secondaryStatCards = dashboardStatCards.slice(1);
   const secondaryLeadStatCard = secondaryStatCards[0];
   const trailingSecondaryStatCards = secondaryStatCards.slice(1);
   const FeaturedStatIcon = featuredStatCard.icon;
   const SecondaryLeadStatIcon = secondaryLeadStatCard?.icon;
-  const getStatCardValue = (card: (typeof statCards)[number]) => {
-    const rawValue =
-      card.key === "interestSavings"
-        ? (data.summary.interestSavings ?? 0)
-        : data.summary[card.key];
-
-    if (card.key === "interestSavings" && !isPremiumUnlocked) {
-      return "Premium";
-    }
-
-    return formatCurrency(rawValue);
-  };
-  const dailyFocusTone =
-    dailyFocus.badgeVariant === "danger" || dailyFocus.badgeVariant === "warning"
-      ? "warning"
-      : isPremiumUnlocked
-        ? "premium"
-        : "default";
-  const dailyFocusIcon =
-    data.summary.totalDebt <= 0
-      ? CreditCard
-      : data.urgentDebt?.status === "LATE"
-        ? AlertTriangle
-        : isPremiumUnlocked
-          ? Sparkles
-          : Wallet;
-  const dashboardSummaryItems: ExecutiveSummaryItem[] = [
-    {
-      label: "Deuda total",
-      value: formatCurrency(data.summary.totalDebt),
-      support: hasDebts
-        ? "Saldo, mora y cargos que hoy están compitiendo por tu flujo."
-        : "Todavía no hay deudas activas para construir una ruta real.",
-      icon: CircleDollarSign,
-      featured: true,
-      badgeLabel: hasDebts ? "Panorama real" : "Activa tu base",
-      badgeVariant: hasDebts ? "success" : "default",
-    },
-    {
-      label: "Pago mínimo del mes",
-      value: formatCurrency(data.summary.totalMinimumPayment),
-      support: "Lo mínimo para que el mes no se te complique más.",
-      icon: CalendarClock,
-    },
-    {
-      label: "Interés estimado del mes",
-      value: formatCurrency(data.summary.estimatedMonthlyInterest),
-      support:
-        data.summary.estimatedMonthlyInterest > 0
-          ? `Estás pagando ${formatCurrency(data.summary.estimatedMonthlyInterest)} en intereses.`
-          : "Cuando registres deuda activa, aquí verás el costo financiero del mes.",
-      icon: AlertTriangle,
-      badgeLabel:
-        data.summary.estimatedMonthlyInterest > 0 ? "Costo visible" : undefined,
-      badgeVariant: "warning" as const,
-    },
-    {
-      label: "Tiempo estimado de salida",
-      value: formatMonthsLabel(data.summary.monthsToDebtFree),
-      support: data.summary.projectedDebtFreeDate
-        ? `Si mantienes este ritmo, apuntas a ${formatDate(
-            data.summary.projectedDebtFreeDate,
-            "MMM yyyy",
-          )}.`
-        : "Completa deudas y pagos para proyectar una salida más clara.",
-      icon: Sparkles,
-      valueKind: "text" as const,
-      badgeLabel:
-        premiumMonthsSaved !== null && premiumMonthsSaved > 0
-          ? `${premiumMonthsSaved} meses menos`
-          : undefined,
-      badgeVariant: "success" as const,
-    },
-    {
-      label: "Prioridad actual",
-      value:
-        data.summary.recommendedDebtName ??
-        data.urgentDebt?.name ??
-        (hasDebts ? "Revisa tu prioridad" : "Registra tu primera deuda"),
-      support: data.summary.recommendedDebtName
-        ? "Hoy es la deuda que más conviene proteger o acelerar."
-        : hasDebts
-          ? "Aún falta una señal más clara para decirte cuál va primero."
-          : "Con una deuda registrada ya activamos la prioridad principal.",
-      icon: CreditCard,
-      valueKind: "text" as const,
-    },
-  ];
-  const firstSecondaryQuickAction = secondaryQuickActions[0] ?? null;
-  const dashboardSecondaryAction = firstSecondaryQuickAction
+  const getStatCardValue = (card: (typeof dashboardStatCards)[number]) =>
+    getDashboardStatCardValue({
+      data,
+      isPremiumUnlocked,
+      key: card.key,
+    });
+  const assistantCoachIcon =
+    data.assistantCoach.tone === "warning" ? AlertTriangle : Sparkles;
+  const assistantSecondaryAction = data.assistantCoach.secondaryAction
     ? {
-        label: firstSecondaryQuickAction.actionLabel,
-        onClick: () => navigateTo(firstSecondaryQuickAction.href),
+        label: data.assistantCoach.secondaryAction.label,
+        onClick: () => navigateTo(data.assistantCoach.secondaryAction?.href ?? "/dashboard"),
         variant: "secondary" as const,
       }
-    : isPremiumUnlocked
-      ? {
-          label: "Revisar mi plan",
-          onClick: revealOptimization,
-          variant: "secondary" as const,
-        }
-      : {
-          label: "Ver planes",
-          onClick: () => navigateTo(upgradePlanHref),
-          variant: "secondary" as const,
-        };
-
+    : undefined;
+  const dashboardSummaryItems = buildDashboardSummaryItems({
+    data,
+    hasDebts,
+    premiumMonthsSaved,
+  });
   return (
     <div className="flex flex-col gap-5 sm:gap-6">
+      <section className="-mx-1 grid gap-3 lg:hidden">
+        <DailyMissionCard data={data} />
+        <PaydownChallengeCard data={data} />
+        <Card className="border-border/70 bg-white/92 p-4 shadow-soft">
+          <CardHeader className="gap-3 px-0 pt-0">
+            <div className="flex items-center justify-between gap-3">
+              <Badge variant="default">Dashboard</Badge>
+              <Badge variant={data.riskAlerts.length > 0 ? "warning" : "success"}>
+                {data.riskAlerts.length > 0 ? "Atención hoy" : "Bajo control"}
+              </Badge>
+            </div>
+            <CardTitle className="text-[clamp(1.55rem,6vw,2rem)] leading-tight">
+              {hasDebts ? "Qué mirar hoy" : "Activa tu panorama"}
+            </CardTitle>
+            <CardDescription className="text-sm leading-6">
+              {hasDebts
+                ? "Lo esencial para decidir y moverte hoy."
+                : "Registra tu primera deuda para activar el panel."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 px-0 pb-0">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-border/60 bg-secondary/45 p-4">
+                <div className="flex items-center gap-2">
+                  <CircleDollarSign className="size-4 text-primary" />
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                    Deuda total
+                  </p>
+                </div>
+                <p className="value-stable mt-3 text-[clamp(1.5rem,6vw,2rem)] font-semibold leading-none text-foreground">
+                  {formatCurrency(data.summary.totalDebt)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-border/60 bg-secondary/45 p-4">
+                <div className="flex items-center gap-2">
+                  <CalendarClock className="size-4 text-primary" />
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                    Próximo pago
+                  </p>
+                </div>
+                <p className="mt-3 text-base font-semibold leading-tight text-foreground">
+                  {nextTimelineItem?.debtName ?? "Sin fecha cercana"}
+                </p>
+                <p className="mt-1 text-xs text-muted">
+                  {nextTimelineItem
+                    ? formatDate(nextTimelineItem.occursOn)
+                    : "Configura fechas para verlo aquí"}
+                </p>
+              </div>
+              <div className="rounded-[1.5rem] border border-border/70 bg-secondary/45 p-4">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="size-4 text-primary" />
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+                    Riesgo / interés
+                  </p>
+                </div>
+                <p className="value-stable mt-3 text-[clamp(1.2rem,5vw,1.7rem)] font-semibold leading-tight text-foreground">
+                  {mobileRiskLabel}
+                </p>
+                <p className="mt-1 text-xs text-muted">{mobileRiskSupport}</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-primary/15 bg-[rgba(240,248,245,0.9)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/80">
+                    Progreso
+                  </p>
+                  <p className="mt-2 text-lg font-semibold text-foreground">
+                    {debtProgressPct}% pagado
+                  </p>
+                </div>
+                <p className="text-right text-xs text-muted">{mobileProgressLabel}</p>
+              </div>
+              <div className="mt-3 h-3 overflow-hidden rounded-full bg-white/85">
+                <div
+                  className="h-full rounded-full bg-[linear-gradient(135deg,#0f584a_0%,#f08a5d_140%)] transition-all"
+                  style={{ width: `${debtProgressPct}%` }}
+                />
+              </div>
+            </div>
+
+            {!isPremiumUnlocked && hasDebts && showDashboardPremiumPrompt ? (
+              <div className="rounded-xl border border-amber-200/90 bg-[rgba(255,248,241,0.96)] p-4">
+                <p className="text-sm font-semibold text-foreground">
+                  {data.analysisScope.partialAnalysis
+                    ? "Todavía estás viendo solo una parte del costo real."
+                    : `Estás pagando ${formatCurrency(data.summary.estimatedMonthlyInterest)} en intereses este mes.`}
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  {data.analysisScope.partialAnalysis
+                    ? "Premium une todas tus deudas activas para que dejes de decidir con el panorama incompleto."
+                    : "Premium te dice qué mover primero para dejar de perder más dinero este mes."}
+                </p>
+                <div className="mt-3">
+                  <Button
+                    className="w-full"
+                    onClick={() => {
+                      trackPlanEvent("upgrade_click", {
+                        source: "dashboard_mobile_summary",
+                        targetPlan: "NORMAL",
+                      });
+                      navigateTo(upgradePlanHref);
+                    }}
+                  >
+                    {MEMBERSHIP_COMMERCIAL_COPY.contextualCta.dashboardPremium}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="grid gap-3">
+              {mobileActionButtons.map((action) => (
+                <Button
+                  key={action.label}
+                  variant={action.variant}
+                  size="lg"
+                  className="w-full"
+                  onClick={() => navigateTo(action.href)}
+                >
+                  {action.label}
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <div className="hidden lg:flex lg:flex-col gap-5 sm:gap-6">
       <section className="border-border shadow-soft -mx-1 rounded-[2rem] border bg-white/90 p-4 sm:mx-0 sm:p-8">
         <div className="flex flex-col gap-5 sm:gap-6">
-          {!isPremiumUnlocked ? (
+          {!isPremiumUnlocked && showDashboardPremiumPrompt ? (
             <Card className="border-amber-200 bg-[linear-gradient(135deg,rgba(255,248,241,0.98),rgba(255,255,255,0.94))] p-4 shadow-[0_22px_50px_rgba(240,138,93,0.1)] sm:p-5">
               <CardHeader className="gap-3 px-0 pt-0">
                 <div className="flex flex-wrap items-center gap-3">
@@ -1125,19 +418,19 @@ export function DashboardOverview({
               </CardHeader>
               <CardContent className="flex flex-col gap-4 px-0 pb-0">
                 <div className="grid gap-3 md:grid-cols-3">
-                  <div className="rounded-[1.4rem] border border-white/80 bg-white/90 px-4 py-4 text-sm leading-6 text-foreground">
+                  <div className="rounded-[1.4rem] border border-border/55 bg-white/90 px-4 py-4 text-sm leading-6 text-foreground">
                     <span className="font-semibold">
                       Estás pagando {formatCurrency(data.summary.estimatedMonthlyInterest)} en intereses
                     </span>{" "}
                     y ese dinero no está bajando capital tan rápido como podría.
                   </div>
-                  <div className="rounded-[1.4rem] border border-white/80 bg-white/90 px-4 py-4 text-sm leading-6 text-foreground">
+                  <div className="rounded-[1.4rem] border border-border/55 bg-white/90 px-4 py-4 text-sm leading-6 text-foreground">
                     {data.analysisScope.partialAnalysis
-                      ? "Hay deudas fuera del análisis Base. Estás tomando decisiones sin ver toda tu realidad."
-                      : "Tu panorama ya muestra el problema, pero todavía no te enseña la mejor salida."}
+                      ? "Hay deudas fuera del análisis Base. Tu lectura de hoy todavía está dejando dinero fuera del mapa."
+                      : "Tu panorama ya muestra el costo. Lo que falta es ver la salida que menos te castiga."}
                   </div>
-                  <div className="rounded-[1.4rem] border border-white/80 bg-white/90 px-4 py-4 text-sm leading-6 text-foreground">
-                    Premium compara tu escenario actual contra una ruta mejorada para que veas cuánto tiempo y dinero estás perdiendo hoy.
+                  <div className="rounded-[1.4rem] border border-border/55 bg-white/90 px-4 py-4 text-sm leading-6 text-foreground">
+                    Premium compara tu ruta actual contra una mejor para mostrarte cuánto podrías recuperar en tiempo y dinero.
                   </div>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -1151,7 +444,7 @@ export function DashboardOverview({
                       navigateTo(upgradePlanHref);
                     }}
                   >
-                    {getCommercialUpgradeCta("Premium")}
+                    {MEMBERSHIP_COMMERCIAL_COPY.contextualCta.dashboardPremium}
                   </Button>
                   <Button className="w-full sm:w-auto" variant="secondary" onClick={() => navigateTo("/simulador")}>
                     Abrir simulador
@@ -1161,10 +454,12 @@ export function DashboardOverview({
             </Card>
           ) : null}
 
+          <DashboardAssistantChat data={data} storageKey={claraStorageKey} />
+
           <ModuleSectionHeader
             kicker="Dashboard"
-            title="Tu tablero ya no solo informa: te dice qué conviene hacer ahora."
-            description="Primero ves tu panorama real. Luego una sola recomendación clara para mover el plan sin abrir demasiados frentes."
+            title="Mini IA Clara te dice qué conviene hacer ahora."
+            description="Clara lee tu panorama, detecta lo más urgente y te muestra una recomendación simple para avanzar sin abrir demasiados frentes."
             action={
               <Button
                 onClick={() => {
@@ -1187,47 +482,24 @@ export function DashboardOverview({
 
           <ExecutiveSummaryStrip items={dashboardSummaryItems} />
 
-          {!isPremiumUnlocked && data.analysisScope.partialAnalysis ? (
-            <LockedCard
-              title={UPGRADE_MESSAGES.PARTIAL_VIEW}
-              description={`${UPGRADE_MESSAGES.HIDDEN_DEBTS} ${UPGRADE_MESSAGES.INTEREST_LOSS}`}
-              requiredPlan="Premium"
-              reason={`Tienes ${data.analysisScope.hiddenDebtCount} deuda${data.analysisScope.hiddenDebtCount === 1 ? "" : "s"} fuera del análisis Base. Hoy estás viendo ${data.analysisScope.analyzedDebtCount} de ${data.analysisScope.activeDebtCount} deuda${data.analysisScope.activeDebtCount === 1 ? "" : "s"} activa${data.analysisScope.activeDebtCount === 1 ? "" : "s"}.`}
-            >
-              <UpgradeCTA
-                title="Estás viendo solo una parte de tu situación financiera"
-                description="Premium toma todas tus deudas activas, compara escenarios y te muestra cuánto dinero y tiempo estás perdiendo por no ver el panorama completo."
-                requiredPlan="Premium"
-                ctaText={getCommercialUpgradeCta("Premium")}
-                onClick={() => {
-                  trackPlanEvent("feature_blocked", {
-                    source: "dashboard_partial_analysis",
-                    hiddenDebtCount: data.analysisScope.hiddenDebtCount,
-                  });
-                  trackPlanEvent("upgrade_click", {
-                    source: "dashboard_partial_analysis",
-                    targetPlan: "NORMAL",
-                  });
-                  navigateTo(upgradePlanHref);
-                }}
-              />
-            </LockedCard>
-          ) : null}
+          <DailyMissionCard data={data} />
+
+          <PaydownChallengeCard data={data} />
 
           <PrimaryActionCard
-            eyebrow="Tu siguiente mejor paso"
-            title={dailyFocus.title}
-            description={dailyFocus.description}
-            badgeLabel={dailyFocus.badgeLabel}
-            badgeVariant={dailyFocus.badgeVariant}
+            eyebrow="Mini IA financiera"
+            title={data.assistantCoach.title}
+            description={data.assistantCoach.description}
+            badgeLabel={data.assistantCoach.badgeLabel}
+            badgeVariant={data.assistantCoach.badgeVariant}
             primaryAction={{
-              label: dailyFocus.primaryLabel,
-              onClick: () => navigateTo(dailyFocus.primaryHref),
+              label: data.assistantCoach.primaryAction.label,
+              onClick: () => navigateTo(data.assistantCoach.primaryAction.href),
             }}
-            secondaryAction={dashboardSecondaryAction}
-            notes={dailyFocus.notes}
-            tone={dailyFocusTone}
-            icon={dailyFocusIcon}
+            secondaryAction={assistantSecondaryAction}
+            notes={data.assistantCoach.notes}
+            tone={data.assistantCoach.tone}
+            icon={assistantCoachIcon}
           />
 
           <TrustInlineNote
@@ -1300,7 +572,7 @@ export function DashboardOverview({
               tone="soft"
               footer={
                 <div className="space-y-4">
-                  <div className="rounded-[1.5rem] border border-white/70 bg-white/85 p-4">
+                  <div className="rounded-[1.5rem] border border-border/50 bg-white/85 p-4">
                     <div className="flex min-w-0 items-end justify-between gap-4">
                       <div className="min-w-0">
                         <p className="text-muted text-xs tracking-[0.16em] uppercase">
@@ -1326,7 +598,7 @@ export function DashboardOverview({
                     {progressMilestones.map((milestone) => (
                       <div
                         key={milestone.label}
-                        className="rounded-3xl border border-white/70 bg-white/82 px-4 py-4"
+                        className="rounded-2xl border border-border/50 bg-white/82 px-4 py-4"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-foreground text-sm font-semibold">
@@ -1363,7 +635,7 @@ export function DashboardOverview({
                   : "Aún faltan datos para proyectar una salida confiable."}
               </p>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-3xl bg-white/10 p-4">
+                <div className="rounded-2xl bg-white/10 p-4">
                   <p className="text-xs tracking-[0.16em] text-white/70 uppercase">
                     {isPremiumUnlocked ? "Ahorro estimado" : "Intereses visibles"}
                   </p>
@@ -1373,7 +645,7 @@ export function DashboardOverview({
                       : formatCurrency(data.summary.estimatedMonthlyInterest)}
                   </p>
                 </div>
-                <div className="rounded-3xl bg-white/10 p-4">
+                <div className="rounded-2xl bg-white/10 p-4">
                   <p className="text-xs tracking-[0.16em] text-white/70 uppercase">
                     Recomendación principal
                   </p>
@@ -1448,7 +720,7 @@ export function DashboardOverview({
                         return (
                           <div
                             key={step.id}
-                            className="rounded-3xl bg-white/88 p-5"
+                            className="rounded-2xl bg-white/88 p-5"
                           >
                             <div className="flex items-center justify-between gap-3">
                               <p className="text-muted text-xs tracking-[0.16em] uppercase">
@@ -1483,7 +755,7 @@ export function DashboardOverview({
                       })}
                     </div>
                   </div>
-                  <div className="rounded-[1.6rem] border border-white/70 bg-white/82 p-4 2xl:sticky 2xl:top-6">
+                  <div className="rounded-[1.6rem] border border-border/50 bg-white/82 p-4 2xl:sticky 2xl:top-6">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Siguiente foco
                     </p>
@@ -1548,7 +820,7 @@ export function DashboardOverview({
               <p className="text-muted mt-2 text-sm leading-7">
                 {planStatusCopy}
               </p>
-              <div className="mt-4 rounded-[1.45rem] border border-white/70 bg-white/82 p-4 text-sm leading-7 text-muted">
+              <div className="mt-4 rounded-xl border border-border/50 bg-white/82 p-4 text-sm leading-7 text-muted">
                 {isPremiumUnlocked
                   ? "Aquí entras directo al simulador o revisas la estructura activa sin pasar por varias pantallas."
                   : "Aquí solo te mostramos el siguiente paso natural, no una lista larga de decisiones."}
@@ -1602,7 +874,7 @@ export function DashboardOverview({
                       <button
                         key={action.title}
                         type="button"
-                        className="hover:border-primary/15 rounded-3xl border border-white/60 bg-white/80 p-4 text-left transition hover:bg-white"
+                        className="hover:border-primary/15 rounded-2xl border border-border/50 bg-white/80 p-4 text-left transition hover:bg-white"
                         onClick={() => navigateTo(action.href)}
                       >
                         <div className="flex items-start gap-3">
@@ -1626,7 +898,7 @@ export function DashboardOverview({
                     );
                   })
                 ) : (
-                  <div className="text-muted rounded-3xl border border-white/60 bg-white/80 p-4 text-sm leading-7">
+                  <div className="text-muted rounded-2xl border border-border/50 bg-white/80 p-4 text-sm leading-7">
                     Después de resolver lo de hoy, aquí verás los siguientes
                     ajustes útiles para sostener el ritmo sin abrir demasiados
                     frentes a la vez.
@@ -1670,7 +942,7 @@ export function DashboardOverview({
                       {getPlanSupportText(plan)}
                     </p>
                     <div className="mt-5 grid gap-4 md:grid-cols-2">
-                      <div className="rounded-[1.5rem] border border-white/70 bg-white/85 p-4">
+                      <div className="rounded-[1.5rem] border border-border/50 bg-white/85 p-4">
                         <p className="text-muted text-xs tracking-[0.16em] uppercase">
                           Intereses
                         </p>
@@ -1678,7 +950,7 @@ export function DashboardOverview({
                           {formatCurrency(plan.totalInterest)}
                         </p>
                       </div>
-                      <div className="rounded-[1.5rem] border border-white/70 bg-white/85 p-4">
+                      <div className="rounded-[1.5rem] border border-border/50 bg-white/85 p-4">
                         <p className="text-muted text-xs tracking-[0.16em] uppercase">
                           Presupuesto
                         </p>
@@ -1702,7 +974,7 @@ export function DashboardOverview({
                   <p className="support-copy mt-3">
                     {data.planComparison?.description}
                   </p>
-                  <div className="text-foreground mt-5 rounded-[1.6rem] border border-white/70 bg-white/82 p-4 text-sm leading-7">
+                  <div className="text-foreground mt-5 rounded-[1.6rem] border border-border/50 bg-white/82 p-4 text-sm leading-7">
                     <span className="font-semibold">Por qué va primero:</span>{" "}
                     {data.planComparison?.immediateAction}
                   </div>
@@ -1796,7 +1068,7 @@ export function DashboardOverview({
                   </div>
                 ) : null}
                 <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-                  <div className="rounded-3xl border border-white/70 bg-white/85 px-4 py-4 text-sm">
+                  <div className="rounded-2xl border border-border/50 bg-white/85 px-4 py-4 text-sm">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Interés visible
                     </p>
@@ -1804,7 +1076,7 @@ export function DashboardOverview({
                       {formatCurrency(data.summary.estimatedMonthlyInterest)}
                     </p>
                   </div>
-                  <div className="rounded-3xl border border-white/70 bg-white/85 px-4 py-4 text-sm">
+                  <div className="rounded-2xl border border-border/50 bg-white/85 px-4 py-4 text-sm">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Ritmo actual
                     </p>
@@ -1812,7 +1084,7 @@ export function DashboardOverview({
                       {formatMonthsLabel(data.summary.monthsToDebtFree)}
                     </p>
                   </div>
-                  <div className="rounded-3xl border border-white/70 bg-white/85 px-4 py-4 text-sm md:col-span-2 2xl:col-span-1">
+                  <div className="rounded-2xl border border-border/50 bg-white/85 px-4 py-4 text-sm md:col-span-2 2xl:col-span-1">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Presión principal
                     </p>
@@ -1824,15 +1096,15 @@ export function DashboardOverview({
                   </div>
                 </div>
                 <div className="mt-4 grid gap-3">
-                  <div className="text-foreground rounded-3xl border border-white/70 bg-white/85 px-4 py-3 text-sm">
+                  <div className="text-foreground rounded-2xl border border-border/50 bg-white/85 px-4 py-3 text-sm">
                     <span className="font-semibold">Base:</span> control,
                     registro y simulación simple.
                   </div>
-                  <div className="text-foreground rounded-3xl border border-white/70 bg-white/85 px-4 py-3 text-sm">
+                  <div className="text-foreground rounded-2xl border border-border/50 bg-white/85 px-4 py-3 text-sm">
                     <span className="font-semibold">Premium:</span> plan
                     recomendado para salir más rápido en 6 meses.
                   </div>
-                  <div className="text-foreground rounded-3xl border border-white/70 bg-white/85 px-4 py-3 text-sm">
+                  <div className="text-foreground rounded-2xl border border-border/50 bg-white/85 px-4 py-3 text-sm">
                     <span className="font-semibold">Pro:</span> seguimiento
                     premium extendido por 12 meses.
                   </div>
@@ -1972,7 +1244,7 @@ export function DashboardOverview({
                   principal.
                 </p>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <div className="rounded-3xl bg-white/85 p-4 sm:p-5 md:col-span-2">
+                  <div className="rounded-2xl bg-white/85 p-4 sm:p-5 md:col-span-2">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Presupuesto sugerido
                     </p>
@@ -1982,7 +1254,7 @@ export function DashboardOverview({
                       )}
                     </p>
                   </div>
-                  <div className="rounded-3xl bg-white/85 p-4 sm:p-5">
+                  <div className="rounded-2xl bg-white/85 p-4 sm:p-5">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Vencimientos cercanos
                     </p>
@@ -1990,7 +1262,7 @@ export function DashboardOverview({
                       {data.dueSoonDebts.length}
                     </p>
                   </div>
-                  <div className="rounded-3xl bg-white/85 p-4 sm:p-5">
+                  <div className="rounded-2xl bg-white/85 p-4 sm:p-5">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Alertas activas
                     </p>
@@ -2030,7 +1302,7 @@ export function DashboardOverview({
             <CardContent className="space-y-4 pt-4">
               {isProUnlocked ? (
                 <>
-                  <div className="border-border bg-secondary/70 rounded-3xl border p-4 sm:p-5">
+                  <div className="border-border bg-secondary/70 rounded-2xl border p-4 sm:p-5">
                     <p className="text-foreground font-semibold">
                       1. Mantén la revisión semanal viva
                     </p>
@@ -2039,7 +1311,7 @@ export function DashboardOverview({
                         "Tu seguimiento ya tiene suficiente contexto para revisar avance, alertas y prioridad una vez por semana."}
                     </p>
                   </div>
-                  <div className="border-border bg-secondary/70 rounded-3xl border p-4 sm:p-5">
+                  <div className="border-border bg-secondary/70 rounded-2xl border p-4 sm:p-5">
                     <p className="text-foreground font-semibold">
                       2. Lee el progreso con más historial
                     </p>
@@ -2049,7 +1321,7 @@ export function DashboardOverview({
                       juzgar si el ritmo está mejorando o se está estancando.
                     </p>
                   </div>
-                  <div className="border-border bg-secondary/70 rounded-3xl border p-4 sm:p-5">
+                  <div className="border-border bg-secondary/70 rounded-2xl border p-4 sm:p-5">
                     <p className="text-foreground font-semibold">
                       3. Convierte alertas en seguimiento
                     </p>
@@ -2076,7 +1348,7 @@ export function DashboardOverview({
                 </>
               ) : (
                 <>
-                  <div className="border-border bg-secondary/70 rounded-3xl border p-4 sm:p-5">
+                  <div className="border-border bg-secondary/70 rounded-2xl border p-4 sm:p-5">
                     <p className="text-foreground font-semibold">
                       1. Más historia para leer tu ritmo
                     </p>
@@ -2086,7 +1358,7 @@ export function DashboardOverview({
                       se está sosteniendo.
                     </p>
                   </div>
-                  <div className="border-border bg-secondary/70 rounded-3xl border p-4 sm:p-5">
+                  <div className="border-border bg-secondary/70 rounded-2xl border p-4 sm:p-5">
                     <p className="text-foreground font-semibold">
                       2. Exportes y seguimiento más operativo
                     </p>
@@ -2095,7 +1367,7 @@ export function DashboardOverview({
                       más contexto y una lectura más larga del plan.
                     </p>
                   </div>
-                  <div className="border-primary/15 rounded-3xl border bg-[rgba(255,248,241,0.88)] p-4 sm:p-5">
+                  <div className="border-primary/15 rounded-2xl border bg-[rgba(255,248,241,0.88)] p-4 sm:p-5">
                     <div className="flex items-center gap-3">
                       <Badge variant="warning">Control total en Pro</Badge>
                       <Badge variant="default">Seguimiento 12 meses</Badge>
@@ -2131,19 +1403,16 @@ export function DashboardOverview({
           <CardHeader>
             <CardTitle>Evolución del saldo</CardTitle>
             <CardDescription>
-              Historial de snapshots guardados por el sistema para que veas si
-              el saldo total baja o se estanca.
+              Mira si tu saldo total va bajando o si se está estancando.
             </CardDescription>
           </CardHeader>
           <CardContent className="h-80 pt-6">
             {hasHistory && chartsReady ? (
               <DashboardBalanceHistoryChart data={data.balanceHistory} />
             ) : hasHistory ? (
-              <div className="bg-secondary/40 text-muted flex h-full items-center justify-center rounded-3xl text-sm">
-                Preparando visualización...
-              </div>
+              <ChartLoadingPlaceholder />
             ) : (
-              <div className="border-border bg-secondary/30 flex h-full flex-col items-center justify-center rounded-3xl border border-dashed px-6 text-center">
+              <div className="border-border bg-secondary/30 flex h-full flex-col items-center justify-center rounded-2xl border border-dashed px-6 text-center">
                 <p className="text-foreground text-base font-semibold">
                   Todavía no hay historial suficiente
                 </p>
@@ -2167,11 +1436,9 @@ export function DashboardOverview({
             {hasBreakdown && chartsReady ? (
               <DashboardDebtBreakdownChart data={data.debtBreakdown} />
             ) : hasBreakdown ? (
-              <div className="bg-secondary/40 text-muted flex h-full items-center justify-center rounded-3xl text-sm">
-                Preparando visualización...
-              </div>
+              <ChartLoadingPlaceholder />
             ) : (
-              <div className="border-border bg-secondary/30 flex h-full flex-col items-center justify-center rounded-3xl border border-dashed px-6 text-center">
+              <div className="border-border bg-secondary/30 flex h-full flex-col items-center justify-center rounded-2xl border border-dashed px-6 text-center">
                 <p className="text-foreground text-base font-semibold">
                   Aquí aparecerá tu mezcla de deudas
                 </p>
@@ -2211,7 +1478,7 @@ export function DashboardOverview({
                   {data.planComparison?.immediateAction}
                 </p>
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-3xl bg-white/90 p-4 sm:p-5">
+                  <div className="rounded-2xl bg-white/90 p-4 sm:p-5">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Ruta elegida
                     </p>
@@ -2219,7 +1486,7 @@ export function DashboardOverview({
                       {optimizedPlan.strategyLabel}
                     </p>
                   </div>
-                  <div className="rounded-3xl bg-white/90 p-4 sm:p-5">
+                  <div className="rounded-2xl bg-white/90 p-4 sm:p-5">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Intereses evitables
                     </p>
@@ -2229,7 +1496,7 @@ export function DashboardOverview({
                       )}
                     </p>
                   </div>
-                  <div className="rounded-3xl bg-white/90 p-4 sm:p-5 md:col-span-2">
+                  <div className="rounded-2xl bg-white/90 p-4 sm:p-5 md:col-span-2">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Pago mensual sugerido
                     </p>
@@ -2309,7 +1576,7 @@ export function DashboardOverview({
                       {priorityOne.explanation}
                     </p>
                     {priorityReason ? (
-                      <div className="text-foreground mt-4 rounded-3xl border border-white/70 bg-white/85 p-4 text-sm leading-7">
+                      <div className="text-foreground mt-4 rounded-2xl border border-border/50 bg-white/85 p-4 text-sm leading-7">
                         <span className="font-semibold">Por qué va primero:</span>{" "}
                         {priorityReason.support}
                       </div>
@@ -2325,7 +1592,7 @@ export function DashboardOverview({
                   </div>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-3xl border border-white/70 bg-white/85 px-4 py-4 text-sm">
+                  <div className="rounded-2xl border border-border/50 bg-white/85 px-4 py-4 text-sm">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Saldo actual
                     </p>
@@ -2333,7 +1600,7 @@ export function DashboardOverview({
                       {formatCurrency(priorityOne.balance)}
                     </p>
                   </div>
-                  <div className="rounded-3xl border border-white/70 bg-white/85 px-4 py-4 text-sm">
+                  <div className="rounded-2xl border border-border/50 bg-white/85 px-4 py-4 text-sm">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Tasa mensual aprox.
                     </p>
@@ -2341,7 +1608,7 @@ export function DashboardOverview({
                       {priorityOne.monthlyRatePct.toFixed(2)}%
                     </p>
                   </div>
-                  <div className="rounded-3xl border border-white/70 bg-white/85 px-4 py-4 text-sm md:col-span-2">
+                  <div className="rounded-2xl border border-border/50 bg-white/85 px-4 py-4 text-sm md:col-span-2">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Si la sostienes
                     </p>
@@ -2388,7 +1655,7 @@ export function DashboardOverview({
                       </p>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
-                      <div className="rounded-3xl border border-white/70 bg-white/85 p-4 text-sm">
+                      <div className="rounded-2xl border border-border/50 bg-white/85 p-4 text-sm">
                         <p className="text-muted text-xs tracking-[0.16em] uppercase">
                           Saldo actual
                         </p>
@@ -2396,7 +1663,7 @@ export function DashboardOverview({
                           {formatCurrency(item.balance)}
                         </p>
                       </div>
-                      <div className="rounded-3xl border border-white/70 bg-white/85 p-4 text-sm">
+                      <div className="rounded-2xl border border-border/50 bg-white/85 p-4 text-sm">
                         <p className="text-muted text-xs tracking-[0.16em] uppercase">
                           Tasa mensual aprox.
                         </p>
@@ -2476,7 +1743,7 @@ export function DashboardOverview({
                 data.riskAlerts.map((alert) => (
                 <div
                   key={alert.title}
-                  className="border-border bg-secondary/70 rounded-3xl border p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:p-5"
+                  className="border-border bg-secondary/70 rounded-2xl border p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:p-5"
                 >
                     <p className="text-foreground font-semibold">
                       {alert.title}
@@ -2509,7 +1776,7 @@ export function DashboardOverview({
               data.dueSoonDebts.map((debt) => (
                 <div
                   key={debt.id}
-                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-3xl border p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:grid-cols-[minmax(0,1fr)_170px] sm:items-center"
+                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-2xl border p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:grid-cols-[minmax(0,1fr)_170px] sm:items-center"
                 >
                   <div className="min-w-0">
                     <p className="text-foreground font-semibold">{debt.name}</p>
@@ -2519,7 +1786,7 @@ export function DashboardOverview({
                         : "Sin fecha"}
                     </p>
                   </div>
-                  <div className="rounded-3xl border border-white/70 bg-white/85 px-4 py-3 sm:text-right">
+                  <div className="rounded-2xl border border-border/50 bg-white/85 px-4 py-3 sm:text-right">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Pago mínimo
                     </p>
@@ -2549,7 +1816,7 @@ export function DashboardOverview({
               data.recentPayments.map((payment) => (
                 <div
                   key={payment.id}
-                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-3xl border p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center"
+                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-2xl border p-4 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:grid-cols-[minmax(0,1fr)_180px] sm:items-center"
                 >
                   <div className="min-w-0">
                     <p className="text-foreground font-semibold">
@@ -2559,7 +1826,7 @@ export function DashboardOverview({
                       {formatDate(payment.paidAt)}
                     </p>
                   </div>
-                  <div className="rounded-3xl border border-white/70 bg-white/85 px-4 py-3 sm:text-right">
+                  <div className="rounded-2xl border border-border/50 bg-white/85 px-4 py-3 sm:text-right">
                     <p className="value-stable text-foreground text-sm font-semibold">
                       {formatCurrency(payment.amount)}
                     </p>
@@ -2577,6 +1844,7 @@ export function DashboardOverview({
           </CardContent>
         </Card>
       </section>
+      </div>
     </div>
   );
 }

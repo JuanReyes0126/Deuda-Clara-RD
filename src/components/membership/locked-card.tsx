@@ -52,7 +52,7 @@ export function LockedCard({
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 pt-1">
-        <p className="rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-sm leading-7 text-muted">
+        <p className="rounded-2xl border border-border/50 bg-white/85 px-4 py-3 text-sm leading-7 text-muted">
           {reason}
         </p>
         <p className="text-xs leading-6 text-primary">

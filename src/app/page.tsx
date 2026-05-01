@@ -36,7 +36,7 @@ const heroPrimaryMetric = heroPrimaryMetricFallback ?? {
 const trustPills = [
   "Empieza gratis",
   "Sin conectar bancos para empezar",
-  "Tú controlas lo que registras",
+  "Seguridad avanzada",
   "Premium desde US$5/mes",
 ];
 
@@ -49,12 +49,12 @@ const howItWorks = [
   {
     step: "2",
     title: "Ve lo urgente y lo caro",
-    copy: "Te mostramos dónde estás perdiendo dinero y qué urge primero.",
+    copy: "Sabe exactamente qué decisión te conviene hoy.",
   },
   {
     step: "3",
     title: "Desbloquea tu mejor ruta",
-    copy: "Premium te dice qué pagar primero y cuánto podrías ahorrar.",
+    copy: "Premium te muestra cómo salir antes y pagar menos intereses.",
   },
 ] as const;
 
@@ -89,7 +89,7 @@ const pricingPlans = [
     annual: "US$49/año",
     annualSavings: "ahorras US$11",
     highlight: "Optimiza y paga menos",
-    idealFor: "Te muestra cuánto pierdes hoy y cómo empezar a pagar menos.",
+    idealFor: "Te muestra cuánto pierdes hoy y cómo empezar a ahorrar.",
     features: getPlanFeatureBullets("NORMAL"),
     featured: true,
   },
@@ -141,11 +141,10 @@ export default function HomePage() {
 
               <div className="space-y-5">
                 <h1 className="max-w-4xl font-display text-5xl leading-[0.95] tracking-tight text-foreground md:text-7xl">
-                  Ve cuánto debes y cómo salir más rápido.
+                  Deja de adivinar qué pagar primero.
                 </h1>
                 <p className="max-w-2xl text-lg leading-8 text-muted md:text-xl">
-                  Organiza tus deudas, muestra lo que estás perdiendo en intereses
-                  y te dice cuál es el siguiente paso.
+                  Ve cuánto debes, evita intereses innecesarios y toma control real de tu dinero en minutos.
                 </p>
               </div>
 
@@ -154,19 +153,19 @@ export default function HomePage() {
                   href="/registro"
                   className="inline-flex h-12 items-center justify-center rounded-full bg-primary px-6 text-base font-semibold text-white shadow-[0_18px_42px_rgba(15,88,74,0.22)] transition hover:bg-primary-strong"
                 >
-                  Crear mi plan ahora
+                  Empezar gratis
                 </Link>
                 <Link
                   href="#como-funciona"
                   className="inline-flex h-12 items-center justify-center rounded-full border border-[rgba(240,138,93,0.18)] bg-white px-6 text-base font-semibold text-foreground transition hover:bg-accent-soft/55"
                 >
-                  Ver cómo salir de deudas
+                  Tomar control de mis deudas
                 </Link>
                 <Link
                   href="/planes"
                   className="inline-flex h-12 items-center justify-center rounded-full bg-primary px-6 text-base font-semibold text-white shadow-[0_18px_42px_rgba(15,88,74,0.18)] transition hover:bg-primary-strong"
                 >
-                  Empieza a ahorrar hoy
+                  Ver mi plan ahora
                 </Link>
               </div>
 
@@ -204,10 +203,10 @@ export default function HomePage() {
                   </span>
                 </div>
                 <CardTitle className="max-w-sm text-4xl text-white">
-                  Menos ruido. Más claridad para pagar mejor.
+                  Menos ruido. Más control sobre tu dinero.
                 </CardTitle>
                 <CardDescription className="max-w-lg text-base leading-7 text-white/72">
-                  Hecho para ver rápido dónde estás, qué te cuesta más y qué hacer ahora.
+                  Hecho para ver qué te cuesta más, qué hacer ahora y cómo dejar de perder dinero.
                 </CardDescription>
               </CardHeader>
 
@@ -291,10 +290,10 @@ export default function HomePage() {
                 Cómo funciona
               </p>
               <h2 className="font-display text-4xl tracking-tight text-foreground">
-                Tres pasos para pasar del caos a un plan claro.
+                Tres pasos para dejar de improvisar con tus deudas.
               </h2>
               <p className="section-summary max-w-2xl">
-                Registras, ves dónde pierdes dinero y decides cómo acelerar la salida.
+                Registras, ves el problema y activas una ruta más clara para salir antes.
               </p>
             </div>
 
@@ -358,10 +357,10 @@ export default function HomePage() {
                 Tu estrategia
               </p>
               <h2 className="font-display text-4xl tracking-tight text-foreground">
-                Te decimos qué método encaja mejor contigo.
+                Sabe exactamente qué decisión te conviene.
               </h2>
               <p className="section-summary max-w-2xl">
-                Menos teoría. Más claridad sobre qué pagar primero y por qué.
+                Te mostramos qué pagar primero y cómo evitar intereses innecesarios.
               </p>
             </div>
 
@@ -391,10 +390,10 @@ export default function HomePage() {
                 Planes claros
               </p>
               <h2 className="font-display text-4xl tracking-tight text-foreground">
-                Empieza gratis y sube cuando quieras pagar menos.
+                Empieza gratis y activa Premium cuando quieras pagar menos.
               </h2>
               <p className="section-summary">
-                Premium te muestra cuánto puedes ahorrar y qué pagar primero.
+                Premium te muestra cuánto puedes ahorrar, qué pagar primero y cómo salir antes.
               </p>
             </div>
 
@@ -461,10 +460,10 @@ export default function HomePage() {
                         }`}
                       >
                         {"featured" in plan && plan.featured
-                          ? "Empieza a ahorrar hoy"
+                          ? "Ver mi plan ahora"
                           : plan.name === "Pro"
-                            ? "Ver cómo salir de deudas"
-                            : "Crear mi plan ahora"}
+                            ? "Tomar control de mis deudas"
+                            : "Empezar gratis"}
                       </Link>
                     </div>
                   </CardContent>
@@ -480,10 +479,10 @@ export default function HomePage() {
                   Empieza hoy
                 </p>
                 <h2 className="font-display text-4xl tracking-tight text-foreground">
-                  Empieza gratis y sube cuando quieras pagar menos.
+                  Empieza gratis y deja de decidir a ciegas.
                 </h2>
                 <p className="section-summary max-w-2xl">
-                  Primero entiende tu panorama. Luego desbloquea una ruta más clara para salir antes.
+                  Primero entiende tu panorama. Luego activa una ruta más clara para ahorrar tiempo y dinero.
                 </p>
               </div>
 
@@ -492,13 +491,13 @@ export default function HomePage() {
                   href="/registro"
                   className="inline-flex h-12 items-center justify-center rounded-full bg-primary px-6 text-base font-semibold text-white shadow-[0_18px_42px_rgba(15,88,74,0.22)] transition hover:bg-primary-strong"
                 >
-                  Crear mi plan ahora
+                  Empezar gratis
                 </Link>
                 <Link
                   href="/planes"
                   className="inline-flex h-12 items-center justify-center rounded-full border border-border bg-white px-6 text-base font-semibold text-foreground transition hover:bg-secondary/60"
                 >
-                  Empieza a ahorrar hoy
+                  Ver mi plan ahora
                 </Link>
               </div>
             </div>
@@ -516,7 +515,7 @@ export default function HomePage() {
                 Seguridad avanzada sin complicarte la vida.
               </h2>
               <p className="section-summary max-w-2xl">
-                Tu información está protegida con buenas prácticas de seguridad y control de acceso.
+                Tu información está protegida con buenas prácticas de seguridad, protección de datos y control de acceso.
               </p>
               <Link
                 href="/security"
@@ -527,19 +526,19 @@ export default function HomePage() {
             </div>
 
             <div className="grid gap-4">
-              <div className="rounded-3xl border border-border bg-secondary/70 p-5">
+              <div className="rounded-2xl border border-border bg-secondary/70 p-5">
                 <p className="text-sm font-semibold text-foreground">Acceso seguro</p>
                 <p className="mt-2 text-sm leading-7 text-muted">
                   Protegemos el inicio de sesión y las acciones sensibles.
                 </p>
               </div>
-              <div className="rounded-3xl border border-border bg-secondary/70 p-5">
+              <div className="rounded-2xl border border-border bg-secondary/70 p-5">
                 <p className="text-sm font-semibold text-foreground">Protección de datos</p>
                 <p className="mt-2 text-sm leading-7 text-muted">
                   Tú decides qué información registrar dentro de la app.
                 </p>
               </div>
-              <div className="rounded-3xl border border-border bg-secondary/70 p-5">
+              <div className="rounded-2xl border border-border bg-secondary/70 p-5">
                 <p className="text-sm font-semibold text-foreground">Buenas prácticas de seguridad</p>
                 <p className="mt-2 text-sm leading-7 text-muted">
                   Aplicamos controles razonables para proteger tu cuenta y tus datos.

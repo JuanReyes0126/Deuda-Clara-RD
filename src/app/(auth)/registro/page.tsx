@@ -37,7 +37,7 @@ export default async function RegisterPage({
       ]}
       asideItems={[
         "Todo en RD$: saldos, intereses, mora y presupuesto mensual.",
-        "Motor snowball, avalanche e hibrido para diferentes perfiles.",
+        "Motor snowball, avalanche e híbrido para diferentes perfiles.",
         "Notificaciones por vencimiento, atraso y riesgo financiero.",
       ]}
     >

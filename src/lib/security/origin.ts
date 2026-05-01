@@ -13,19 +13,29 @@ function normalizeOrigin(value: string) {
   return new URL(value).origin;
 }
 
-function buildAllowedOrigins(request: NextRequest) {
+function shouldTrustRuntimeHostOrigin() {
+  const env = getServerEnv();
+
+  if (env.NODE_ENV !== "production") {
+    return true;
+  }
+
+  return process.env.VERCEL_ENV === "preview";
+}
+
+export function getAllowedOriginsForRequest(request: NextRequest) {
   const origins = new Set<string>();
   const env = getServerEnv();
   const host = request.headers.get("host");
   const protocol = request.nextUrl.protocol;
   const appUrl = env.APP_URL;
-  const isProduction = env.NODE_ENV === "production";
 
   if (appUrl) {
     origins.add(new URL(appUrl).origin);
   }
 
-  if (!isProduction && host) {
+  if (shouldTrustRuntimeHostOrigin() && host) {
+    origins.add(request.nextUrl.origin);
     origins.add(`${protocol}//${host}`.replace(/\/$/, ""));
     origins.add(`https://${host}`);
   }
@@ -50,7 +60,7 @@ export function assertSameOriginWithOptions(
 
   const origin = request.headers.get("origin");
   const referer = request.headers.get("referer");
-  const allowedOrigins = buildAllowedOrigins(request);
+  const allowedOrigins = getAllowedOriginsForRequest(request);
   const candidate = origin ?? referer;
 
   if (!candidate) {
@@ -62,7 +72,20 @@ export function assertSameOriginWithOptions(
     throw new ServiceError("ORIGIN_MISSING", 403, "La solicitud fue bloqueada por seguridad.");
   }
 
-  const normalizedCandidate = normalizeOrigin(candidate);
+  let normalizedCandidate: string;
+
+  try {
+    normalizedCandidate = normalizeOrigin(candidate);
+  } catch {
+    logSecurityEvent("origin_invalid", {
+      route: request.nextUrl.pathname,
+      method: request.method,
+      origin: origin ?? undefined,
+      referer: referer ?? undefined,
+      host: request.headers.get("host") ?? undefined,
+    });
+    throw new ServiceError("ORIGIN_INVALID", 403, "La solicitud fue bloqueada por seguridad.");
+  }
 
   if (!allowedOrigins.has(normalizedCandidate)) {
     logSecurityEvent("origin_blocked", {

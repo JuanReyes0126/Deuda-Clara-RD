@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
@@ -14,7 +14,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatCurrency } from "@/lib/utils/currency";
 import { fetchWithCsrf } from "@/lib/http/fetch-with-csrf";
+import { buildMonthlyCashflowSnapshot } from "@/lib/finance/monthly-cashflow";
 import { resolveFeatureAccess } from "@/lib/feature-access";
 import { sanitizeText } from "@/lib/security/sanitize";
 import type { PasskeyPublicDto, UserSettingsViewModelDto } from "@/lib/types/app";
@@ -35,6 +37,12 @@ type PreferencesFormValues = {
   preferredStrategy: "SNOWBALL" | "AVALANCHE" | "HYBRID";
   hybridRateWeight: number;
   hybridBalanceWeight: number;
+  monthlyIncome: number;
+  monthlyHousingCost: number;
+  monthlyGroceriesCost: number;
+  monthlyUtilitiesCost: number;
+  monthlyTransportCost: number;
+  monthlyOtherEssentialExpenses: number;
   monthlyDebtBudget: number;
   notifyDueSoon: boolean;
   notifyOverdue: boolean;
@@ -280,6 +288,14 @@ export function SettingsPanel({ user, securityNotice = null }: SettingsPanelProp
       preferredStrategy: user.settings?.preferredStrategy ?? "AVALANCHE",
       hybridRateWeight: user.settings?.hybridRateWeight ?? 70,
       hybridBalanceWeight: user.settings?.hybridBalanceWeight ?? 30,
+      monthlyIncome: Number(user.settings?.monthlyIncome ?? 0),
+      monthlyHousingCost: Number(user.settings?.monthlyHousingCost ?? 0),
+      monthlyGroceriesCost: Number(user.settings?.monthlyGroceriesCost ?? 0),
+      monthlyUtilitiesCost: Number(user.settings?.monthlyUtilitiesCost ?? 0),
+      monthlyTransportCost: Number(user.settings?.monthlyTransportCost ?? 0),
+      monthlyOtherEssentialExpenses: Number(
+        user.settings?.monthlyOtherEssentialExpenses ?? 0,
+      ),
       monthlyDebtBudget: Number(user.settings?.monthlyDebtBudget ?? 0),
       notifyDueSoon: user.settings?.notifyDueSoon ?? true,
       notifyOverdue: user.settings?.notifyOverdue ?? true,
@@ -297,6 +313,34 @@ export function SettingsPanel({ user, securityNotice = null }: SettingsPanelProp
     control: preferencesForm.control,
     name: "emailRemindersEnabled",
   });
+  const watchedMonthlyIncome = useWatch({
+    control: preferencesForm.control,
+    name: "monthlyIncome",
+  });
+  const watchedMonthlyHousingCost = useWatch({
+    control: preferencesForm.control,
+    name: "monthlyHousingCost",
+  });
+  const watchedMonthlyGroceriesCost = useWatch({
+    control: preferencesForm.control,
+    name: "monthlyGroceriesCost",
+  });
+  const watchedMonthlyUtilitiesCost = useWatch({
+    control: preferencesForm.control,
+    name: "monthlyUtilitiesCost",
+  });
+  const watchedMonthlyTransportCost = useWatch({
+    control: preferencesForm.control,
+    name: "monthlyTransportCost",
+  });
+  const watchedMonthlyOtherEssentialExpenses = useWatch({
+    control: preferencesForm.control,
+    name: "monthlyOtherEssentialExpenses",
+  });
+  const watchedDefaultCurrency = useWatch({
+    control: preferencesForm.control,
+    name: "defaultCurrency",
+  }) ?? "DOP";
   const featureAccess = resolveFeatureAccess({
     membershipTier: user.settings?.membershipTier ?? "FREE",
     membershipBillingStatus: user.settings?.membershipBillingStatus ?? "FREE",
@@ -336,6 +380,29 @@ export function SettingsPanel({ user, securityNotice = null }: SettingsPanelProp
     control: preferencesForm.control,
     name: "preferredReminderHour",
   });
+  const watchedMonthlyDebtBudget = useWatch({
+    control: preferencesForm.control,
+    name: "monthlyDebtBudget",
+  });
+  const financialSnapshot = useMemo(
+    () =>
+      buildMonthlyCashflowSnapshot({
+        monthlyIncome: watchedMonthlyIncome,
+        monthlyHousingCost: watchedMonthlyHousingCost,
+        monthlyGroceriesCost: watchedMonthlyGroceriesCost,
+        monthlyUtilitiesCost: watchedMonthlyUtilitiesCost,
+        monthlyTransportCost: watchedMonthlyTransportCost,
+        monthlyOtherEssentialExpenses: watchedMonthlyOtherEssentialExpenses,
+      }),
+    [
+      watchedMonthlyGroceriesCost,
+      watchedMonthlyHousingCost,
+      watchedMonthlyIncome,
+      watchedMonthlyOtherEssentialExpenses,
+      watchedMonthlyTransportCost,
+      watchedMonthlyUtilitiesCost,
+    ],
+  );
   const reminderDayLabels = REMINDER_DAY_OPTIONS.filter((option) =>
     watchedPreferredReminderDays.includes(option.value),
   ).map((option) => option.label);
@@ -577,7 +644,7 @@ export function SettingsPanel({ user, securityNotice = null }: SettingsPanelProp
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 pt-4">
-          <div className="rounded-[1.5rem] border border-primary/12 bg-[linear-gradient(135deg,rgba(15,118,110,0.08),rgba(240,138,93,0.08))] p-5">
+          <div className="rounded-2xl border border-primary/12 bg-[linear-gradient(135deg,rgba(15,118,110,0.08),rgba(240,138,93,0.08))] p-5">
             <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">
               Estado MFA
             </p>
@@ -874,7 +941,7 @@ export function SettingsPanel({ user, securityNotice = null }: SettingsPanelProp
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 pt-4">
-          <div className="rounded-[1.5rem] border border-primary/12 bg-[linear-gradient(135deg,rgba(15,118,110,0.08),rgba(240,138,93,0.08))] p-5">
+          <div className="rounded-2xl border border-primary/12 bg-[linear-gradient(135deg,rgba(15,118,110,0.08),rgba(240,138,93,0.08))] p-5">
             <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">
               Estado passkeys
             </p>
@@ -943,7 +1010,7 @@ export function SettingsPanel({ user, securityNotice = null }: SettingsPanelProp
               {passkeys.map((passkey, index) => (
                 <div
                   key={passkey.id}
-                  className="flex flex-col gap-4 rounded-[1.5rem] border border-border bg-white/88 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-4 rounded-2xl border border-border bg-white/88 p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="space-y-1">
                     <p className="text-sm font-semibold text-foreground">
@@ -994,7 +1061,7 @@ export function SettingsPanel({ user, securityNotice = null }: SettingsPanelProp
               ))}
             </div>
           ) : (
-            <div className="rounded-[1.5rem] border border-dashed border-border bg-white/72 px-4 py-5 text-sm leading-7 text-muted">
+            <div className="rounded-2xl border border-dashed border-border bg-white/72 px-4 py-5 text-sm leading-7 text-muted">
               Cuando registres una passkey, aquí verás cada dispositivo autorizado para entrar a tu cuenta.
             </div>
           )}
@@ -1088,23 +1155,137 @@ export function SettingsPanel({ user, securityNotice = null }: SettingsPanelProp
               </div>
 
               <div className="mt-4 grid gap-3 md:grid-cols-3">
-                <div className="rounded-3xl border border-white/70 bg-white/80 p-4">
+                <div className="rounded-2xl border border-border/50 bg-white/80 p-4">
                   <p className="text-xs uppercase tracking-[0.16em] text-muted">Canal</p>
                   <p className="mt-2 text-lg font-semibold text-foreground">{reminderChannelLabel}</p>
                 </div>
-                <div className="rounded-3xl border border-white/70 bg-white/80 p-4">
+                <div className="rounded-2xl border border-border/50 bg-white/80 p-4">
                   <p className="text-xs uppercase tracking-[0.16em] text-muted">Avisos por correo</p>
                   <p className="mt-2 text-lg font-semibold text-foreground">
                     {reminderDayLabels.length ? reminderDayLabels.join(", ") : "Sin aviso"}
                   </p>
                 </div>
-                <div className="rounded-3xl border border-white/70 bg-white/80 p-4">
+                <div className="rounded-2xl border border-border/50 bg-white/80 p-4">
                   <p className="text-xs uppercase tracking-[0.16em] text-muted">Hora preferida</p>
                   <p className="mt-2 text-lg font-semibold text-foreground">
                     {reminderHourLabel}
                   </p>
                 </div>
               </div>
+            </div>
+
+            <div className="rounded-[1.75rem] border border-primary/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(240,248,245,0.9)_100%)] p-5 md:col-span-2">
+              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">
+                Contexto financiero
+              </p>
+              <p className="mt-3 text-sm leading-7 text-muted">
+                Registra cuánto ganas y cuánto se te va en gastos base. Así el presupuesto de deudas y el simulador parten de una realidad más clara.
+              </p>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-2xl border border-border/50 bg-white/85 p-4">
+                  <p className="text-xs uppercase tracking-[0.16em] text-muted">Ingreso mensual</p>
+                  <p className="mt-2 text-lg font-semibold text-foreground">
+                    {formatCurrency(
+                      financialSnapshot.monthlyIncome ?? 0,
+                      watchedDefaultCurrency,
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-border/50 bg-white/85 p-4">
+                  <p className="text-xs uppercase tracking-[0.16em] text-muted">Gastos base</p>
+                  <p className="mt-2 text-lg font-semibold text-foreground">
+                    {formatCurrency(
+                      financialSnapshot.monthlyEssentialExpensesTotal ?? 0,
+                      watchedDefaultCurrency,
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-border/50 bg-white/85 p-4">
+                  <p className="text-xs uppercase tracking-[0.16em] text-muted">Capacidad de deudas</p>
+                  <p className="mt-2 text-lg font-semibold text-foreground">
+                    {formatCurrency(
+                      financialSnapshot.monthlyDebtCapacity ?? 0,
+                      watchedDefaultCurrency,
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-border/50 bg-white/85 p-4">
+                  <p className="text-xs uppercase tracking-[0.16em] text-muted">Presupuesto actual</p>
+                  <p className="mt-2 text-lg font-semibold text-foreground">
+                    {formatCurrency(
+                      watchedMonthlyDebtBudget ?? 0,
+                      watchedDefaultCurrency,
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="monthlyIncome">Ingreso mensual</Label>
+              <Input
+                id="monthlyIncome"
+                type="number"
+                step="0.01"
+                {...preferencesForm.register("monthlyIncome", monthlyDebtBudgetValidation)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="monthlyHousingCost">Vivienda / renta</Label>
+              <Input
+                id="monthlyHousingCost"
+                type="number"
+                step="0.01"
+                {...preferencesForm.register("monthlyHousingCost", monthlyDebtBudgetValidation)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="monthlyGroceriesCost">Compras / comida</Label>
+              <Input
+                id="monthlyGroceriesCost"
+                type="number"
+                step="0.01"
+                {...preferencesForm.register(
+                  "monthlyGroceriesCost",
+                  monthlyDebtBudgetValidation,
+                )}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="monthlyUtilitiesCost">Agua, luz e internet</Label>
+              <Input
+                id="monthlyUtilitiesCost"
+                type="number"
+                step="0.01"
+                {...preferencesForm.register(
+                  "monthlyUtilitiesCost",
+                  monthlyDebtBudgetValidation,
+                )}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="monthlyTransportCost">Vehículo / transporte</Label>
+              <Input
+                id="monthlyTransportCost"
+                type="number"
+                step="0.01"
+                {...preferencesForm.register(
+                  "monthlyTransportCost",
+                  monthlyDebtBudgetValidation,
+                )}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="monthlyOtherEssentialExpenses">Otros gastos base</Label>
+              <Input
+                id="monthlyOtherEssentialExpenses"
+                type="number"
+                step="0.01"
+                {...preferencesForm.register(
+                  "monthlyOtherEssentialExpenses",
+                  monthlyDebtBudgetValidation,
+                )}
+              />
             </div>
 
             <div className="space-y-2">

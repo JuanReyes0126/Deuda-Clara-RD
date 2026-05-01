@@ -18,7 +18,7 @@ export function BlurredInsight({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-[1.4rem] border border-white/70 bg-white/85 px-4 py-4",
+        "relative overflow-hidden rounded-[1.4rem] border border-border/50 bg-white/85 px-4 py-4",
         className,
       )}
     >

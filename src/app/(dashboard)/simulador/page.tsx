@@ -16,9 +16,16 @@ export default async function SimulatorPage() {
     return (
       <SimulatorPanel
         debts={debts}
+        preferredStrategy="AVALANCHE"
         conversionSnapshot={buildMembershipConversionSnapshot({
           debts,
           preferredStrategy: "AVALANCHE",
+          monthlyIncome: 55000,
+          monthlyHousingCost: 14000,
+          monthlyGroceriesCost: 9000,
+          monthlyUtilitiesCost: 4500,
+          monthlyTransportCost: 5000,
+          monthlyOtherEssentialExpenses: 2500,
           monthlyDebtBudget: 22000,
           hybridRateWeight: 70,
           hybridBalanceWeight: 30,
@@ -36,6 +43,13 @@ export default async function SimulatorPage() {
   const conversionSnapshot = buildMembershipConversionSnapshot({
     debts,
     preferredStrategy: settingsViewModel.settings?.preferredStrategy ?? "AVALANCHE",
+    monthlyIncome: settingsViewModel.settings?.monthlyIncome ?? null,
+    monthlyHousingCost: settingsViewModel.settings?.monthlyHousingCost ?? null,
+    monthlyGroceriesCost: settingsViewModel.settings?.monthlyGroceriesCost ?? null,
+    monthlyUtilitiesCost: settingsViewModel.settings?.monthlyUtilitiesCost ?? null,
+    monthlyTransportCost: settingsViewModel.settings?.monthlyTransportCost ?? null,
+    monthlyOtherEssentialExpenses:
+      settingsViewModel.settings?.monthlyOtherEssentialExpenses ?? null,
     monthlyDebtBudget: settingsViewModel.settings?.monthlyDebtBudget ?? null,
     hybridRateWeight: settingsViewModel.settings?.hybridRateWeight ?? 70,
     hybridBalanceWeight: settingsViewModel.settings?.hybridBalanceWeight ?? 30,
@@ -44,6 +58,7 @@ export default async function SimulatorPage() {
   return (
     <SimulatorPanel
       debts={debts}
+      preferredStrategy={settingsViewModel.settings?.preferredStrategy ?? "AVALANCHE"}
       conversionSnapshot={conversionSnapshot}
       membershipTier={(settingsViewModel.settings?.membershipTier ?? "FREE") as "FREE" | "NORMAL" | "PRO"}
       billingStatus={

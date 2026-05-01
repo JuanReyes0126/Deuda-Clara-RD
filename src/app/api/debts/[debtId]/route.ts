@@ -3,9 +3,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { getRequestMeta } from "@/lib/security/request-meta";
+import {
+  assertRateLimit,
+  buildRateLimitKey,
+} from "@/lib/security/rate-limit";
 import { debtSchema } from "@/lib/validations/debts";
 import { deleteDebt, getDebtById, updateDebt } from "@/server/debts/debt-service";
-import { apiBadRequest, handleApiError } from "@/server/api/api-response";
+import {
+  apiBadRequest,
+  apiRateLimited,
+  handleApiError,
+} from "@/server/api/api-response";
 import { isInfrastructureUnavailableError } from "@/server/services/infrastructure-error";
 
 type RouteContext = {
@@ -47,6 +55,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return apiBadRequest("No autenticado.", 401);
     }
 
+    const rateLimit = await assertRateLimit({
+      key: buildRateLimitKey(request, "debts:update", session.user.id),
+      limit: 60,
+      windowMs: 10 * 60 * 1000,
+    });
+
+    if (!rateLimit.success) {
+      return apiRateLimited(
+        "Demasiadas actualizaciones de deudas. Intenta más tarde.",
+        rateLimit.resetAt,
+      );
+    }
+
     const parsed = debtSchema.safeParse(await request.json());
 
     if (!parsed.success) {
@@ -86,6 +107,19 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
     if (!session) {
       return apiBadRequest("No autenticado.", 401);
+    }
+
+    const rateLimit = await assertRateLimit({
+      key: buildRateLimitKey(request, "debts:delete", session.user.id),
+      limit: 20,
+      windowMs: 10 * 60 * 1000,
+    });
+
+    if (!rateLimit.success) {
+      return apiRateLimited(
+        "Demasiadas eliminaciones de deudas. Intenta más tarde.",
+        rateLimit.resetAt,
+      );
     }
 
     const { debtId } = await context.params;

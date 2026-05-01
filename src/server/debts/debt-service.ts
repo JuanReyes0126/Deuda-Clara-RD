@@ -226,7 +226,9 @@ export async function createDebt(
       creditLimit: input.creditLimit ?? null,
       interestRate: input.interestRate,
       interestRateType: input.interestRateType,
+      interestRateMode: input.interestRateMode,
       minimumPayment: input.minimumPayment,
+      paymentAmountType: input.paymentAmountType,
       statementDay: input.statementDay ?? null,
       dueDay: input.dueDay ?? null,
       nextDueDate: input.nextDueDate ?? null,
@@ -311,7 +313,9 @@ export async function updateDebt(
       creditLimit: input.creditLimit ?? null,
       interestRate: input.interestRate,
       interestRateType: input.interestRateType,
+      interestRateMode: input.interestRateMode,
       minimumPayment: input.minimumPayment,
+      paymentAmountType: input.paymentAmountType,
       statementDay: input.statementDay ?? null,
       dueDay: input.dueDay ?? null,
       nextDueDate: input.nextDueDate ?? null,
@@ -358,25 +362,73 @@ export async function deleteDebt(
     return;
   }
 
-  await getUserDebtRecord(userId, debtId);
+  const debt = await getUserDebtRecord(userId, debtId);
+  const paymentIds = debt.payments.map((payment) => payment.id);
 
-  const deleteResult = await prisma.debt.deleteMany({
-    where: { id: debtId, userId },
+  await prisma.$transaction(async (transaction) => {
+    if (paymentIds.length) {
+      await transaction.auditLog.updateMany({
+        where: {
+          paymentId: {
+            in: paymentIds,
+          },
+        },
+        data: {
+          paymentId: null,
+        },
+      });
+
+      await transaction.payment.deleteMany({
+        where: {
+          id: {
+            in: paymentIds,
+          },
+          userId,
+          debtId,
+        },
+      });
+    }
+
+    await Promise.all([
+      transaction.notification.updateMany({
+        where: { debtId, userId },
+        data: { debtId: null },
+      }),
+      transaction.notificationEvent.updateMany({
+        where: { debtId, userId },
+        data: { debtId: null },
+      }),
+      transaction.auditLog.updateMany({
+        where: { debtId },
+        data: { debtId: null },
+      }),
+    ]);
+
+    const deleteResult = await transaction.debt.deleteMany({
+      where: { id: debtId, userId },
+    });
+
+    if (deleteResult.count !== 1) {
+      throw new ServiceError("DEBT_NOT_FOUND", 404, "No se encontró la deuda.");
+    }
+
+    await createAuditLog(
+      {
+        userId,
+        action: AuditAction.DEBT_DELETED,
+        resourceType: "debt",
+        resourceId: debtId,
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        metadata: {
+          debtName: debt.name,
+          deletedPaymentCount: paymentIds.length,
+        },
+      },
+      transaction,
+    );
   });
 
-  if (deleteResult.count !== 1) {
-    throw new ServiceError("DEBT_NOT_FOUND", 404, "No se encontró la deuda.");
-  }
-
-  await createAuditLog({
-    userId,
-    debtId,
-    action: AuditAction.DEBT_DELETED,
-    resourceType: "debt",
-    resourceId: debtId,
-    ipAddress: meta.ipAddress,
-    userAgent: meta.userAgent,
-  });
   await captureBalanceSnapshot(userId, BalanceSnapshotSource.MUTATION);
 }
 

@@ -7,13 +7,14 @@ import type {
   ServerUserSettingsContextDto,
   SessionUserContextDto,
 } from "@/lib/auth/session-context";
-import { prisma } from "@/lib/db/prisma";
+import { prisma, runWithPrismaReconnect } from "@/lib/db/prisma";
 import {
   clearDemoSession,
   getDemoServerUser,
   getDemoSession,
   isDemoModeEnabled,
 } from "@/lib/demo/session";
+import { buildMonthlyCashflowSnapshot } from "@/lib/finance/monthly-cashflow";
 import {
   isDatabaseReachable,
   markDatabaseUnavailable,
@@ -48,6 +49,11 @@ const serverUserSettingsSelect = {
   hybridRateWeight: true,
   hybridBalanceWeight: true,
   monthlyIncome: true,
+  monthlyHousingCost: true,
+  monthlyGroceriesCost: true,
+  monthlyUtilitiesCost: true,
+  monthlyTransportCost: true,
+  monthlyOtherEssentialExpenses: true,
   monthlyDebtBudget: true,
   notifyDueSoon: true,
   notifyOverdue: true,
@@ -96,13 +102,15 @@ export async function clearSessionCookie() {
 export async function createUserSession(userId: string, rawToken: string) {
   const expires = buildSessionExpiration();
 
-  await prisma.session.create({
-    data: {
-      userId,
-      sessionToken: hashOpaqueToken(rawToken),
-      expires,
-    },
-  });
+  await runWithPrismaReconnect(() =>
+    prisma.session.create({
+      data: {
+        userId,
+        sessionToken: hashOpaqueToken(rawToken),
+        expires,
+      },
+    }),
+  );
 
   await setSessionCookie(rawToken, expires);
   await refreshRecentAuth(userId);
@@ -123,16 +131,18 @@ export async function revokeOtherSessions(userId: string) {
   const rawToken = store.get(SESSION_COOKIE_NAME)?.value;
 
   try {
-    await prisma.session.deleteMany({
-      where: rawToken
-        ? {
-            userId,
-            sessionToken: {
-              not: hashOpaqueToken(rawToken),
-            },
-          }
-        : { userId },
-    });
+    await runWithPrismaReconnect(() =>
+      prisma.session.deleteMany({
+        where: rawToken
+          ? {
+              userId,
+              sessionToken: {
+                not: hashOpaqueToken(rawToken),
+              },
+            }
+          : { userId },
+      }),
+    );
   } catch (error) {
     if (!isInfrastructureUnavailableError(error) || !isDemoModeEnabled()) {
       throw error;
@@ -160,21 +170,25 @@ export async function rotateCurrentSession(userId: string) {
 
   try {
     if (rawToken) {
-      await prisma.session.deleteMany({
-        where: {
-          userId,
-          sessionToken: hashOpaqueToken(rawToken),
-        },
-      });
+      await runWithPrismaReconnect(() =>
+        prisma.session.deleteMany({
+          where: {
+            userId,
+            sessionToken: hashOpaqueToken(rawToken),
+          },
+        }),
+      );
     }
 
-    await prisma.session.create({
-      data: {
-        userId,
-        sessionToken: hashOpaqueToken(nextRawToken),
-        expires,
-      },
-    });
+    await runWithPrismaReconnect(() =>
+      prisma.session.create({
+        data: {
+          userId,
+          sessionToken: hashOpaqueToken(nextRawToken),
+          expires,
+        },
+      }),
+    );
   } catch (error) {
     if (!isInfrastructureUnavailableError(error) || !isDemoModeEnabled()) {
       throw error;
@@ -215,6 +229,11 @@ function toServerUserContext(user: {
         hybridRateWeight: number;
         hybridBalanceWeight: number;
         monthlyIncome: unknown;
+        monthlyHousingCost: unknown;
+        monthlyGroceriesCost: unknown;
+        monthlyUtilitiesCost: unknown;
+        monthlyTransportCost: unknown;
+        monthlyOtherEssentialExpenses: unknown;
         monthlyDebtBudget: unknown;
         notifyDueSoon: boolean;
         notifyOverdue: boolean;
@@ -231,6 +250,40 @@ function toServerUserContext(user: {
       }
     | null;
 }): ServerUserContextDto {
+  const cashflow = user.settings
+    ? buildMonthlyCashflowSnapshot({
+        monthlyIncome:
+          user.settings.monthlyIncome === null ||
+          user.settings.monthlyIncome === undefined
+            ? null
+            : Number(user.settings.monthlyIncome),
+        monthlyHousingCost:
+          user.settings.monthlyHousingCost === null ||
+          user.settings.monthlyHousingCost === undefined
+            ? null
+            : Number(user.settings.monthlyHousingCost),
+        monthlyGroceriesCost:
+          user.settings.monthlyGroceriesCost === null ||
+          user.settings.monthlyGroceriesCost === undefined
+            ? null
+            : Number(user.settings.monthlyGroceriesCost),
+        monthlyUtilitiesCost:
+          user.settings.monthlyUtilitiesCost === null ||
+          user.settings.monthlyUtilitiesCost === undefined
+            ? null
+            : Number(user.settings.monthlyUtilitiesCost),
+        monthlyTransportCost:
+          user.settings.monthlyTransportCost === null ||
+          user.settings.monthlyTransportCost === undefined
+            ? null
+            : Number(user.settings.monthlyTransportCost),
+        monthlyOtherEssentialExpenses:
+          user.settings.monthlyOtherEssentialExpenses === null ||
+          user.settings.monthlyOtherEssentialExpenses === undefined
+            ? null
+            : Number(user.settings.monthlyOtherEssentialExpenses),
+      })
+    : null;
   const settings: ServerUserSettingsContextDto | null = user.settings
     ? {
         defaultCurrency: user.settings.defaultCurrency,
@@ -243,11 +296,16 @@ function toServerUserContext(user: {
           user.settings.membershipCancelAtPeriodEnd,
         hybridRateWeight: user.settings.hybridRateWeight,
         hybridBalanceWeight: user.settings.hybridBalanceWeight,
-        monthlyIncome:
-          user.settings.monthlyIncome === null ||
-          user.settings.monthlyIncome === undefined
-            ? null
-            : Number(user.settings.monthlyIncome),
+        monthlyIncome: cashflow?.monthlyIncome ?? null,
+        monthlyHousingCost: cashflow?.monthlyHousingCost ?? null,
+        monthlyGroceriesCost: cashflow?.monthlyGroceriesCost ?? null,
+        monthlyUtilitiesCost: cashflow?.monthlyUtilitiesCost ?? null,
+        monthlyTransportCost: cashflow?.monthlyTransportCost ?? null,
+        monthlyOtherEssentialExpenses:
+          cashflow?.monthlyOtherEssentialExpenses ?? null,
+        monthlyEssentialExpensesTotal:
+          cashflow?.monthlyEssentialExpensesTotal ?? null,
+        monthlyDebtCapacity: cashflow?.monthlyDebtCapacity ?? null,
         monthlyDebtBudget:
           user.settings.monthlyDebtBudget === null ||
           user.settings.monthlyDebtBudget === undefined
@@ -303,11 +361,13 @@ export async function destroyCurrentSession() {
 
   if (rawToken) {
     try {
-      await prisma.session.deleteMany({
-        where: {
-          sessionToken: hashOpaqueToken(rawToken),
-        },
-      });
+      await runWithPrismaReconnect(() =>
+        prisma.session.deleteMany({
+          where: {
+            sessionToken: hashOpaqueToken(rawToken),
+          },
+        }),
+      );
     } catch (error) {
       if (!isInfrastructureUnavailableError(error) || !isDemoModeEnabled()) {
         throw error;
@@ -342,19 +402,21 @@ export async function getCurrentSession(): Promise<CurrentSessionDto | null> {
   }
 
   try {
-    const session = await prisma.session.findUnique({
-      where: {
-        sessionToken: hashOpaqueToken(rawToken),
-      },
-      select: {
-        id: true,
-        userId: true,
-        expires: true,
-        user: {
-          select: sessionUserSelect,
+    const session = await runWithPrismaReconnect(() =>
+      prisma.session.findUnique({
+        where: {
+          sessionToken: hashOpaqueToken(rawToken),
         },
-      },
-    });
+        select: {
+          id: true,
+          userId: true,
+          expires: true,
+          user: {
+            select: sessionUserSelect,
+          },
+        },
+      }),
+    );
 
     if (!session || session.expires < new Date() || session.user.status !== "ACTIVE") {
       await clearSessionCookie();
@@ -392,12 +454,14 @@ export async function requireUser(): Promise<ServerUserContextDto> {
 
   const sessionUser = await requireSessionUser();
 
-  const user = await prisma.user.findUnique({
-    where: {
-      id: sessionUser.id,
-    },
-    select: serverUserContextSelect,
-  });
+  const user = await runWithPrismaReconnect(() =>
+    prisma.user.findUnique({
+      where: {
+        id: sessionUser.id,
+      },
+      select: serverUserContextSelect,
+    }),
+  );
 
   if (!user || user.status !== "ACTIVE") {
     await clearSessionCookie();
