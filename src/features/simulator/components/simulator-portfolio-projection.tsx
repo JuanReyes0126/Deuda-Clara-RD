@@ -47,9 +47,9 @@ function getDefaultPortfolioBudget(
     return Math.round(snapshot.suggestedMonthlyBudget);
   }
 
-  const dopDebts = debts.filter((debt) => debt.currency === "DOP");
-  const pool = dopDebts.length > 0 ? dopDebts : debts;
-  const sum = pool.reduce((acc, debt) => acc + debt.minimumPayment, 0);
+  // Suma mínimos de todas las deudas activas. Si hay DOP y USD, mezclar montos sigue siendo
+  // una aproximación (igual que el motor agregado), pero evita arrancar solo con líneas DOP.
+  const sum = debts.reduce((acc, debt) => acc + debt.minimumPayment, 0);
 
   return Math.max(1, Math.round(sum));
 }
@@ -150,6 +150,15 @@ export function SimulatorPortfolioProjection({
     () => new Set(debts.map((debt) => debt.currency)).size > 1,
     [debts],
   );
+
+  const portfolioDisplayCurrency = useMemo((): DebtItemDto["currency"] => {
+    const currencies = new Set(debts.map((debt) => debt.currency));
+    if (currencies.size === 1) {
+      return debts[0]!.currency;
+    }
+
+    return "DOP";
+  }, [debts]);
 
   const creditCardDebts = useMemo(() => debts.filter(isCreditCardDebt), [debts]);
 
@@ -362,7 +371,10 @@ export function SimulatorPortfolioProjection({
                   setMonthlyBudget(Math.round(conversionSnapshot.currentMonthlyBudget))
                 }
               >
-                Usar presupuesto registrado ({formatCurrency(conversionSnapshot.currentMonthlyBudget)})
+                {`Usar presupuesto registrado (${formatCurrency(
+                  conversionSnapshot.currentMonthlyBudget,
+                  portfolioDisplayCurrency,
+                )})`}
               </Button>
             ) : null}
           </div>
@@ -618,7 +630,8 @@ export function SimulatorPortfolioProjection({
             <CardHeader>
               <CardTitle className="text-lg">Resumen del plan base</CardTitle>
               <CardDescription>
-                Con {formatCurrency(monthlyBudget)} al mes y estrategia {strategyLabels[strategy]}.
+                Con {formatCurrency(monthlyBudget, portfolioDisplayCurrency)} al mes y estrategia{" "}
+                {strategyLabels[strategy]}.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 sm:grid-cols-3">
@@ -635,7 +648,7 @@ export function SimulatorPortfolioProjection({
                   Intereses totales
                 </p>
                 <p className="value-stable mt-2 text-lg font-semibold text-foreground">
-                  {formatCurrency(result.basePlan.totalInterest)}
+                  {formatCurrency(result.basePlan.totalInterest, portfolioDisplayCurrency)}
                 </p>
               </div>
               <div className="rounded-2xl border border-border/70 bg-secondary/30 p-3">
@@ -643,7 +656,7 @@ export function SimulatorPortfolioProjection({
                   Saldo restante (fin simulación)
                 </p>
                 <p className="value-stable mt-2 text-lg font-semibold text-foreground">
-                  {formatCurrency(result.basePlan.remainingBalance)}
+                  {formatCurrency(result.basePlan.remainingBalance, portfolioDisplayCurrency)}
                 </p>
               </div>
             </CardContent>
@@ -655,7 +668,7 @@ export function SimulatorPortfolioProjection({
               <CardDescription>
                 {access.canUseAdvancedExtraPayments
                   ? extraMonthlyPayment > 0
-                    ? `Incluye ${formatCurrency(extraMonthlyPayment)} adicionales al presupuesto.`
+                    ? `Incluye ${formatCurrency(extraMonthlyPayment, portfolioDisplayCurrency)} adicionales al presupuesto.`
                     : "Sube el extra arriba para comparar."
                   : "Activa Premium para ver esta comparación con el mismo criterio del servidor."}
               </CardDescription>
@@ -666,7 +679,7 @@ export function SimulatorPortfolioProjection({
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-200/80 bg-emerald-50/80 px-4 py-3">
                     <p className="text-sm font-semibold text-foreground">Ahorro de intereses</p>
                     <p className="value-stable text-base font-semibold text-emerald-900">
-                      {formatCurrency(result.extraPaymentPlan.savings)}
+                      {formatCurrency(result.extraPaymentPlan.savings, portfolioDisplayCurrency)}
                     </p>
                   </div>
                   <p className="text-sm text-muted">
@@ -677,7 +690,10 @@ export function SimulatorPortfolioProjection({
                     {" · "}
                     Intereses con extra:{" "}
                     <span className="font-medium text-foreground">
-                      {formatCurrency(result.extraPaymentPlan.totalInterest)}
+                      {formatCurrency(
+                        result.extraPaymentPlan.totalInterest,
+                        portfolioDisplayCurrency,
+                      )}
                     </span>
                   </p>
                 </>
@@ -713,13 +729,19 @@ export function SimulatorPortfolioProjection({
                       {" · "}
                       Intereses:{" "}
                       <span className="font-semibold text-foreground">
-                        {formatCurrency(result.focusedDebtPlan.totalInterest)}
+                        {formatCurrency(
+                          result.focusedDebtPlan.totalInterest,
+                          portfolioDisplayCurrency,
+                        )}
                       </span>
                     </p>
                     <p className="rounded-xl border border-emerald-200/70 bg-emerald-50/80 px-3 py-2 text-foreground">
                       Ahorro de intereses vs. plan base:{" "}
                       <span className="value-stable font-semibold">
-                        {formatCurrency(result.focusedDebtPlan.savings)}
+                        {formatCurrency(
+                          result.focusedDebtPlan.savings,
+                          portfolioDisplayCurrency,
+                        )}
                       </span>
                     </p>
                   </>
@@ -738,7 +760,8 @@ export function SimulatorPortfolioProjection({
               <CardHeader>
                 <CardTitle className="text-lg">Sin nuevas cargas en la tarjeta</CardTitle>
                 <CardDescription>
-                  Dejando de gastar aprox. {formatCurrency(monthlyCardUsageToStop)} al mes en{" "}
+                  Dejando de gastar aprox.{" "}
+                  {formatCurrency(monthlyCardUsageToStop, portfolioDisplayCurrency)} al mes en{" "}
                   {debts.find((d) => d.id === cardToFreezeId)?.name ?? "la tarjeta"}.
                 </CardDescription>
               </CardHeader>
@@ -753,13 +776,19 @@ export function SimulatorPortfolioProjection({
                       {" · "}
                       Intereses:{" "}
                       <span className="font-semibold text-foreground">
-                        {formatCurrency(result.freezeCardPlan.totalInterest)}
+                        {formatCurrency(
+                          result.freezeCardPlan.totalInterest,
+                          portfolioDisplayCurrency,
+                        )}
                       </span>
                     </p>
                     <p className="rounded-xl border border-emerald-200/70 bg-emerald-50/80 px-3 py-2 text-foreground">
                       Ahorro de intereses vs. plan base:{" "}
                       <span className="value-stable font-semibold">
-                        {formatCurrency(result.freezeCardPlan.savings)}
+                        {formatCurrency(
+                          result.freezeCardPlan.savings,
+                          portfolioDisplayCurrency,
+                        )}
                       </span>
                     </p>
                   </>
@@ -796,13 +825,19 @@ export function SimulatorPortfolioProjection({
                       {" · "}
                       Intereses:{" "}
                       <span className="font-semibold text-foreground">
-                        {formatCurrency(result.refinancePlan.totalInterest)}
+                        {formatCurrency(
+                          result.refinancePlan.totalInterest,
+                          portfolioDisplayCurrency,
+                        )}
                       </span>
                     </p>
                     <p className="rounded-xl border border-emerald-200/70 bg-emerald-50/80 px-3 py-2 text-foreground">
                       Ahorro de intereses vs. plan base:{" "}
                       <span className="value-stable font-semibold">
-                        {formatCurrency(result.refinancePlan.savings)}
+                        {formatCurrency(
+                          result.refinancePlan.savings,
+                          portfolioDisplayCurrency,
+                        )}
                       </span>
                     </p>
                   </>
@@ -849,7 +884,7 @@ export function SimulatorPortfolioProjection({
                         <tr key={row.month} className="border-b border-border/60">
                           <td className="py-2 pr-4 text-foreground">{row.month}</td>
                           <td className="value-stable py-2 text-foreground">
-                            {formatCurrency(row.totalBalance)}
+                            {formatCurrency(row.totalBalance, portfolioDisplayCurrency)}
                           </td>
                         </tr>
                       ))}
