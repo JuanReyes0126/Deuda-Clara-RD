@@ -947,7 +947,7 @@ export function SimulatorPanel({
         ) : null}
       </section>
 
-      <section className="grid gap-5 sm:gap-6 xl:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)]">
+      <section className="grid gap-5 sm:gap-6 lg:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)]">
         <Card className="order-1 -mx-1 min-w-0 p-4 sm:mx-0 sm:p-6">
           <CardHeader className="gap-3">
             <div className="flex flex-wrap items-center gap-3">
