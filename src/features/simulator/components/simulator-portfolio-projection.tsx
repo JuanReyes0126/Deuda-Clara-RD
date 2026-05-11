@@ -330,7 +330,7 @@ export function SimulatorPortfolioProjection({
             <Label htmlFor="portfolio-strategy">Estrategia</Label>
             <select
               id="portfolio-strategy"
-              className="min-h-12 w-full rounded-2xl border border-border bg-white px-4 text-sm text-foreground outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
+              className="min-h-12 w-full rounded-xl border border-border/80 bg-white px-4 text-sm text-foreground outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
               value={strategy}
               onChange={(event) => setStrategy(event.target.value as StrategyMethod)}
             >
@@ -346,7 +346,7 @@ export function SimulatorPortfolioProjection({
             <Input
               id="portfolio-budget"
               inputMode="numeric"
-              className="min-h-12 rounded-2xl"
+              className="min-h-12 rounded-xl"
               value={Number.isFinite(monthlyBudget) ? String(monthlyBudget) : ""}
               onChange={(event) => {
                 const next = Number(event.target.value.replace(/[^\d.]/g, ""));
@@ -372,7 +372,7 @@ export function SimulatorPortfolioProjection({
               <Input
                 id="portfolio-extra"
                 inputMode="numeric"
-                className="min-h-12 rounded-2xl"
+                className="min-h-12 rounded-xl"
                 value={extraMonthlyPayment ? String(extraMonthlyPayment) : ""}
                 placeholder="0"
                 onChange={(event) => {
@@ -413,7 +413,7 @@ export function SimulatorPortfolioProjection({
           )}
 
           {access.canSeeRecommendedStrategy || access.canSeeOptimizedSavings ? (
-            <details className="sm:col-span-2 rounded-[1.35rem] border border-border bg-secondary/25 p-4">
+            <details className="sm:col-span-2 rounded-xl border border-border/60 bg-secondary/20 p-4">
               <summary className="cursor-pointer list-none text-sm font-semibold text-foreground">
                 Escenarios opcionales
               </summary>
@@ -423,7 +423,7 @@ export function SimulatorPortfolioProjection({
               </p>
               <div className="mt-4 grid gap-5 md:grid-cols-3">
                 {access.canSeeRecommendedStrategy ? (
-                  <div className="space-y-2 rounded-[1.15rem] border border-border/60 bg-white/80 p-3">
+                  <div className="space-y-2 rounded-xl border border-border/55 bg-white/90 p-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
                       Priorizar una deuda
                     </p>
@@ -451,7 +451,7 @@ export function SimulatorPortfolioProjection({
                 ) : null}
 
                 {access.canSeeOptimizedSavings ? (
-                  <div className="space-y-2 rounded-[1.15rem] border border-border/60 bg-white/80 p-3">
+                  <div className="space-y-2 rounded-xl border border-border/55 bg-white/90 p-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
                       Dejar de cargar la tarjeta
                     </p>
@@ -504,7 +504,7 @@ export function SimulatorPortfolioProjection({
                 ) : null}
 
                 {access.canSeeRefinanceScenario ? (
-                  <div className="space-y-2 rounded-[1.15rem] border border-border/60 bg-white/80 p-3">
+                  <div className="space-y-2 rounded-xl border border-border/55 bg-white/90 p-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
                       Refinanciar tasa
                     </p>
@@ -543,7 +543,7 @@ export function SimulatorPortfolioProjection({
                   </div>
                 ) : access.canSeeOptimizedSavings ? (
                   <LockedCard
-                    className="rounded-[1.15rem]"
+                    className="rounded-xl"
                     title="Refinanciar tasa"
                     description="Compara el impacto de bajar la tasa de una línea con el motor del servidor. En Pro lo tienes junto al resto de escenarios de cartera."
                     requiredPlan="Pro"
@@ -607,7 +607,7 @@ export function SimulatorPortfolioProjection({
       </Card>
 
       {error ? (
-        <div className="rounded-[1.25rem] border border-danger/25 bg-danger/5 px-4 py-3 text-sm text-foreground">
+        <div className="rounded-xl border border-danger/25 bg-danger/5 px-4 py-3 text-sm text-foreground">
           {error}
         </div>
       ) : null}
@@ -622,7 +622,7 @@ export function SimulatorPortfolioProjection({
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-border/70 bg-secondary/30 p-3">
+              <div className="rounded-lg border border-border/55 bg-secondary/25 p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
                   Tiempo estimado
                 </p>
@@ -630,7 +630,7 @@ export function SimulatorPortfolioProjection({
                   {formatMonthsLabel(result.basePlan.monthsToPayoff)}
                 </p>
               </div>
-              <div className="rounded-2xl border border-border/70 bg-secondary/30 p-3">
+              <div className="rounded-lg border border-border/55 bg-secondary/25 p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
                   Intereses totales
                 </p>
@@ -638,7 +638,7 @@ export function SimulatorPortfolioProjection({
                   {formatCurrency(result.basePlan.totalInterest)}
                 </p>
               </div>
-              <div className="rounded-2xl border border-border/70 bg-secondary/30 p-3">
+              <div className="rounded-lg border border-border/55 bg-secondary/25 p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
                   Saldo restante (fin simulación)
                 </p>
@@ -663,7 +663,7 @@ export function SimulatorPortfolioProjection({
             <CardContent className="space-y-3">
               {access.canUseAdvancedExtraPayments && result.extraPaymentPlan.savings !== null ? (
                 <>
-                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-200/80 bg-emerald-50/80 px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200/70 bg-emerald-50/70 px-4 py-3">
                     <p className="text-sm font-semibold text-foreground">Ahorro de intereses</p>
                     <p className="value-stable text-base font-semibold text-emerald-900">
                       {formatCurrency(result.extraPaymentPlan.savings)}
@@ -836,25 +836,27 @@ export function SimulatorPortfolioProjection({
             </CardHeader>
             <CardContent>
               {result.monthlyProjection.length ? (
-                <div className="overflow-x-auto">
+                <div className="overflow-hidden rounded-lg border border-border/55">
+                  <div className="overflow-x-auto">
                   <table className="min-w-full text-left text-sm">
                     <thead>
-                      <tr className="border-b border-border text-muted">
-                        <th className="py-2 pr-4 font-medium">Mes</th>
-                        <th className="py-2 font-medium">Saldo total</th>
+                      <tr className="border-b border-border/70 bg-secondary/20 text-muted">
+                        <th className="px-3 py-2.5 pr-4 font-medium">Mes</th>
+                        <th className="px-3 py-2.5 font-medium">Saldo total</th>
                       </tr>
                     </thead>
                     <tbody>
                       {result.monthlyProjection.map((row) => (
-                        <tr key={row.month} className="border-b border-border/60">
-                          <td className="py-2 pr-4 text-foreground">{row.month}</td>
-                          <td className="value-stable py-2 text-foreground">
+                        <tr key={row.month} className="border-b border-border/50 last:border-b-0">
+                          <td className="px-3 py-2 pr-4 text-foreground">{row.month}</td>
+                          <td className="value-stable px-3 py-2 text-foreground">
                             {formatCurrency(row.totalBalance)}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-muted">Sin puntos de proyección para mostrar.</p>
