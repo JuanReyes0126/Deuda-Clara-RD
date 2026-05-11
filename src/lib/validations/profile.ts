@@ -28,6 +28,12 @@ export const preferencesSchema = z
       .int()
       .min(0, "Debe ser un porcentaje válido.")
       .max(100, "Debe ser un porcentaje válido."),
+    monthlyIncome: moneyInputSchema,
+    monthlyHousingCost: moneyInputSchema,
+    monthlyGroceriesCost: moneyInputSchema,
+    monthlyUtilitiesCost: moneyInputSchema,
+    monthlyTransportCost: moneyInputSchema,
+    monthlyOtherEssentialExpenses: moneyInputSchema,
     monthlyDebtBudget: moneyInputSchema,
     notifyDueSoon: z.boolean(),
     notifyOverdue: z.boolean(),

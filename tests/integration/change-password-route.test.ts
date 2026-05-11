@@ -87,4 +87,22 @@ describe("api/auth/cambiar-contrasena", () => {
     expect(body.error).toBe("Confirma tu identidad para continuar.");
     expect(body.reauthRequired).toBe(true);
   });
+
+  it("rechaza el cambio cuando no hay sesión activa", async () => {
+    const { getCurrentSession } = await import("@/lib/auth/session");
+
+    vi.mocked(getCurrentSession).mockResolvedValueOnce(null as never);
+
+    const response = await POST(
+      buildJsonRequest("http://localhost/api/auth/cambiar-contrasena", {
+        currentPassword: "DeudaClara123!",
+        newPassword: "Segura123A",
+        confirmPassword: "Segura123A",
+      }),
+    );
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(401);
+    expect(body.error).toBe("No autenticado.");
+  });
 });

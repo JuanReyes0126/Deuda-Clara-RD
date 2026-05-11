@@ -2,6 +2,7 @@ import { AuditAction } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 import { revokeOtherSessions, rotateCurrentSession } from "@/lib/auth/session";
+import { buildMonthlyCashflowSnapshot } from "@/lib/finance/monthly-cashflow";
 import {
   resolveFeatureAccess,
   sanitizeReminderDaysForAccess,
@@ -83,6 +84,11 @@ function toUserSettingsPublic(settings: {
   hybridRateWeight: number;
   hybridBalanceWeight: number;
   monthlyIncome: unknown;
+  monthlyHousingCost: unknown;
+  monthlyGroceriesCost: unknown;
+  monthlyUtilitiesCost: unknown;
+  monthlyTransportCost: unknown;
+  monthlyOtherEssentialExpenses: unknown;
   monthlyDebtBudget: unknown;
   notifyDueSoon: boolean;
   notifyOverdue: boolean;
@@ -115,15 +121,47 @@ function toUserSettingsPublic(settings: {
     settings.preferredReminderDays,
   );
 
+  const cashflow = buildMonthlyCashflowSnapshot({
+    monthlyIncome:
+      settings.monthlyIncome === null || settings.monthlyIncome === undefined
+        ? null
+        : Number(settings.monthlyIncome),
+    monthlyHousingCost:
+      settings.monthlyHousingCost === null || settings.monthlyHousingCost === undefined
+        ? null
+        : Number(settings.monthlyHousingCost),
+    monthlyGroceriesCost:
+      settings.monthlyGroceriesCost === null || settings.monthlyGroceriesCost === undefined
+        ? null
+        : Number(settings.monthlyGroceriesCost),
+    monthlyUtilitiesCost:
+      settings.monthlyUtilitiesCost === null || settings.monthlyUtilitiesCost === undefined
+        ? null
+        : Number(settings.monthlyUtilitiesCost),
+    monthlyTransportCost:
+      settings.monthlyTransportCost === null || settings.monthlyTransportCost === undefined
+        ? null
+        : Number(settings.monthlyTransportCost),
+    monthlyOtherEssentialExpenses:
+      settings.monthlyOtherEssentialExpenses === null ||
+      settings.monthlyOtherEssentialExpenses === undefined
+        ? null
+        : Number(settings.monthlyOtherEssentialExpenses),
+  });
+
   return {
     defaultCurrency: settings.defaultCurrency,
     preferredStrategy: settings.preferredStrategy,
     hybridRateWeight: settings.hybridRateWeight,
     hybridBalanceWeight: settings.hybridBalanceWeight,
-    monthlyIncome:
-      settings.monthlyIncome === null || settings.monthlyIncome === undefined
-        ? null
-        : Number(settings.monthlyIncome),
+    monthlyIncome: cashflow.monthlyIncome,
+    monthlyHousingCost: cashflow.monthlyHousingCost,
+    monthlyGroceriesCost: cashflow.monthlyGroceriesCost,
+    monthlyUtilitiesCost: cashflow.monthlyUtilitiesCost,
+    monthlyTransportCost: cashflow.monthlyTransportCost,
+    monthlyOtherEssentialExpenses: cashflow.monthlyOtherEssentialExpenses,
+    monthlyEssentialExpensesTotal: cashflow.monthlyEssentialExpensesTotal,
+    monthlyDebtCapacity: cashflow.monthlyDebtCapacity,
     monthlyDebtBudget:
       settings.monthlyDebtBudget === null ||
       settings.monthlyDebtBudget === undefined
@@ -234,6 +272,11 @@ function toUserSettingsViewModel(user: {
         hybridRateWeight: number;
         hybridBalanceWeight: number;
         monthlyIncome: unknown;
+        monthlyHousingCost: unknown;
+        monthlyGroceriesCost: unknown;
+        monthlyUtilitiesCost: unknown;
+        monthlyTransportCost: unknown;
+        monthlyOtherEssentialExpenses: unknown;
         monthlyDebtBudget: unknown;
         notifyDueSoon: boolean;
         notifyOverdue: boolean;
@@ -314,6 +357,11 @@ export async function getUserSettingsViewModel(userId: string) {
           hybridRateWeight: true,
           hybridBalanceWeight: true,
           monthlyIncome: true,
+          monthlyHousingCost: true,
+          monthlyGroceriesCost: true,
+          monthlyUtilitiesCost: true,
+          monthlyTransportCost: true,
+          monthlyOtherEssentialExpenses: true,
           monthlyDebtBudget: true,
           notifyDueSoon: true,
           notifyOverdue: true,
@@ -429,6 +477,12 @@ export async function updateUserPreferences(
       preferredStrategy: normalizedInput.preferredStrategy,
       hybridRateWeight: normalizedInput.hybridRateWeight,
       hybridBalanceWeight: normalizedInput.hybridBalanceWeight,
+      monthlyIncome: normalizedInput.monthlyIncome,
+      monthlyHousingCost: normalizedInput.monthlyHousingCost,
+      monthlyGroceriesCost: normalizedInput.monthlyGroceriesCost,
+      monthlyUtilitiesCost: normalizedInput.monthlyUtilitiesCost,
+      monthlyTransportCost: normalizedInput.monthlyTransportCost,
+      monthlyOtherEssentialExpenses: normalizedInput.monthlyOtherEssentialExpenses,
       monthlyDebtBudget: normalizedInput.monthlyDebtBudget,
       notifyDueSoon: normalizedInput.notifyDueSoon,
       notifyOverdue: normalizedInput.notifyOverdue,
@@ -446,6 +500,12 @@ export async function updateUserPreferences(
       preferredStrategy: normalizedInput.preferredStrategy,
       hybridRateWeight: normalizedInput.hybridRateWeight,
       hybridBalanceWeight: normalizedInput.hybridBalanceWeight,
+      monthlyIncome: normalizedInput.monthlyIncome,
+      monthlyHousingCost: normalizedInput.monthlyHousingCost,
+      monthlyGroceriesCost: normalizedInput.monthlyGroceriesCost,
+      monthlyUtilitiesCost: normalizedInput.monthlyUtilitiesCost,
+      monthlyTransportCost: normalizedInput.monthlyTransportCost,
+      monthlyOtherEssentialExpenses: normalizedInput.monthlyOtherEssentialExpenses,
       monthlyDebtBudget: normalizedInput.monthlyDebtBudget,
       notifyDueSoon: normalizedInput.notifyDueSoon,
       notifyOverdue: normalizedInput.notifyOverdue,
@@ -811,6 +871,14 @@ export async function updateUserMembershipPlan(
   },
   meta: { ipAddress?: string | undefined; userAgent?: string | undefined },
 ) {
+  if (input.membershipTier !== "FREE") {
+    throw new ServiceError(
+      "MEMBERSHIP_MANUAL_UPGRADE_BLOCKED",
+      403,
+      "Los planes pagos solo se activan por checkout seguro.",
+    );
+  }
+
   const settings = await prisma.userSettings.upsert({
     where: { userId },
     create: {

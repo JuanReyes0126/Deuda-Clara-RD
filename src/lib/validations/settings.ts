@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ONBOARDING_MAX_DEBTS } from "@/config/onboarding";
+import { moneyInputSchema } from "@/lib/validations/common";
 
 const moneyField = z
   .number()
@@ -26,6 +27,11 @@ const onboardingDebtSchema = z.object({
 
 export const onboardingSchema = z.object({
   monthlyIncome: moneyField,
+  monthlyHousingCost: moneyInputSchema,
+  monthlyGroceriesCost: moneyInputSchema,
+  monthlyUtilitiesCost: moneyInputSchema,
+  monthlyTransportCost: moneyInputSchema,
+  monthlyOtherEssentialExpenses: moneyInputSchema,
   monthlyDebtBudget: moneyField,
   debts: z
     .array(onboardingDebtSchema)

@@ -23,7 +23,9 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@prisma/client": ["./node_modules/.prisma/client/index"],
+      "@prisma/client/*": ["./node_modules/.prisma/client/*"]
     }
   },
   "include": [

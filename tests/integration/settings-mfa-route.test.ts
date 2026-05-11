@@ -60,12 +60,14 @@ describe("api/settings/mfa/totp", () => {
   it("activa MFA al confirmar un codigo valido", async () => {
     const { getCurrentSession } = await import("@/lib/auth/session");
     const { assertRecentAuth } = await import("@/lib/security/recent-auth");
+    const { assertRateLimit } = await import("@/lib/security/rate-limit");
     const { verifyUserTotpSetup } = await import("@/server/settings/settings-service");
 
     vi.mocked(getCurrentSession).mockResolvedValueOnce({
       user: { id: "user-1" },
     } as never);
     vi.mocked(assertRecentAuth).mockResolvedValueOnce(undefined as never);
+    vi.mocked(assertRateLimit).mockResolvedValueOnce({ success: true } as never);
     vi.mocked(verifyUserTotpSetup).mockResolvedValueOnce({
       mfaTotpEnabled: true,
       backupCodes: ["ABCDE-12345", "FGHIJ-67890"],
@@ -123,12 +125,14 @@ describe("api/settings/mfa/totp", () => {
   it("desactiva MFA con contraseña y codigo actual", async () => {
     const { getCurrentSession } = await import("@/lib/auth/session");
     const { assertRecentAuth } = await import("@/lib/security/recent-auth");
+    const { assertRateLimit } = await import("@/lib/security/rate-limit");
     const { disableUserTotp } = await import("@/server/settings/settings-service");
 
     vi.mocked(getCurrentSession).mockResolvedValueOnce({
       user: { id: "user-1" },
     } as never);
     vi.mocked(assertRecentAuth).mockResolvedValueOnce(undefined as never);
+    vi.mocked(assertRateLimit).mockResolvedValueOnce({ success: true } as never);
     vi.mocked(disableUserTotp).mockResolvedValueOnce({
       mfaTotpEnabled: false,
     } as never);

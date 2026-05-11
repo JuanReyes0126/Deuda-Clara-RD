@@ -147,10 +147,10 @@ function simulateScenario(
 ): DebtSimulatorScenario {
   const label =
     scenarioId === "BASE"
-      ? "Pago normal"
+      ? "Conservador"
       : scenarioId === "EXTRA"
-        ? "Pago con extra"
-        : "Pago agresivo";
+        ? "Recomendado"
+        : "Acelerado";
   const warnings: string[] = [];
   const paymentPerPeriod = money(buildScenarioPayment(input, scenarioId));
   const periodRate = getPeriodRate(input);
@@ -323,9 +323,7 @@ function buildSimulatorRecommendation(result: DebtSimulationResult) {
   }
 
   const strategyLabel =
-    rankedScenario.id === "AGGRESSIVE"
-      ? "Ruta agresiva"
-      : "Extra inteligente";
+    rankedScenario.id === "AGGRESSIVE" ? "Te conviene Acelerado" : "Te conviene Recomendado";
   const dynamicFocus =
     rankedScenario.id === "AGGRESSIVE"
       ? "La deuda mejora más cuando subes el pago y sostienes esa presión."
@@ -449,7 +447,7 @@ export function filterSimulationByAccess(
       : {
           ...fullResult.scenarios.base,
           id: "EXTRA" as const,
-          label: "Pago con extra",
+          label: "Recomendado",
         };
   const aggressiveScenario =
     allowScenarioComparison && allowAdvancedExtraPayments

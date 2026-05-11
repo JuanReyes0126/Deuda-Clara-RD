@@ -5,6 +5,14 @@ export const MEMBERSHIP_COMMERCIAL_COPY = {
     primary: "Desbloquear y ahorrar ahora",
     secondary: "Empezar a pagar menos ahora",
   },
+  contextualCta: {
+    dashboardPremium: "Empieza a ahorrar hoy",
+    simulatorPremium: "Desbloquear y ahorrar ahora",
+    reportsPremium: "Ver cómo rendir más tu dinero",
+    reportsPro: "Desbloquear seguimiento más profundo",
+    notificationsPremium: "Convertir alertas en decisiones",
+    notificationsPro: "Mantener seguimiento completo",
+  },
   loss: {
     currentOnly: "Este es tu escenario actual. Pero no es el más eficiente.",
     partialView: "Estás viendo una versión parcial de tu situación financiera.",

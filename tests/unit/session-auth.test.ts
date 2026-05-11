@@ -13,6 +13,8 @@ const redirectMock = vi.fn();
 const findUniqueMock = vi.fn();
 const createMock = vi.fn();
 const deleteManyMock = vi.fn();
+const runWithPrismaReconnectMock = vi.fn(async <T>(operation: () => Promise<T> | T) => operation());
+const isPrismaClosedConnectionErrorMock = vi.fn(() => false);
 
 vi.mock("next/headers", () => ({
   cookies: cookiesMock,
@@ -41,10 +43,13 @@ vi.mock("@/lib/db/prisma", () => ({
       findUnique: findUniqueMock,
     },
   },
+  runWithPrismaReconnect: runWithPrismaReconnectMock,
+  isPrismaClosedConnectionError: isPrismaClosedConnectionErrorMock,
 }));
 
 describe("auth session access", () => {
   beforeEach(() => {
+    vi.resetModules();
     cookieStore.get.mockReset();
     cookieStore.set.mockReset();
     cookieStore.delete.mockReset();
@@ -53,6 +58,9 @@ describe("auth session access", () => {
     findUniqueMock.mockReset();
     createMock.mockReset();
     deleteManyMock.mockReset();
+    runWithPrismaReconnectMock.mockClear();
+    isPrismaClosedConnectionErrorMock.mockReset();
+    isPrismaClosedConnectionErrorMock.mockReturnValue(false);
   });
 
   it("lee la cookie actual en cada llamada para no reciclar una sesion vieja", async () => {

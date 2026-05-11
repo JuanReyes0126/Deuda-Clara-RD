@@ -1,1 +1,16 @@
-{"projectId":"prj_DixKYshr7flGCVwKMri5t2UAZQWx","orgId":"team_AYQ269Fv8Ygj2jDegi37YfgL","projectName":"deuda-clara-rd-beta"}
+{
+  "projectId": "prj_DixKYshr7flGCVwKMri5t2UAZQWx",
+  "orgId": "team_AYQ269Fv8Ygj2jDegi37YfgL",
+  "projectName": "deuda-clara-rd-beta",
+  "settings": {
+    "createdAt": 1774928478474,
+    "framework": "nextjs",
+    "devCommand": null,
+    "installCommand": null,
+    "buildCommand": null,
+    "outputDirectory": null,
+    "rootDirectory": null,
+    "directoryListing": false,
+    "nodeVersion": "24.x"
+  }
+}

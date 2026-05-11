@@ -65,7 +65,7 @@ export function ExecutiveSummaryStrip({
           </div>
           <div className="flex items-start gap-4">
             {FeaturedIcon ? (
-              <span className="bg-white/85 text-primary mt-1 grid size-11 shrink-0 place-items-center rounded-2xl border border-white/80">
+              <span className="bg-white/85 text-primary mt-1 grid size-11 shrink-0 place-items-center rounded-2xl border border-border/50">
                 <FeaturedIcon className="size-5" />
               </span>
             ) : null}

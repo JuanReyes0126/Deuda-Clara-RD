@@ -2,7 +2,9 @@ import {
   CurrencyCode,
   DebtStatus,
   DebtType,
+  InterestRateMode,
   InterestRateType,
+  PaymentAmountType,
   StrategyMethod,
 } from "@prisma/client";
 import { z } from "zod";
@@ -28,7 +30,9 @@ export const debtSchema = z
     creditLimit: optionalMoneyInputSchema,
     interestRate: percentageInputSchema,
     interestRateType: z.nativeEnum(InterestRateType),
+    interestRateMode: z.nativeEnum(InterestRateMode).default(InterestRateMode.FIXED),
     minimumPayment: moneyInputSchema,
+    paymentAmountType: z.nativeEnum(PaymentAmountType).default(PaymentAmountType.FIXED),
     statementDay: optionalIntegerDayInputSchema,
     dueDay: optionalIntegerDayInputSchema,
     nextDueDate: optionalDateInputSchema,
@@ -60,7 +64,10 @@ export const debtSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["minimumPayment"],
-        message: "El pago mínimo no puede superar la deuda total actual.",
+        message:
+          value.paymentAmountType === PaymentAmountType.VARIABLE
+            ? "El pago de referencia no puede superar la deuda total actual."
+            : "El pago mínimo no puede superar la deuda total actual.",
       });
     }
 

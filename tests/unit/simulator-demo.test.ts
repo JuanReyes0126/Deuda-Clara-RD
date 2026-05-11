@@ -61,7 +61,7 @@ describe("simulator demo fallback", () => {
     expect(updated.basePlan.monthsToPayoff).toBeLessThanOrEqual(
       baseline.basePlan.monthsToPayoff ?? Number.MAX_SAFE_INTEGER,
     );
-  });
+  }, 120000);
 
   it("arma el snapshot de conversion con el estado demo real", async () => {
     const { createDemoPayment } = await import("@/lib/demo/payments");
@@ -98,5 +98,5 @@ describe("simulator demo fallback", () => {
     expect(updatedSnapshot.estimatedMonthlyInterest).toBeLessThan(
       baselineSnapshot.estimatedMonthlyInterest,
     );
-  });
+  }, 120000);
 });

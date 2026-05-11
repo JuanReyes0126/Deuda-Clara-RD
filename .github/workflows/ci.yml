@@ -42,10 +42,13 @@ jobs:
       PASSKEY_RP_NAME: Deuda Clara RD
       RESEND_API_KEY: re_ci_placeholder
       RESEND_FROM_EMAIL: Deuda Clara RD <no-reply@deudaclarard.com>
-      STRIPE_PREMIUM_PRICE_ID: price_ci_premium
-      STRIPE_PRO_PRICE_ID: price_ci_pro
-      STRIPE_SECRET_KEY: sk_test_ci_placeholder
-      STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
+      BILLING_PROVIDER: AZUL
+      AZUL_PAYMENT_URL: https://pagos.azul.test/PaymentPage
+      AZUL_MERCHANT_ID: "390000000000001"
+      AZUL_MERCHANT_NAME: Deuda Clara RD
+      AZUL_MERCHANT_TYPE: ECommerce
+      AZUL_AUTH_KEY: azul-ci-auth-key-placeholder
+      AZUL_CURRENCY_CODE: USD
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,8 +86,8 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Passkey E2E
-        run: npx playwright test tests/e2e/passkeys.spec.ts --project=chromium --workers=1
+      - name: E2E
+        run: npm run test:e2e -- --project=chromium --workers=1
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
           PLAYWRIGHT_WEB_SERVER_COMMAND: npm run start -- --hostname 127.0.0.1

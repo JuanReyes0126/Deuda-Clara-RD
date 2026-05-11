@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
       key: buildRateLimitKey(request, "passkey-registration-verify", session.user.id),
       limit: 10,
       windowMs: 10 * 60 * 1000,
+      requireDistributedStore: true,
     });
 
     if (!rateLimit.success) {

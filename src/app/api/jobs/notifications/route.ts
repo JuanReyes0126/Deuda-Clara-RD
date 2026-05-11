@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getServerEnv } from "@/lib/env/server";
 import { assertRateLimit, buildRateLimitKey } from "@/lib/security/rate-limit";
-import { handleApiError } from "@/server/api/api-response";
+import { apiBadRequest, apiRateLimited, handleApiError } from "@/server/api/api-response";
 import { dispatchPendingNotificationEmails } from "@/server/notifications/notification-service";
 import { dispatchAutomatedReminderEmails } from "@/server/reminders/reminder-scheduler-service";
 import { logSecurityEvent } from "@/server/observability/logger";
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       logSecurityEvent("cron_secret_rejected", {
         route: "/api/jobs/notifications",
       });
-      return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+      return apiBadRequest("No autorizado.", 401);
     }
 
     const rateLimit = await assertRateLimit({
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       logSecurityEvent("rate_limit_cron_notifications", {
         route: "/api/jobs/notifications",
       });
-      return NextResponse.json({ error: "Demasiadas solicitudes." }, { status: 429 });
+      return apiRateLimited("Demasiadas solicitudes.", rateLimit.resetAt);
     }
 
     const [reminderStats, digestStats] = await Promise.all([

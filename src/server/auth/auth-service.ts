@@ -4,7 +4,7 @@ import {
   CURRENT_PRIVACY_VERSION,
   CURRENT_TERMS_VERSION,
 } from "@/config/legal";
-import { prisma } from "@/lib/db/prisma";
+import { prisma, runWithPrismaReconnect } from "@/lib/db/prisma";
 import { revokeOtherSessions, rotateCurrentSession } from "@/lib/auth/session";
 import { decryptSensitiveText } from "@/lib/security/encryption";
 import { verifyRecoveryCode, verifyTotpCode } from "@/lib/security/totp";
@@ -83,14 +83,16 @@ async function deliverAuthEmailSafely(input: {
 
 export async function registerUser(input: RegisterInput, meta: RequestMeta) {
   const normalizedEmail = normalizeAuthEmail(input.email);
-  const existingUser = await prisma.user.findFirst({
-    where: {
-      email: {
-        equals: normalizedEmail,
-        mode: "insensitive",
+  const existingUser = await runWithPrismaReconnect(() =>
+    prisma.user.findFirst({
+      where: {
+        email: {
+          equals: normalizedEmail,
+          mode: "insensitive",
+        },
       },
-    },
-  });
+    }),
+  );
 
   if (existingUser) {
     throw new ServiceError("EMAIL_IN_USE", 409, "Ya existe una cuenta con ese correo.");
@@ -99,65 +101,67 @@ export async function registerUser(input: RegisterInput, meta: RequestMeta) {
   const passwordHash = await hashPassword(input.password);
   const acceptedAt = new Date();
 
-  const user = await prisma.$transaction(async (tx) => {
-    const createdUser = await tx.user.create({
-      data: {
-        email: normalizedEmail,
-        passwordHash,
-        firstName: input.firstName,
-        lastName: input.lastName,
-        termsAcceptedAt: acceptedAt,
-        termsVersion: CURRENT_TERMS_VERSION,
-        privacyVersion: CURRENT_PRIVACY_VERSION,
-        settings: {
-          create: {
-            defaultCurrency: CurrencyCode.DOP,
-            preferredStrategy: StrategyMethod.AVALANCHE,
-            membershipTier: "FREE",
-            notifyDueSoon: true,
-            notifyOverdue: true,
-            notifyMinimumRisk: true,
-            notifyMonthlyReport: true,
-            emailRemindersEnabled: false,
-            preferredReminderDays: [5, 2, 0],
-            preferredReminderHour: 8,
-            upcomingDueDays: 3,
-          },
-        },
-      },
-    });
-
-    await tx.userConsent.create({
-      data: {
-        userId: createdUser.id,
-        termsVersion: CURRENT_TERMS_VERSION,
-        privacyVersion: CURRENT_PRIVACY_VERSION,
-        acceptedAt,
-        ipAddress: meta.ipAddress ?? null,
-        userAgent: meta.userAgent ?? null,
-      },
-    });
-
-    await createAuditLog(
-      {
-        userId: createdUser.id,
-        action: AuditAction.USER_REGISTERED,
-        resourceType: "user",
-        resourceId: createdUser.id,
-        ipAddress: meta.ipAddress,
-        userAgent: meta.userAgent,
-        metadata: {
-          legalAccepted: true,
+  const user = await runWithPrismaReconnect(() =>
+    prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          email: normalizedEmail,
+          passwordHash,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          termsAcceptedAt: acceptedAt,
           termsVersion: CURRENT_TERMS_VERSION,
           privacyVersion: CURRENT_PRIVACY_VERSION,
-          termsAcceptedAt: acceptedAt.toISOString(),
+          settings: {
+            create: {
+              defaultCurrency: CurrencyCode.DOP,
+              preferredStrategy: StrategyMethod.AVALANCHE,
+              membershipTier: "FREE",
+              notifyDueSoon: true,
+              notifyOverdue: true,
+              notifyMinimumRisk: true,
+              notifyMonthlyReport: true,
+              emailRemindersEnabled: false,
+              preferredReminderDays: [5, 2, 0],
+              preferredReminderHour: 8,
+              upcomingDueDays: 3,
+            },
+          },
         },
-      },
-      tx,
-    );
+      });
 
-    return createdUser;
-  });
+      await tx.userConsent.create({
+        data: {
+          userId: createdUser.id,
+          termsVersion: CURRENT_TERMS_VERSION,
+          privacyVersion: CURRENT_PRIVACY_VERSION,
+          acceptedAt,
+          ipAddress: meta.ipAddress ?? null,
+          userAgent: meta.userAgent ?? null,
+        },
+      });
+
+      await createAuditLog(
+        {
+          userId: createdUser.id,
+          action: AuditAction.USER_REGISTERED,
+          resourceType: "user",
+          resourceId: createdUser.id,
+          ipAddress: meta.ipAddress,
+          userAgent: meta.userAgent,
+          metadata: {
+            legalAccepted: true,
+            termsVersion: CURRENT_TERMS_VERSION,
+            privacyVersion: CURRENT_PRIVACY_VERSION,
+            termsAcceptedAt: acceptedAt.toISOString(),
+          },
+        },
+        tx,
+      );
+
+      return createdUser;
+    }),
+  );
 
   logSecurityEvent(
     "user_registered_with_legal_acceptance",
@@ -186,15 +190,17 @@ export async function registerUser(input: RegisterInput, meta: RequestMeta) {
 
 export async function authenticateUser(input: LoginInput, meta: RequestMeta) {
   const normalizedEmail = normalizeAuthEmail(input.email);
-  const user = await prisma.user.findFirst({
-    where: {
-      email: {
-        equals: normalizedEmail,
-        mode: "insensitive",
+  const user = await runWithPrismaReconnect(() =>
+    prisma.user.findFirst({
+      where: {
+        email: {
+          equals: normalizedEmail,
+          mode: "insensitive",
+        },
       },
-    },
-    select: loginUserSelect,
-  });
+      select: loginUserSelect,
+    }),
+  );
 
   if (!user) {
     await createAuditLog({
@@ -266,12 +272,14 @@ export async function authenticateUser(input: LoginInput, meta: RequestMeta) {
       );
 
       if (recoveryResult.matched) {
-        await prisma.userSettings.update({
-          where: { userId: user.id },
-          data: {
-            mfaRecoveryCodesHashes: recoveryResult.remainingHashes,
-          },
-        });
+        await runWithPrismaReconnect(() =>
+          prisma.userSettings.update({
+            where: { userId: user.id },
+            data: {
+              mfaRecoveryCodesHashes: recoveryResult.remainingHashes,
+            },
+          }),
+        );
 
         mfaVerified = true;
       }
@@ -300,10 +308,12 @@ export async function authenticateUser(input: LoginInput, meta: RequestMeta) {
     }
   }
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { lastLoginAt: new Date() },
-  });
+  await runWithPrismaReconnect(() =>
+    prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    }),
+  );
 
   await createAuditLog({
     userId: user.id,
@@ -322,10 +332,12 @@ export async function reauthenticateUser(
   input: ReauthenticateInput,
   meta: RequestMeta,
 ) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: loginUserSelect,
-  });
+  const user = await runWithPrismaReconnect(() =>
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: loginUserSelect,
+    }),
+  );
 
   if (!user) {
     throw new ServiceError("USER_NOT_FOUND", 404, "No se encontró la cuenta.");
@@ -385,12 +397,14 @@ export async function reauthenticateUser(
       );
 
       if (recoveryResult.matched) {
-        await prisma.userSettings.update({
-          where: { userId: user.id },
-          data: {
-            mfaRecoveryCodesHashes: recoveryResult.remainingHashes,
-          },
-        });
+        await runWithPrismaReconnect(() =>
+          prisma.userSettings.update({
+            where: { userId: user.id },
+            data: {
+              mfaRecoveryCodesHashes: recoveryResult.remainingHashes,
+            },
+          }),
+        );
 
         mfaVerified = true;
       }
@@ -423,14 +437,16 @@ export async function requestPasswordReset(
   meta: RequestMeta,
 ) {
   const normalizedEmail = normalizeAuthEmail(input.email);
-  const user = await prisma.user.findFirst({
-    where: {
-      email: {
-        equals: normalizedEmail,
-        mode: "insensitive",
+  const user = await runWithPrismaReconnect(() =>
+    prisma.user.findFirst({
+      where: {
+        email: {
+          equals: normalizedEmail,
+          mode: "insensitive",
+        },
       },
-    },
-  });
+    }),
+  );
 
   if (!user) {
     return;
@@ -440,13 +456,15 @@ export async function requestPasswordReset(
   const tokenHash = hashOpaqueToken(rawToken);
   const expiresAt = new Date(Date.now() + 1000 * 60 * 60);
 
-  await prisma.passwordResetToken.create({
-    data: {
-      userId: user.id,
-      tokenHash,
-      expiresAt,
-    },
-  });
+  await runWithPrismaReconnect(() =>
+    prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash,
+        expiresAt,
+      },
+    }),
+  );
 
   const email = buildPasswordResetEmail(rawToken);
 
@@ -471,10 +489,12 @@ export async function requestPasswordReset(
 export async function resetPassword(input: ResetPasswordInput, meta: RequestMeta) {
   const tokenHash = hashOpaqueToken(input.token);
 
-  const resetToken = await prisma.passwordResetToken.findUnique({
-    where: { tokenHash },
-    include: { user: true },
-  });
+  const resetToken = await runWithPrismaReconnect(() =>
+    prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    }),
+  );
 
   if (!resetToken || resetToken.usedAt || resetToken.expiresAt < new Date()) {
     throw new ServiceError("RESET_TOKEN_INVALID", 400, "El enlace ya no es válido.");
@@ -482,19 +502,21 @@ export async function resetPassword(input: ResetPasswordInput, meta: RequestMeta
 
   const passwordHash = await hashPassword(input.password);
 
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: resetToken.userId },
-      data: { passwordHash },
-    }),
-    prisma.passwordResetToken.update({
-      where: { id: resetToken.id },
-      data: { usedAt: new Date() },
-    }),
-    prisma.session.deleteMany({
-      where: { userId: resetToken.userId },
-    }),
-  ]);
+  await runWithPrismaReconnect(() =>
+    prisma.$transaction([
+      prisma.user.update({
+        where: { id: resetToken.userId },
+        data: { passwordHash },
+      }),
+      prisma.passwordResetToken.update({
+        where: { id: resetToken.id },
+        data: { usedAt: new Date() },
+      }),
+      prisma.session.deleteMany({
+        where: { userId: resetToken.userId },
+      }),
+    ]),
+  );
 
   await createAuditLog({
     userId: resetToken.userId,
@@ -520,9 +542,11 @@ export async function changePassword(
   input: ChangePasswordInput,
   meta: RequestMeta,
 ) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-  });
+  const user = await runWithPrismaReconnect(() =>
+    prisma.user.findUnique({
+      where: { id: userId },
+    }),
+  );
 
   if (!user) {
     throw new ServiceError("USER_NOT_FOUND", 404, "No se encontró la cuenta.");
@@ -543,10 +567,12 @@ export async function changePassword(
 
   const passwordHash = await hashPassword(input.newPassword);
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: { passwordHash },
-  });
+  await runWithPrismaReconnect(() =>
+    prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    }),
+  );
 
   await revokeOtherSessions(userId);
   await rotateCurrentSession(userId);

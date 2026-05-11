@@ -77,7 +77,7 @@ export function AppShell({ user, children }: AppShellProps) {
     <div className="min-h-screen bg-background">
       <div className="mx-auto min-h-screen w-full max-w-[1840px] px-0 py-0 lg:grid lg:grid-cols-[252px_minmax(0,1fr)] lg:items-start lg:gap-6 lg:px-6 lg:py-4 2xl:max-w-[1980px] 2xl:px-8">
         <div className="sticky top-0 z-30 border-b border-border/70 bg-[rgba(247,250,248,0.92)] px-2 pb-2.5 pt-2.5 backdrop-blur sm:px-3 lg:hidden">
-          <div className="rounded-[1.5rem] border border-[#dfe9e4] bg-[linear-gradient(180deg,rgba(255,255,255,0.985)_0%,rgba(245,250,248,0.97)_58%,rgba(241,247,244,0.94)_100%)] px-4 py-3 shadow-[0_18px_44px_-34px_rgba(18,61,54,0.3)] ring-1 ring-white/80">
+          <div className="rounded-2xl border border-[#dfe9e4] bg-[linear-gradient(180deg,rgba(255,255,255,0.985)_0%,rgba(245,250,248,0.97)_58%,rgba(241,247,244,0.94)_100%)] px-4 py-3 shadow-[0_18px_44px_-34px_rgba(18,61,54,0.3)]">
             <div className="flex items-center justify-between gap-3">
               <Link
                 href="/dashboard"
@@ -105,7 +105,7 @@ export function AppShell({ user, children }: AppShellProps) {
           </div>
         </div>
 
-        <aside className="sticky top-4 hidden h-[calc(100dvh-2rem)] min-h-[620px] flex-col rounded-[2rem] border border-[#dfe9e4] bg-[linear-gradient(180deg,rgba(255,255,255,0.985)_0%,rgba(245,250,248,0.97)_58%,rgba(241,247,244,0.94)_100%)] px-4 py-5 shadow-[0_24px_60px_-38px_rgba(18,61,54,0.28)] ring-1 ring-white/80 lg:flex">
+        <aside className="sticky top-4 hidden h-[calc(100dvh-2rem)] min-h-[620px] flex-col rounded-2xl border border-[#dfe9e4] bg-[linear-gradient(180deg,rgba(255,255,255,0.985)_0%,rgba(245,250,248,0.97)_58%,rgba(241,247,244,0.94)_100%)] px-4 py-5 shadow-[0_24px_60px_-38px_rgba(18,61,54,0.28)] lg:flex">
           <Link
             href="/dashboard"
             prefetch={false}
@@ -125,7 +125,7 @@ export function AppShell({ user, children }: AppShellProps) {
           </Link>
 
           <div className="mt-5 hidden gap-4 lg:grid">
-            <div className="rounded-3xl border border-white/60 bg-white/72 p-4 shadow-[0_14px_28px_rgba(24,49,59,0.06)]">
+            <div className="rounded-2xl border border-border/55 bg-white/72 p-4 shadow-[0_14px_28px_rgba(24,49,59,0.06)]">
               <p className="text-sm text-muted">Sesión actual</p>
               <p className="mt-1 text-lg font-semibold text-foreground">
                 {user.firstName} {user.lastName}
@@ -138,7 +138,7 @@ export function AppShell({ user, children }: AppShellProps) {
               </div>
             </div>
 
-            <div className="rounded-3xl bg-[linear-gradient(135deg,rgba(15,118,110,0.12)_0%,rgba(255,210,125,0.24)_100%)] p-4">
+            <div className="rounded-2xl bg-[linear-gradient(135deg,rgba(15,118,110,0.12)_0%,rgba(255,210,125,0.24)_100%)] p-4">
               <p className="text-sm font-semibold text-foreground">Navegación clara</p>
               <p className="mt-2 text-sm leading-6 text-muted">
                 Entramos por secciones simples: primero panorama, luego deudas, pagos y simulación.
@@ -162,7 +162,7 @@ export function AppShell({ user, children }: AppShellProps) {
                   className={cn(
                     "group relative flex w-full items-center justify-start rounded-2xl px-4 py-3 transition-all duration-200 ease-out active:scale-[0.97]",
                     isActive
-                      ? "bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(246,251,249,0.94)_100%)] text-[#163c4e] shadow-[0_16px_32px_-22px_rgba(23,56,74,0.34)] ring-1 ring-[#d7e8e1]"
+                      ? "border border-[#d7e8e1] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(246,251,249,0.94)_100%)] text-[#163c4e] shadow-[0_16px_32px_-22px_rgba(23,56,74,0.34)]"
                       : "text-muted hover:bg-white/84 hover:text-foreground active:bg-white/92",
                   )}
                 >
@@ -186,7 +186,7 @@ export function AppShell({ user, children }: AppShellProps) {
           </nav>
 
           <div className="mt-auto flex items-center justify-center pt-2 lg:block lg:pt-4">
-            <div className="rounded-3xl border border-white/60 bg-white/72 p-1.5 sm:p-2 lg:p-3">
+            <div className="rounded-2xl border border-border/55 bg-white/72 p-1.5 sm:p-2 lg:p-3">
               <nav
                 aria-label="Enlaces públicos"
                 className="mb-3 hidden flex-wrap gap-x-3 gap-y-2 px-1 text-xs font-medium text-muted lg:flex"
@@ -209,7 +209,7 @@ export function AppShell({ user, children }: AppShellProps) {
 
         <main className="flex min-w-0 flex-col gap-4 px-2 pb-[9.25rem] pt-3 sm:px-4 sm:pb-[9.5rem] sm:pt-4 lg:gap-6 lg:px-0 lg:pb-0 lg:pt-0">
           {children}
-          <footer className="rounded-[1.5rem] border border-border/70 bg-white/72 px-4 py-4 text-xs text-muted shadow-soft ring-1 ring-white/70 lg:hidden">
+          <footer className="rounded-2xl border border-border/70 bg-white/72 px-4 py-4 text-xs text-muted shadow-soft lg:hidden">
             <p className="font-semibold text-foreground">Deuda Clara RD</p>
             <nav
               aria-label="Enlaces legales y públicos"
@@ -226,7 +226,7 @@ export function AppShell({ user, children }: AppShellProps) {
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-40 px-2 pb-[calc(env(safe-area-inset-bottom,0px)+1.15rem)] sm:px-3 lg:hidden">
-        <div className="rounded-[1.75rem] border border-[#dfe9e4] bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(245,250,248,0.96)_100%)] p-1.5 shadow-[0_26px_60px_-38px_rgba(18,61,54,0.34)] ring-1 ring-white/85 sm:p-2">
+        <div className="rounded-2xl border border-[#dfe9e4] bg-[linear-gradient(180deg,rgba(255,255,255,0.99)_0%,rgba(245,250,248,0.96)_100%)] p-1.5 shadow-[0_26px_60px_-38px_rgba(18,61,54,0.34)] sm:p-2">
           <div className="grid grid-cols-5 gap-1.5">
             {mobilePrimaryNavItems.map((item) => {
               const Icon = item.icon;
@@ -238,7 +238,7 @@ export function AppShell({ user, children }: AppShellProps) {
                   type="button"
                   onClick={() => navigateTo(item.href)}
                   className={cn(
-                    "flex min-h-[3.95rem] flex-col items-center justify-center gap-1 rounded-[1.35rem] px-2 py-2 text-[10.5px] font-medium transition-all",
+                    "flex min-h-[3.95rem] flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[10.5px] font-medium transition-all",
                     isActive
                       ? "bg-primary text-white shadow-[0_18px_34px_-24px_rgba(15,88,74,0.52)]"
                       : "bg-white/78 text-muted",
@@ -253,7 +253,7 @@ export function AppShell({ user, children }: AppShellProps) {
               type="button"
               onClick={() => setIsMobileMenuOpen(true)}
               className={cn(
-                "flex min-h-[3.95rem] flex-col items-center justify-center gap-1 rounded-[1.35rem] px-2 py-2 text-[10.5px] font-medium transition-all",
+                "flex min-h-[3.95rem] flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[10.5px] font-medium transition-all",
                 isMoreActive || isMobileMenuOpen
                   ? "bg-primary text-white shadow-[0_18px_34px_-24px_rgba(15,88,74,0.52)]"
                   : "bg-white/78 text-muted",
@@ -274,7 +274,7 @@ export function AppShell({ user, children }: AppShellProps) {
             className="absolute inset-0"
             onClick={() => setIsMobileMenuOpen(false)}
           />
-          <div className="absolute inset-x-3 bottom-4 rounded-[2rem] border border-[#dfe9e4] bg-[linear-gradient(180deg,rgba(255,255,255,0.995)_0%,rgba(245,250,248,0.98)_100%)] p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1.1rem)] shadow-[0_28px_70px_-36px_rgba(18,61,54,0.36)] ring-1 ring-white/90">
+          <div className="absolute inset-x-3 bottom-4 rounded-2xl border border-[#dfe9e4] bg-[linear-gradient(180deg,rgba(255,255,255,0.995)_0%,rgba(245,250,248,0.98)_100%)] p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1.1rem)] shadow-[0_28px_70px_-36px_rgba(18,61,54,0.36)]">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/80">
@@ -302,7 +302,7 @@ export function AppShell({ user, children }: AppShellProps) {
                     type="button"
                     onClick={() => navigateTo(item.href)}
                     className={cn(
-                      "flex min-h-[3.75rem] items-center gap-3 rounded-[1.35rem] border px-4 py-3 text-left text-sm font-medium transition-all",
+                      "flex min-h-[3.75rem] items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm font-medium transition-all",
                       isActive
                         ? "border-primary/18 bg-primary/8 text-foreground"
                         : "border-border/70 bg-white/82 text-foreground",
@@ -317,7 +317,7 @@ export function AppShell({ user, children }: AppShellProps) {
               })}
             </div>
 
-            <div className="mt-4 rounded-[1.35rem] border border-border/70 bg-white/82 p-3">
+            <div className="mt-4 rounded-xl border border-border/70 bg-white/82 p-3">
               <nav
                 aria-label="Enlaces públicos"
                 className="mb-3 flex flex-wrap gap-x-3 gap-y-2 text-xs font-medium text-muted"

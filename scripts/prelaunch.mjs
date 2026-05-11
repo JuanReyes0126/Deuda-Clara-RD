@@ -4,6 +4,10 @@ import path from "node:path";
 const cwd = process.cwd();
 const envPath = path.join(cwd, ".env");
 const envLocalPath = path.join(cwd, ".env.local");
+const explicitEnvFiles = (process.env.ENV_FILE || "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
 
 function parseEnvFile(raw) {
   const env = {};
@@ -37,12 +41,23 @@ function parseEnvFile(raw) {
   return env;
 }
 
+function resolveEnvFiles() {
+  const defaultFiles = [envPath, envLocalPath];
+  const selectedFiles = explicitEnvFiles.length
+    ? [envPath, ...explicitEnvFiles.map((file) => path.join(cwd, file))]
+    : defaultFiles;
+
+  return [...new Set(selectedFiles)];
+}
+
 function readLocalEnv() {
-  if (!fs.existsSync(envPath) && !fs.existsSync(envLocalPath)) {
+  const files = resolveEnvFiles();
+
+  if (!files.some((filePath) => fs.existsSync(filePath))) {
     return null;
   }
 
-  return [envPath, envLocalPath].reduce((env, filePath) => {
+  return files.reduce((env, filePath) => {
     if (!fs.existsSync(filePath)) {
       return env;
     }
@@ -103,8 +118,21 @@ async function healthCheck(appUrl) {
   }
 }
 
+function summarizeMissingVars(env, keys) {
+  const missing = keys.filter((key) => !env[key]);
+  return {
+    ok: missing.length === 0,
+    missing,
+  };
+}
+
 console.log("Deuda Clara RD · Release candidate");
 console.log("");
+
+if (explicitEnvFiles.length) {
+  console.log(`Archivos de entorno evaluados: .env + ${explicitEnvFiles.join(", ")}`);
+  console.log("");
+}
 
 const env = readLocalEnv();
 
@@ -176,6 +204,56 @@ warnCheck(
   "DEMO_MODE_ENABLED",
   "Desactivado. Correcto para lanzamiento.",
   "Sigue en `true`. Para lanzamiento debe usar `false` y trabajar con base persistente.",
+);
+
+const passkeySummary = summarizeMissingVars(env, [
+  "PASSKEY_RP_ID",
+  "PASSKEY_RP_NAME",
+  "PASSKEY_ALLOWED_ORIGINS",
+]);
+warnCheck(
+  passkeySummary.ok,
+  "Passkeys",
+  "Configuradas para el dominio actual.",
+  passkeySummary.ok ? "Configuradas." : `Faltan: ${passkeySummary.missing.join(", ")}`,
+);
+
+const redisSummary = summarizeMissingVars(env, [
+  "UPSTASH_REDIS_REST_URL",
+  "UPSTASH_REDIS_REST_TOKEN",
+]);
+warnCheck(
+  redisSummary.ok,
+  "Upstash Redis",
+  "Rate limit persistente listo.",
+  redisSummary.ok ? "Configurado." : `Faltan: ${redisSummary.missing.join(", ")}`,
+);
+const resendSummary = summarizeMissingVars(env, [
+  "RESEND_API_KEY",
+  "RESEND_FROM_EMAIL",
+]);
+warnCheck(
+  resendSummary.ok,
+  "Email transaccional",
+  "Resend configurado.",
+  resendSummary.ok ? "Configurado." : `Faltan: ${resendSummary.missing.join(", ")}`,
+);
+const azulSummary = summarizeMissingVars(env, [
+  "BILLING_PROVIDER",
+  "AZUL_PAYMENT_URL",
+  "AZUL_MERCHANT_ID",
+  "AZUL_MERCHANT_NAME",
+  "AZUL_MERCHANT_TYPE",
+  "AZUL_AUTH_KEY",
+  "AZUL_CURRENCY_CODE",
+]);
+warnCheck(
+  azulSummary.ok && env.BILLING_PROVIDER === "AZUL",
+  "AZUL",
+  "Billing listo para membresías.",
+  azulSummary.missing.length
+    ? `Faltan: ${azulSummary.missing.join(", ")}`
+    : "BILLING_PROVIDER debe ser AZUL.",
 );
 
 if (env.APP_URL) {
@@ -268,6 +346,26 @@ if (failures === 0) {
 
 if (warnings > 0) {
   console.log("- Revisa los warnings antes de compartir el enlace públicamente.");
+}
+
+if (!passkeySummary.ok) {
+  console.log(`- Completa passkeys antes del dominio real: ${passkeySummary.missing.join(", ")}.`);
+}
+
+if (!redisSummary.ok) {
+  console.log(`- Configura Upstash antes de producción: ${redisSummary.missing.join(", ")}.`);
+}
+
+if (!resendSummary.ok) {
+  console.log(`- Completa email transaccional: ${resendSummary.missing.join(", ")}.`);
+}
+
+if (!(azulSummary.ok && env.BILLING_PROVIDER === "AZUL")) {
+  console.log(
+    `- Completa billing antes de cobrar membresías: ${
+      azulSummary.missing.length ? azulSummary.missing.join(", ") : "BILLING_PROVIDER=AZUL"
+    }.`,
+  );
 }
 
 console.log("");

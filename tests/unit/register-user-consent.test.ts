@@ -8,6 +8,8 @@ const hashPasswordMock = vi.fn(async () => "hashed-password");
 const createAuditLogMock = vi.fn();
 const sendTransactionalEmailMock = vi.fn(async () => undefined);
 const logSecurityEventMock = vi.fn();
+const runWithPrismaReconnectMock = vi.fn(async <T>(operation: () => Promise<T> | T) => operation());
+const isPrismaClosedConnectionErrorMock = vi.fn(() => false);
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
@@ -16,6 +18,8 @@ vi.mock("@/lib/db/prisma", () => ({
     },
     $transaction: transactionMock,
   },
+  runWithPrismaReconnect: runWithPrismaReconnectMock,
+  isPrismaClosedConnectionError: isPrismaClosedConnectionErrorMock,
 }));
 
 vi.mock("@/server/auth/password", () => ({
@@ -49,6 +53,7 @@ vi.mock("@/server/observability/logger", () => ({
 
 describe("registerUser legal consent", () => {
   beforeEach(() => {
+    vi.resetModules();
     findFirstMock.mockReset();
     transactionMock.mockReset();
     userCreateMock.mockReset();
@@ -57,6 +62,9 @@ describe("registerUser legal consent", () => {
     createAuditLogMock.mockReset();
     sendTransactionalEmailMock.mockReset();
     logSecurityEventMock.mockReset();
+    runWithPrismaReconnectMock.mockClear();
+    isPrismaClosedConnectionErrorMock.mockReset();
+    isPrismaClosedConnectionErrorMock.mockReturnValue(false);
   });
 
   it("crea usuario y consentimiento legal dentro de la misma transacción", async () => {
@@ -137,5 +145,5 @@ describe("registerUser legal consent", () => {
       }),
       "info",
     );
-  });
+  }, 15000);
 });

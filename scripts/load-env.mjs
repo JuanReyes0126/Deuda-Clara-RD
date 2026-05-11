@@ -43,13 +43,37 @@ function parseEnvFile(filePath) {
   return result;
 }
 
-export function loadProjectEnv(projectRoot) {
-  const baseEnv = parseEnvFile(path.join(projectRoot, ".env"));
-  const localEnv = parseEnvFile(path.join(projectRoot, ".env.local"));
+function resolveEnvFiles(projectRoot) {
+  const explicitEnvFiles = (process.env.ENV_FILE || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map((file) => path.join(projectRoot, file));
 
-  return {
-    ...baseEnv,
-    ...localEnv,
-    ...process.env,
-  };
+  const defaultFiles = [
+    path.join(projectRoot, ".env"),
+    path.join(projectRoot, ".env.local"),
+  ];
+
+  const selectedFiles = explicitEnvFiles.length
+    ? [path.join(projectRoot, ".env"), ...explicitEnvFiles]
+    : defaultFiles;
+
+  return [...new Set(selectedFiles)];
+}
+
+export function loadProjectEnv(projectRoot) {
+  const envFiles = resolveEnvFiles(projectRoot);
+
+  return envFiles.reduce(
+    (env, filePath) => ({
+      ...env,
+      ...parseEnvFile(filePath),
+    }),
+    {},
+  );
+}
+
+export function getLoadedEnvFiles(projectRoot) {
+  return resolveEnvFiles(projectRoot).filter((filePath) => existsSync(filePath));
 }

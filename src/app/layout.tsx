@@ -8,6 +8,14 @@ export const metadata: Metadata = {
   title: "Deuda Clara RD",
   description:
     "Aplicación web para entender deudas, intereses, vencimientos y construir un plan inteligente de salida en República Dominicana.",
+  icons: {
+    icon: [
+      { url: "/brand/deuda-clara-favicon-20260408.ico?v=4", type: "image/x-icon" },
+      { url: "/brand/deuda-clara-logo-20260408.png?v=4", type: "image/png" },
+    ],
+    shortcut: ["/brand/deuda-clara-favicon-20260408.ico?v=4"],
+    apple: [{ url: "/brand/deuda-clara-logo-20260408.png?v=4", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({

@@ -1,4 +1,8 @@
+import Image from "next/image";
+
 import { cn } from "@/lib/utils/cn";
+
+const brandLogoSrc = "/brand/deuda-clara-logo-20260408.png";
 
 type BrandMarkProps = {
   className?: string;
@@ -24,44 +28,18 @@ export function BrandMark({
   title = "Logo de Deuda Clara RD",
 }: BrandMarkProps) {
   return (
-    <svg
-      width="96"
-      height="96"
-      viewBox="0 0 96 96"
-      role="img"
-      aria-label={title}
-      className={cn("shrink-0 text-[#2e8c80]", className)}
-      style={{ maxWidth: "100%", height: "auto" }}
-      preserveAspectRatio="xMidYMid meet"
-      fill="none"
-    >
-      <circle
-        cx="48"
-        cy="48"
-        r="33.5"
-        stroke="currentColor"
-        strokeWidth="5.5"
-        vectorEffect="non-scaling-stroke"
-      />
-
-      <path
-        d="M24 57.5L36 45.5L44 53.5L57 40.5L71 40.5"
-        stroke="currentColor"
-        strokeWidth="5.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-      />
-
-      <path
-        d="M63 32.5L71 40.5L63 48.5"
-        stroke="currentColor"
-        strokeWidth="5.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
+    <Image
+      src={brandLogoSrc}
+      alt={title}
+      width={1024}
+      height={1024}
+      className={cn(
+        "shrink-0 object-contain mix-blend-darken scale-[1.14]",
+        className,
+      )}
+      sizes="(max-width: 640px) 48px, 64px"
+      priority
+    />
   );
 }
 
@@ -73,13 +51,13 @@ export function BrandBadge({
   return (
     <div
       className={cn(
-        "grid size-12 place-items-center overflow-hidden rounded-2xl border border-[#d5e8e2] bg-[linear-gradient(180deg,#ffffff_0%,#f4faf8_100%)] shadow-[0_18px_40px_-28px_rgba(23,56,74,0.38)]",
+        "grid size-12 place-items-center overflow-hidden rounded-2xl",
         className,
       )}
     >
       <BrandMark
         {...(title ? { title } : {})}
-        className={cn("size-7", markClassName)}
+        className={cn("size-[92%]", markClassName)}
       />
     </div>
   );

@@ -13,10 +13,12 @@ import {
   ONBOARDING_DEBT_PRESETS,
 } from "@/config/onboarding";
 import { prisma } from "@/lib/db/prisma";
+import { buildMonthlyCashflowSnapshot } from "@/lib/finance/monthly-cashflow";
 import type { OnboardingPreviewDto } from "@/lib/types/app";
 import type { OnboardingInput } from "@/lib/validations/settings";
 import { createAuditLog } from "@/server/audit/audit-service";
 import { buildDashboardPlanComparison } from "@/server/dashboard/plan-optimization";
+import { ServiceError } from "@/server/services/service-error";
 import { captureBalanceSnapshot } from "@/server/snapshots/balance-snapshot-service";
 
 type ResolvedOnboardingDebt = {
@@ -78,6 +80,7 @@ function buildPreviewStrategyDebts(input: OnboardingInput) {
 
 export function buildOnboardingPreview(input: OnboardingInput): OnboardingPreviewDto {
   const strategyDebts = buildPreviewStrategyDebts(input);
+  const cashflow = buildMonthlyCashflowSnapshot(input);
   const { comparison, optimizedResult } = buildDashboardPlanComparison({
     debts: strategyDebts,
     currentStrategy: StrategyMethod.AVALANCHE,
@@ -91,6 +94,8 @@ export function buildOnboardingPreview(input: OnboardingInput): OnboardingPrevie
     ),
     potentialSavings:
       optimizedResult.savingsVsMinimumOnly ?? comparison.interestSavings ?? 0,
+    monthlyEssentialExpensesTotal: cashflow.monthlyEssentialExpensesTotal ?? 0,
+    monthlyDebtCapacity: cashflow.monthlyDebtCapacity ?? 0,
     recommendedStrategy: comparison.recommendedStrategy,
     recommendedStrategyLabel: getStrategyLabel(comparison.recommendedStrategy),
     priorityDebtName: priorityDebt?.name ?? null,
@@ -115,7 +120,7 @@ export async function completeUserOnboarding(
     });
 
     if (!user) {
-      throw new Error("Usuario no encontrado.");
+      throw new ServiceError("USER_NOT_FOUND", 404, "No se encontró la cuenta.");
     }
 
     if (user.onboardingCompleted) {
@@ -132,6 +137,11 @@ export async function completeUserOnboarding(
               defaultCurrency: CurrencyCode.DOP,
               preferredStrategy: preview.recommendedStrategy,
               monthlyIncome: input.monthlyIncome,
+              monthlyHousingCost: input.monthlyHousingCost,
+              monthlyGroceriesCost: input.monthlyGroceriesCost,
+              monthlyUtilitiesCost: input.monthlyUtilitiesCost,
+              monthlyTransportCost: input.monthlyTransportCost,
+              monthlyOtherEssentialExpenses: input.monthlyOtherEssentialExpenses,
               monthlyDebtBudget: input.monthlyDebtBudget,
               membershipTier: "FREE",
               notifyDueSoon: true,
@@ -146,6 +156,11 @@ export async function completeUserOnboarding(
             update: {
               preferredStrategy: preview.recommendedStrategy,
               monthlyIncome: input.monthlyIncome,
+              monthlyHousingCost: input.monthlyHousingCost,
+              monthlyGroceriesCost: input.monthlyGroceriesCost,
+              monthlyUtilitiesCost: input.monthlyUtilitiesCost,
+              monthlyTransportCost: input.monthlyTransportCost,
+              monthlyOtherEssentialExpenses: input.monthlyOtherEssentialExpenses,
               monthlyDebtBudget: input.monthlyDebtBudget,
             },
           },
@@ -178,6 +193,8 @@ export async function completeUserOnboarding(
         userAgent: meta.userAgent,
         metadata: {
           monthlyIncome: input.monthlyIncome,
+          monthlyEssentialExpensesTotal: preview.monthlyEssentialExpensesTotal,
+          monthlyDebtCapacity: preview.monthlyDebtCapacity,
           monthlyDebtBudget: input.monthlyDebtBudget,
           debtCount: resolvedDebts.length,
           recommendedStrategy: preview.recommendedStrategy,

@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, Plus, ShieldCheck, Sparkles, Trash2 } from "luci
 import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { buildMonthlyCashflowSnapshot } from "@/lib/finance/monthly-cashflow";
 import { readJsonPayload } from "@/lib/http/read-json-payload";
 import { fetchWithCsrf } from "@/lib/http/fetch-with-csrf";
 import type { OnboardingPreviewDto } from "@/lib/types/app";
@@ -29,7 +30,7 @@ type OnboardingWizardProps = {
   defaultValues: OnboardingInput;
 };
 
-const totalSteps = 5;
+const totalSteps = 3;
 
 function getPresetName(presetType: OnboardingDebtPresetType, index: number) {
   const preset = ONBOARDING_DEBT_PRESETS[presetType];
@@ -46,44 +47,72 @@ function buildEmptyDebt(index = 0): OnboardingInput["debts"][number] {
   };
 }
 
-function getStepTitle(step: number) {
+function getStepTitle(step: number, preview: OnboardingPreviewDto | null) {
   if (step === 1) {
-    return "Ponle claridad a tus deudas";
+    return "Tu situación mensual";
   }
 
   if (step === 2) {
-    return "¿Cuánto ganas al mes?";
-  }
-
-  if (step === 3) {
     return "Agrega tus deudas principales";
   }
 
-  if (step === 4) {
-    return "¿Cuánto puedes pagar al mes?";
+  if (!preview) {
+    return "¿Cuánto puedes dedicar al mes?";
   }
 
   return "Así se vería tu salida";
 }
 
-function getStepDescription(step: number) {
+function getStepDescription(step: number, preview: OnboardingPreviewDto | null) {
   if (step === 1) {
-    return "En menos de 2 minutos te mostramos cuándo sales y cómo pagar menos intereses.";
+    return "En tres pasos rápidos estimamos tu capacidad de pago y te damos una primera salida clara.";
   }
 
   if (step === 2) {
-    return "Esto nos ayuda a sugerirte un plan realista.";
-  }
-
-  if (step === 3) {
     return "Empieza con 1 a 3 deudas. No necesitas tenerlo perfecto para recibir una ruta útil.";
   }
 
-  if (step === 4) {
-    return "Puedes empezar con el mínimo y luego ajustar.";
+  if (!preview) {
+    return "Puedes usar la capacidad estimada o ajustar a un ritmo más conservador.";
   }
 
-  return "Este resultado sale del planner del servidor con los datos que acabas de registrar.";
+  return "Este resultado sale del planner con lo que acabas de registrar. Puedes volver atrás si quieres ajustar montos.";
+}
+
+function parseMoneyInput(value: string) {
+  return value === "" ? Number.NaN : Number(value);
+}
+
+function validatePositiveMoney(value: number) {
+  if (!Number.isFinite(value)) {
+    return "Debes introducir un monto válido.";
+  }
+
+  if (value <= 0) {
+    return "Debes introducir un monto mayor que cero.";
+  }
+
+  if (value > 999_999_999) {
+    return "El monto es demasiado alto.";
+  }
+
+  return true;
+}
+
+function validateNonNegativeMoney(value: number) {
+  if (!Number.isFinite(value)) {
+    return "Debes introducir un monto válido.";
+  }
+
+  if (value < 0) {
+    return "El monto no puede ser negativo.";
+  }
+
+  if (value > 999_999_999) {
+    return "El monto es demasiado alto.";
+  }
+
+  return true;
 }
 
 export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
@@ -108,9 +137,52 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
     control: form.control,
     name: "monthlyDebtBudget",
   });
+  const watchedIncome = useWatch({
+    control: form.control,
+    name: "monthlyIncome",
+  });
+  const watchedHousingCost = useWatch({
+    control: form.control,
+    name: "monthlyHousingCost",
+  });
+  const watchedGroceriesCost = useWatch({
+    control: form.control,
+    name: "monthlyGroceriesCost",
+  });
+  const watchedUtilitiesCost = useWatch({
+    control: form.control,
+    name: "monthlyUtilitiesCost",
+  });
+  const watchedTransportCost = useWatch({
+    control: form.control,
+    name: "monthlyTransportCost",
+  });
+  const watchedOtherEssentialExpenses = useWatch({
+    control: form.control,
+    name: "monthlyOtherEssentialExpenses",
+  });
   const minimumSuggestedBudget = watchedDebts.reduce(
     (sum, debt) => sum + Number(debt?.minimumPayment ?? 0),
     0,
+  );
+  const cashflow = useMemo(
+    () =>
+      buildMonthlyCashflowSnapshot({
+        monthlyIncome: watchedIncome,
+        monthlyHousingCost: watchedHousingCost,
+        monthlyGroceriesCost: watchedGroceriesCost,
+        monthlyUtilitiesCost: watchedUtilitiesCost,
+        monthlyTransportCost: watchedTransportCost,
+        monthlyOtherEssentialExpenses: watchedOtherEssentialExpenses,
+      }),
+    [
+      watchedGroceriesCost,
+      watchedHousingCost,
+      watchedIncome,
+      watchedOtherEssentialExpenses,
+      watchedTransportCost,
+      watchedUtilitiesCost,
+    ],
   );
 
   async function loadPreview() {
@@ -139,20 +211,22 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
     setStepError(null);
 
     if (currentStep === 1) {
-      setCurrentStep(2);
-      return;
-    }
-
-    if (currentStep === 2) {
-      const isValid = await form.trigger("monthlyIncome");
+      const isValid = await form.trigger([
+        "monthlyIncome",
+        "monthlyHousingCost",
+        "monthlyGroceriesCost",
+        "monthlyUtilitiesCost",
+        "monthlyTransportCost",
+        "monthlyOtherEssentialExpenses",
+      ]);
 
       if (isValid) {
-        setCurrentStep(3);
+        setCurrentStep(2);
       }
       return;
     }
 
-    if (currentStep === 3) {
+    if (currentStep === 2) {
       if (debtsFieldArray.fields.length === 0) {
         setStepError("Debes registrar al menos una deuda.");
         return;
@@ -161,24 +235,21 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
       const isValid = await form.trigger("debts");
 
       if (isValid) {
-        setCurrentStep(4);
+        setPreview(null);
+        setCurrentStep(3);
       }
+    }
+  }
+
+  async function loadPlanPreviewForStep3() {
+    setStepError(null);
+    const isValid = await form.trigger("monthlyDebtBudget");
+
+    if (!isValid) {
       return;
     }
 
-    if (currentStep === 4) {
-      const isValid = await form.trigger("monthlyDebtBudget");
-
-      if (!isValid) {
-        return;
-      }
-
-      const previewLoaded = await loadPreview();
-
-      if (previewLoaded) {
-        setCurrentStep(5);
-      }
-    }
+    await loadPreview();
   }
 
   const onSubmit = form.handleSubmit(async (values) => {
@@ -198,7 +269,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
       return;
     }
 
-    toast.success("Tu plan inicial ya está listo.");
+    toast.success("¡Listo! Ya tienes tu plan inicial en el panel.");
     router.push("/dashboard" as Route);
     router.refresh();
   });
@@ -213,10 +284,10 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                 Paso {currentStep}/{totalSteps}
               </p>
               <h1 className="mt-3 font-display text-3xl tracking-tight text-foreground sm:text-4xl">
-                {getStepTitle(currentStep)}
+                {getStepTitle(currentStep, preview)}
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-muted">
-                {getStepDescription(currentStep)}
+                {getStepDescription(currentStep, preview)}
               </p>
             </div>
             <Badge variant="success">Menos de 2 minutos</Badge>
@@ -235,81 +306,146 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
         <div className="grid gap-6">
           {currentStep === 1 ? (
             <section className="rounded-[2rem] border border-border bg-white p-6 shadow-soft sm:p-8">
-              <div className="flex items-start gap-4">
-                <span className="grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
                   <Sparkles className="size-5" />
                 </span>
-                <div>
-                  <h2 className="text-2xl font-semibold text-foreground">
-                    Ponle claridad a tus deudas
-                  </h2>
-                  <p className="mt-3 text-sm leading-7 text-muted">
-                    En menos de 2 minutos te mostramos cuándo sales y cómo pagar menos intereses.
+                <div className="grid gap-3 text-sm leading-7 text-muted">
+                  <p className="text-base font-semibold text-foreground">
+                    Tres pasos: ingresos y gastos base, tus deudas, y cuánto puedes pagar. Luego ves tu primera salida.
                   </p>
+                  <ul className="grid list-inside list-disc gap-1">
+                    <li>Fecha de salida estimada y por dónde empezar</li>
+                    <li>Sin conectar bancos</li>
+                    <li>Recordatorios opcionales después</li>
+                  </ul>
                 </div>
               </div>
 
-              <div className="mt-6 grid gap-3 rounded-[1.5rem] border border-primary/10 bg-[rgba(240,248,245,0.88)] p-5">
-                <p className="text-sm font-medium text-foreground">Esto es lo que te llevas hoy:</p>
-                <ul className="grid gap-3 text-sm leading-7 text-muted">
-                  <li>Verás tu fecha de salida.</li>
-                  <li>Te diremos por dónde empezar.</li>
-                  <li>Sin conectar cuentas bancarias.</li>
-                </ul>
-              </div>
+              <div className="mt-8 grid gap-5">
+                <div className="space-y-3">
+                  <Label htmlFor="monthlyIncome">Ingreso mensual (RD$)</Label>
+                  <Input
+                    id="monthlyIncome"
+                    type="number"
+                    inputMode="decimal"
+                    placeholder="Ej: 35,000"
+                    {...form.register("monthlyIncome", {
+                      required: "Debes indicar tu ingreso mensual.",
+                      validate: validatePositiveMoney,
+                      setValueAs: parseMoneyInput,
+                    })}
+                  />
+                  <p className="text-sm text-muted">
+                    Lo usamos como base para estimar tu capacidad real de pago.
+                  </p>
+                  <p className="text-sm text-rose-600">
+                    {form.formState.errors.monthlyIncome?.message}
+                  </p>
+                </div>
 
-              <div className="mt-4 rounded-[1.5rem] border border-border bg-secondary/35 p-5">
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
-                  Siempre a tiempo
-                </p>
-                <p className="mt-3 text-sm leading-7 text-muted">
-                  Te avisamos antes del corte y antes del pago para que no se te pase nada.
-                </p>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="monthlyHousingCost">Vivienda / renta (RD$)</Label>
+                    <Input
+                      id="monthlyHousingCost"
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="0"
+                      {...form.register("monthlyHousingCost", {
+                        validate: validateNonNegativeMoney,
+                        setValueAs: parseMoneyInput,
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="monthlyGroceriesCost">Compras / comida (RD$)</Label>
+                    <Input
+                      id="monthlyGroceriesCost"
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="0"
+                      {...form.register("monthlyGroceriesCost", {
+                        validate: validateNonNegativeMoney,
+                        setValueAs: parseMoneyInput,
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="monthlyUtilitiesCost">Agua, luz e internet (RD$)</Label>
+                    <Input
+                      id="monthlyUtilitiesCost"
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="0"
+                      {...form.register("monthlyUtilitiesCost", {
+                        validate: validateNonNegativeMoney,
+                        setValueAs: parseMoneyInput,
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="monthlyTransportCost">Vehículo / transporte (RD$)</Label>
+                    <Input
+                      id="monthlyTransportCost"
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="0"
+                      {...form.register("monthlyTransportCost", {
+                        validate: validateNonNegativeMoney,
+                        setValueAs: parseMoneyInput,
+                      })}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="monthlyOtherEssentialExpenses">Otros gastos base (RD$)</Label>
+                  <Input
+                    id="monthlyOtherEssentialExpenses"
+                    type="number"
+                    inputMode="decimal"
+                    placeholder="0"
+                    {...form.register("monthlyOtherEssentialExpenses", {
+                      validate: validateNonNegativeMoney,
+                      setValueAs: parseMoneyInput,
+                    })}
+                  />
+                  <p className="text-sm text-muted">
+                    Aquí puedes poner colegios, seguros, cuidado del hogar u otros compromisos mensuales.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-2xl border border-border bg-secondary/20 p-4">
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted">
+                      Gastos base estimados
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-foreground">
+                      {cashflow.monthlyEssentialExpensesTotal !== null
+                        ? formatCurrency(cashflow.monthlyEssentialExpensesTotal)
+                        : "Pendiente"}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-primary/12 bg-[rgba(240,248,245,0.88)] p-4">
+                    <p className="text-xs uppercase tracking-[0.16em] text-primary">
+                      Capacidad estimada para deudas
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-foreground">
+                      {cashflow.monthlyDebtCapacity !== null
+                        ? formatCurrency(cashflow.monthlyDebtCapacity)
+                        : "Pendiente"}
+                    </p>
+                    <p className="mt-2 text-sm text-muted">
+                      Sale de ingreso menos gastos base. Luego puedes ajustarlo a tu realidad.
+                    </p>
+                  </div>
+                </div>
               </div>
             </section>
           ) : null}
 
           {currentStep === 2 ? (
-            <section className="rounded-[2rem] border border-border bg-white p-6 shadow-soft sm:p-8">
-              <div className="space-y-3">
-                <Label htmlFor="monthlyIncome">Ingreso mensual (RD$)</Label>
-                <Input
-                  id="monthlyIncome"
-                  type="number"
-                  inputMode="decimal"
-                  placeholder="Ej: 35,000"
-                  {...form.register("monthlyIncome", {
-                    required: "Debes indicar tu ingreso mensual.",
-                    validate: (value) => {
-                      if (!Number.isFinite(value)) {
-                        return "Debes introducir un monto válido.";
-                      }
-
-                      if (value <= 0) {
-                        return "Debes introducir un monto mayor que cero.";
-                      }
-
-                      if (value > 999_999_999) {
-                        return "El monto es demasiado alto.";
-                      }
-
-                      return true;
-                    },
-                    setValueAs: (value) =>
-                      value === "" ? Number.NaN : Number(value),
-                  })}
-                />
-                <p className="text-sm text-muted">
-                  Esto nos ayuda a sugerirte un plan realista.
-                </p>
-                <p className="text-sm text-rose-600">
-                  {form.formState.errors.monthlyIncome?.message}
-                </p>
-              </div>
-            </section>
-          ) : null}
-
-          {currentStep === 3 ? (
             <section className="rounded-[2rem] border border-border bg-white p-6 shadow-soft sm:p-8">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
@@ -360,7 +496,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                   return (
                     <div
                       key={field.id}
-                      className="rounded-[1.5rem] border border-border bg-secondary/30 p-5"
+                      className="rounded-2xl border border-border bg-secondary/30 p-5"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -516,19 +652,19 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                 })}
 
                 {debtsFieldArray.fields.length === 0 ? (
-                  <div className="rounded-[1.5rem] border border-dashed border-border bg-secondary/20 p-5 text-sm leading-7 text-muted">
+                  <div className="rounded-2xl border border-dashed border-border bg-secondary/20 p-5 text-sm leading-7 text-muted">
                     Agrega al menos una deuda para poder estimar tu fecha de salida.
                   </div>
                 ) : null}
 
-                <div className="rounded-[1.5rem] border border-border bg-secondary/20 p-4 text-sm leading-7 text-muted">
+                <div className="rounded-2xl border border-border bg-secondary/20 p-4 text-sm leading-7 text-muted">
                   Después podrás agregar fecha de corte y fecha de pago para activar <span className="font-semibold text-foreground">Siempre a tiempo</span> sin fricción.
                 </div>
               </div>
             </section>
           ) : null}
 
-          {currentStep === 4 ? (
+          {currentStep === 3 && !preview ? (
             <section className="rounded-[2rem] border border-border bg-white p-6 shadow-soft sm:p-8">
               <div className="space-y-3">
                 <Label htmlFor="monthlyDebtBudget">Monto mensual disponible (RD$)</Label>
@@ -539,29 +675,44 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                   placeholder="Ej: 18,000"
                   {...form.register("monthlyDebtBudget", {
                     required: "Debes indicar cuánto puedes pagar al mes.",
-                    validate: (value) => {
-                      if (!Number.isFinite(value)) {
-                        return "Debes introducir un monto válido.";
-                      }
-
-                      if (value <= 0) {
-                        return "Debes introducir un monto mayor que cero.";
-                      }
-
-                      if (value > 999_999_999) {
-                        return "El monto es demasiado alto.";
-                      }
-
-                      return true;
-                    },
-                    setValueAs: (value) =>
-                      value === "" ? Number.NaN : Number(value),
+                    validate: validatePositiveMoney,
+                    setValueAs: parseMoneyInput,
                   })}
                 />
                 <p className="text-sm text-muted">
-                  Puedes empezar con el mínimo y luego ajustar.
+                  Puedes aceptar la capacidad estimada o ajustarla si quieres ser más conservador.
                 </p>
-                <div className="rounded-[1.5rem] border border-primary/12 bg-[rgba(240,248,245,0.88)] p-4">
+                {cashflow.monthlyDebtCapacity !== null ? (
+                  <div className="rounded-2xl border border-primary/12 bg-[rgba(240,248,245,0.88)] p-4">
+                    <p className="text-sm font-medium text-foreground">
+                      Según tu flujo base, te quedan {formatCurrency(cashflow.monthlyDebtCapacity)} al mes para deudas.
+                    </p>
+                    <p className="mt-2 text-sm text-muted">
+                      Ingreso: {formatCurrency(cashflow.monthlyIncome ?? 0)} · Gastos base:{" "}
+                      {formatCurrency(cashflow.monthlyEssentialExpensesTotal ?? 0)}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="mt-4"
+                      onClick={() => {
+                        form.setValue(
+                          "monthlyDebtBudget",
+                          cashflow.monthlyDebtCapacity ?? 0,
+                          {
+                            shouldDirty: true,
+                            shouldTouch: true,
+                            shouldValidate: true,
+                          },
+                        );
+                      }}
+                    >
+                      Usar capacidad estimada
+                    </Button>
+                  </div>
+                ) : null}
+                <div className="rounded-2xl border border-primary/12 bg-[rgba(240,248,245,0.88)] p-4">
                   <p className="text-sm font-medium text-foreground">
                     Mínimo sugerido ahora mismo: {formatCurrency(minimumSuggestedBudget)}
                   </p>
@@ -584,6 +735,12 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                     Usar mínimo sugerido
                   </Button>
                 </div>
+                {cashflow.monthlyDebtCapacity !== null &&
+                cashflow.monthlyDebtCapacity < minimumSuggestedBudget ? (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-900">
+                    Tus gastos base dejan {formatCurrency(cashflow.monthlyDebtCapacity)} disponibles, pero tus pagos base suman {formatCurrency(minimumSuggestedBudget)}. Conviene revisar gastos, negociar cuotas o empezar con la deuda más urgente.
+                  </div>
+                ) : null}
                 <p className="text-sm text-rose-600">
                   {form.formState.errors.monthlyDebtBudget?.message}
                 </p>
@@ -591,17 +748,17 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
             </section>
           ) : null}
 
-          {currentStep === 5 ? (
+          {currentStep === 3 && preview ? (
             <section className="rounded-[2rem] border border-border bg-white p-6 shadow-soft sm:p-8">
               {isLoadingPreview ? (
                 <div className="grid gap-4">
                   <div className="h-6 w-48 animate-pulse rounded-full bg-secondary" />
-                  <div className="h-28 animate-pulse rounded-[1.5rem] bg-secondary" />
-                  <div className="h-24 animate-pulse rounded-[1.5rem] bg-secondary" />
+                  <div className="h-28 animate-pulse rounded-2xl bg-secondary" />
+                  <div className="h-24 animate-pulse rounded-2xl bg-secondary" />
                 </div>
               ) : preview ? (
                 <div className="grid gap-5">
-                  <div className="rounded-[1.75rem] border border-primary/12 bg-[linear-gradient(160deg,rgba(12,88,74,0.98),rgba(33,132,113,0.92))] p-5 text-white">
+                  <div className="rounded-2xl border border-primary/12 bg-[linear-gradient(160deg,rgba(12,88,74,0.98),rgba(33,132,113,0.92))] p-5 text-white">
                     <p className="text-sm font-semibold uppercase tracking-[0.18em] text-white/75">
                       Resultado inicial
                     </p>
@@ -618,8 +775,8 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                     </p>
                   </div>
 
-                  <div className="grid gap-4 lg:grid-cols-3">
-                    <div className="rounded-[1.5rem] border border-border bg-secondary/30 p-5">
+                  <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-2xl border border-border bg-secondary/30 p-5">
                       <p className="text-xs uppercase tracking-[0.16em] text-muted">
                         Ahorro potencial
                       </p>
@@ -627,7 +784,7 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                         {formatCurrency(preview.potentialSavings)}
                       </p>
                     </div>
-                    <div className="rounded-[1.5rem] border border-border bg-secondary/30 p-5">
+                    <div className="rounded-2xl border border-border bg-secondary/30 p-5">
                       <p className="text-xs uppercase tracking-[0.16em] text-muted">
                         Plan recomendado
                       </p>
@@ -635,17 +792,25 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                         {preview.recommendedStrategyLabel}
                       </p>
                     </div>
-                    <div className="rounded-[1.5rem] border border-border bg-secondary/30 p-5">
+                    <div className="rounded-2xl border border-border bg-secondary/30 p-5">
                       <p className="text-xs uppercase tracking-[0.16em] text-muted">
-                        Prioridad
+                        Gastos base
                       </p>
                       <p className="mt-2 text-xl font-semibold text-foreground">
-                        {preview.priorityDebtName ?? "Tu deuda más costosa"}
+                        {formatCurrency(preview.monthlyEssentialExpensesTotal)}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-border bg-secondary/30 p-5">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted">
+                        Capacidad para deudas
+                      </p>
+                      <p className="mt-2 text-xl font-semibold text-foreground">
+                        {formatCurrency(preview.monthlyDebtCapacity)}
                       </p>
                     </div>
                   </div>
 
-                  <div className="rounded-[1.5rem] border border-primary/12 bg-[rgba(240,248,245,0.88)] p-5">
+                  <div className="rounded-2xl border border-primary/12 bg-[rgba(240,248,245,0.88)] p-5">
                     <p className="text-sm font-semibold text-foreground">
                       {preview.monthsSaved && preview.monthsSaved > 0
                         ? `Podrías ahorrar ${formatCurrency(preview.potentialSavings)} y salir ${preview.monthsSaved} ${preview.monthsSaved === 1 ? "mes" : "meses"} antes.`
@@ -659,11 +824,11 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                     </p>
                   </div>
 
-                  <div className="rounded-[1.5rem] border border-border bg-secondary/20 p-4 text-sm leading-7 text-muted">
+                  <div className="rounded-2xl border border-border bg-secondary/20 p-4 text-sm leading-7 text-muted">
                     <span className="font-semibold text-foreground">Siempre a tiempo:</span> después de entrar podrás registrar fechas de corte y pago para recibir recordatorios por correo antes de cada fecha importante.
                   </div>
 
-                  <div className="rounded-[1.5rem] border border-border bg-secondary/20 p-4 text-sm leading-7 text-muted">
+                  <div className="rounded-2xl border border-border bg-secondary/20 p-4 text-sm leading-7 text-muted">
                     Optimiza tu plan y ahorra más con Premium.
                   </div>
                 </div>
@@ -684,6 +849,11 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
               disabled={currentStep === 1 || isSubmitting || isLoadingPreview}
               onClick={() => {
                 setStepError(null);
+                if (currentStep === 3 && preview) {
+                  setPreview(null);
+                  return;
+                }
+
                 setCurrentStep((step) => Math.max(1, step - 1));
               }}
             >
@@ -691,18 +861,23 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
               Atrás
             </Button>
 
-            {currentStep < totalSteps ? (
+            {currentStep < 3 ? (
+              <Button type="button" disabled={isLoadingPreview} onClick={goToNextStep}>
+                Continuar
+                <ArrowRight className="ml-2 size-4" />
+              </Button>
+            ) : !preview ? (
               <Button
                 type="button"
-                disabled={isLoadingPreview}
-                onClick={goToNextStep}
+                disabled={isSubmitting || isLoadingPreview}
+                onClick={() => void loadPlanPreviewForStep3()}
               >
-                {currentStep === 1 ? "Empezar" : "Continuar"}
+                Ver mi plan inicial
                 <ArrowRight className="ml-2 size-4" />
               </Button>
             ) : (
               <Button type="submit" disabled={isSubmitting || isLoadingPreview}>
-                Ver mi plan completo
+                Abrir mi panel
                 <ArrowRight className="ml-2 size-4" />
               </Button>
             )}
@@ -731,17 +906,27 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
               Resumen rápido
             </p>
             <div className="mt-4 grid gap-4">
-              <div className="rounded-[1.5rem] border border-border bg-secondary/20 p-4">
+              <div className="rounded-2xl border border-border bg-secondary/20 p-4">
                 <p className="text-xs uppercase tracking-[0.16em] text-muted">
                   Ingreso mensual
                 </p>
                 <p className="mt-2 text-lg font-semibold text-foreground">
-                  {Number.isFinite(form.getValues("monthlyIncome"))
-                    ? formatCurrency(Number(form.getValues("monthlyIncome")))
+                  {Number.isFinite(Number(watchedIncome))
+                    ? formatCurrency(Number(watchedIncome))
                     : "Pendiente"}
                 </p>
               </div>
-              <div className="rounded-[1.5rem] border border-border bg-secondary/20 p-4">
+              <div className="rounded-2xl border border-border bg-secondary/20 p-4">
+                <p className="text-xs uppercase tracking-[0.16em] text-muted">
+                  Gastos base
+                </p>
+                <p className="mt-2 text-lg font-semibold text-foreground">
+                  {cashflow.monthlyEssentialExpensesTotal !== null
+                    ? formatCurrency(cashflow.monthlyEssentialExpensesTotal)
+                    : "Pendiente"}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border bg-secondary/20 p-4">
                 <p className="text-xs uppercase tracking-[0.16em] text-muted">
                   Deudas cargadas
                 </p>
@@ -749,13 +934,23 @@ export function OnboardingWizard({ defaultValues }: OnboardingWizardProps) {
                   {watchedDebts.length} / {ONBOARDING_MAX_DEBTS}
                 </p>
               </div>
-              <div className="rounded-[1.5rem] border border-border bg-secondary/20 p-4">
+              <div className="rounded-2xl border border-border bg-secondary/20 p-4">
                 <p className="text-xs uppercase tracking-[0.16em] text-muted">
                   Presupuesto mensual
                 </p>
                 <p className="mt-2 text-lg font-semibold text-foreground">
                   {Number.isFinite(Number(watchedBudget))
                     ? formatCurrency(Number(watchedBudget))
+                    : "Pendiente"}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-primary/12 bg-[rgba(240,248,245,0.88)] p-4">
+                <p className="text-xs uppercase tracking-[0.16em] text-primary">
+                  Capacidad estimada
+                </p>
+                <p className="mt-2 text-lg font-semibold text-foreground">
+                  {cashflow.monthlyDebtCapacity !== null
+                    ? formatCurrency(cashflow.monthlyDebtCapacity)
                     : "Pendiente"}
                 </p>
               </div>

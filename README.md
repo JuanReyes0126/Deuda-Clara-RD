@@ -50,7 +50,7 @@ Razón breve:
   - pago extra mensual
   - priorizar una deuda específica
   - dejar de usar una tarjeta
-  - refinanciar a menor tasa
+  - refinanciar a menor tasa en vista cartera (plan Pro activo)
 - Reportes con exportación CSV y PDF
 - Centro de notificaciones
 - Emails transaccionales de:
@@ -78,10 +78,12 @@ Detalles más extensos:
 - [Plan de implementación](./docs/IMPLEMENTATION_PLAN.md)
 - [Guía de despliegue](./docs/DEPLOYMENT.md)
 - [Staging real con Vercel + Neon](./docs/STAGING_SETUP.md)
+- [Previews rápidos en Vercel](./docs/VERCEL_PREVIEW_WORKFLOW.md)
 - [Entorno privado de testing](./docs/PRIVATE_TESTING.md)
 - [Billing con AZUL](./docs/BILLING_AZUL.md)
 - [Release Candidate 1.2](./docs/RELEASE_CANDIDATE_1_2.md)
 - [Checklist go/no-go](./docs/GO_NO_GO_CHECKLIST.md)
+- [Límites por plan (Base / Premium / Pro)](./docs/MEMBERSHIP_FEATURE_TIERS_PLAN.md)
 - [Checklist de seguridad producción](./docs/PRODUCTION_SECURITY_CHECKLIST.md)
 
 ## Requisitos

@@ -40,7 +40,7 @@ export function HostShell({
             </div>
           </Link>
 
-          <div className="mt-6 rounded-3xl border border-border bg-secondary/45 p-4">
+          <div className="mt-6 rounded-2xl border border-border bg-secondary/45 p-4">
             <p className="text-sm text-muted">Sesión autorizada</p>
             <p className="mt-1 font-semibold text-foreground">{userName}</p>
             <p className="text-sm text-muted">{userEmail}</p>
@@ -65,7 +65,7 @@ export function HostShell({
             })}
           </nav>
 
-          <div className="mt-6 rounded-3xl border border-border bg-white/80 p-3">
+          <div className="mt-6 rounded-2xl border border-border bg-white/80 p-3">
             <LogoutButton />
           </div>
         </aside>

@@ -53,6 +53,36 @@ describe("api/jobs/notifications", () => {
     expect(response.status).toBe(401);
     expect(body.error).toBe("No autorizado.");
     expect(dispatchAutomatedReminderEmails).not.toHaveBeenCalled();
+    expect(response.headers.get("cache-control")).toBe("no-store, max-age=0");
+  });
+
+  it("devuelve rate limit consistente cuando el cron excede el umbral", async () => {
+    const { getServerEnv } = await import("@/lib/env/server");
+    const { assertRateLimit } = await import("@/lib/security/rate-limit");
+    const resetAt = Date.now() + 60_000;
+
+    vi.mocked(getServerEnv).mockReturnValue({
+      CRON_SECRET: "cron-secret",
+    } as never);
+    vi.mocked(assertRateLimit).mockResolvedValueOnce({
+      success: false,
+      resetAt,
+    } as never);
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/jobs/notifications", {
+        method: "POST",
+        headers: {
+          host: "localhost",
+          "x-cron-secret": "cron-secret",
+        },
+      }),
+    );
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(429);
+    expect(body.error).toBe("Demasiadas solicitudes.");
+    expect(response.headers.get("x-ratelimit-reset")).toBe(String(resetAt));
   });
 
   it("ejecuta recordatorios y digest cuando el cron está autorizado", async () => {

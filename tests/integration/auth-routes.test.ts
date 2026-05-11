@@ -96,6 +96,7 @@ describe("api/auth", () => {
     expect(response.status).toBe(401);
     expect(body.error).toBe("Ingresa tu código de verificación.");
     expect(body.mfaRequired).toBe(true);
+    expect(response.headers.get("cache-control")).toBe("no-store, max-age=0");
   });
 
   it("registra una cuenta valida", async () => {
@@ -153,5 +154,6 @@ describe("api/auth", () => {
       "Debes aceptar los Términos y Condiciones y la Política de Privacidad.",
     );
     expect(registerUser).not.toHaveBeenCalled();
+    expect(response.headers.get("cache-control")).toBe("no-store, max-age=0");
   });
 });

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { dashboardData, membershipConversionSnapshot } from "@/lib/demo/data";
-import { isDemoSessionUser } from "@/lib/demo/session";
+import { DEMO_USER_ID, isDemoSessionUser } from "@/lib/demo/session";
 import { DashboardOverview } from "@/features/dashboard/components/dashboard-overview";
 import {
   getDashboardPageData,
@@ -34,6 +34,7 @@ export default async function DashboardPage({
         conversionSnapshot={membershipConversionSnapshot}
         premiumWelcome={premiumWelcome}
         initialShowOptimization={initialShowOptimization}
+        claraStorageKey={DEMO_USER_ID}
       />
     );
   }
@@ -53,6 +54,7 @@ export default async function DashboardPage({
       conversionSnapshot={conversionSnapshot}
       premiumWelcome={premiumWelcome}
       initialShowOptimization={initialShowOptimization}
+      claraStorageKey={user.id}
     />
   );
 }

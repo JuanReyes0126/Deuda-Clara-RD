@@ -16,11 +16,13 @@ import {
 import { ExecutiveSummaryStrip } from "@/components/shared/executive-summary-strip";
 import { ModuleSectionHeader } from "@/components/shared/module-section-header";
 import { PrimaryActionCard } from "@/components/shared/primary-action-card";
+import { MEMBERSHIP_COMMERCIAL_COPY } from "@/config/membership-commercial-copy";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { fetchWithCsrf } from "@/lib/http/fetch-with-csrf";
 import { readJsonPayload } from "@/lib/http/read-json-payload";
 import { isReportRangeAllowed, resolveFeatureAccess } from "@/lib/feature-access";
+import { useSessionUpgradePrompt } from "@/lib/membership/use-session-upgrade-prompt";
 import type {
   MembershipBillingStatus,
   MembershipPlanId,
@@ -168,9 +170,9 @@ function getReportPremiumUpsell(summary: ReportSummaryDto) {
   if (summary.paymentCount === 0) {
     return {
       title:
-        "Premium cobra más sentido cuando ya empieces a registrar pagos reales.",
+        "En cuanto registres pagos, Premium te muestra si ese dinero realmente te está haciendo avanzar.",
       description:
-        "En cuanto tengas movimiento, este bloque te dice si tu dinero está bajando capital o si se sigue yendo demasiado a intereses.",
+        "Así dejas de mirar solo actividad y empiezas a ver si estás perdiendo dinero en intereses sin darte cuenta.",
     };
   }
 
@@ -178,7 +180,7 @@ function getReportPremiumUpsell(summary: ReportSummaryDto) {
     return {
       title: `Este período ya dejó ${formatCurrency(feesAndInterest)} en intereses y cargos.`,
       description:
-        "Premium te ayuda a leer si el flujo empeoró y qué deuda conviene corregir primero para que el próximo mes no rinda menos.",
+        "Premium convierte ese desgaste en una decisión clara: qué corregir primero para que el próximo mes rinda mejor.",
     };
   }
 
@@ -186,7 +188,7 @@ function getReportPremiumUpsell(summary: ReportSummaryDto) {
     return {
       title: `Todavía ${summary.interestAndFeesSharePct}% de lo pagado se está yendo en intereses y cargos.`,
       description:
-        "Aquí Premium agrega valor porque convierte ese desgaste en una prioridad más clara y una lectura más accionable del período.",
+        "Aquí Premium gana valor porque te dice qué mover para que más dinero llegue a capital y menos se siga escapando.",
     };
   }
 
@@ -194,7 +196,7 @@ function getReportPremiumUpsell(summary: ReportSummaryDto) {
     return {
       title: "Ya vas mejorando. Premium sirve para que no pierdas ese avance.",
       description:
-        "Además de mostrar el progreso, te ayuda a sostener la mezcla correcta entre principal, alertas y prioridad de pago.",
+        "Además de mostrar el progreso, te ayuda a sostener la mezcla correcta entre capital, alertas y prioridad de pago.",
     };
   }
 
@@ -249,6 +251,15 @@ export function ReportsPanel({
   const reportStatus = getReportStatus(summary);
   const reportMilestones = getReportMilestones(summary);
   const premiumUpsell = getReportPremiumUpsell(summary);
+  const showReportsUpgradePrompt = useSessionUpgradePrompt({
+    id: access.isBase ? "reports:premium" : "reports:pro",
+    active:
+      !premiumInsightsEnabled &&
+      hasPayments &&
+      (summary.comparison.signal === "REGRESSION" ||
+        summary.comparison.signal === "IMPROVING" ||
+        summary.interestAndFeesSharePct >= 25),
+  });
   const topCategory = useMemo(
     () =>
       [...summary.categorySummary].sort(
@@ -275,7 +286,7 @@ export function ReportsPanel({
               href: "/dashboard?focus=optimization",
             }
           : {
-          label: "Desbloquear Premium",
+          label: MEMBERSHIP_COMMERCIAL_COPY.contextualCta.reportsPremium,
           href: premiumPlanHref,
         };
   const reportSummaryItems = [
@@ -412,9 +423,9 @@ export function ReportsPanel({
             <div className="rounded-[1.4rem] border border-dashed border-primary/18 bg-[rgba(255,248,241,0.76)] p-4">
               <p className="text-sm font-semibold text-foreground">
                 {access.isBase
-                  ? "Base te deja leer hasta 31 días. Premium abre 90 días y Pro suma exportación."
+                  ? "Base te deja leer 31 días. Premium abre más contexto para ver si tu dinero rinde mejor."
                   : access.isPremium
-                    ? "Premium ya abre 90 días. Pro añade exportación y lectura histórica extendida."
+                    ? "Premium ya abre 90 días. Pro añade exportación y más contexto para seguir tu avance."
                     : "Pro ya tiene la capa completa de reportes y exportación."}
               </p>
               {!canExportReports ? (
@@ -424,7 +435,9 @@ export function ReportsPanel({
                     size="sm"
                     onClick={() => navigate(access.isBase ? premiumPlanHref : proPlanHref)}
                   >
-                    {access.isBase ? "Desbloquear Premium" : "Desbloquear Pro"}
+                    {access.isBase
+                      ? MEMBERSHIP_COMMERCIAL_COPY.contextualCta.reportsPremium
+                      : MEMBERSHIP_COMMERCIAL_COPY.contextualCta.reportsPro}
                   </Button>
                 </div>
               ) : null}
@@ -479,14 +492,14 @@ export function ReportsPanel({
                   variant="secondary"
                   onClick={() => navigate(proPlanHref)}
                 >
-                  Desbloquear seguimiento más profundo
+                  {MEMBERSHIP_COMMERCIAL_COPY.contextualCta.reportsPro}
                 </Button>
               )}
             </div>
           </div>
 
           <div className="grid gap-5 2xl:grid-cols-[1.14fr_0.86fr]">
-            <div className="border-primary/10 rounded-[1.75rem] border bg-[rgba(240,248,245,0.9)] p-5">
+            <div className="border-primary/10 rounded-2xl border bg-[rgba(240,248,245,0.9)] p-5">
               <div className="grid gap-5">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-3">
@@ -511,7 +524,7 @@ export function ReportsPanel({
                       : "Cambia el rango o registra tu primer pago para empezar a construir reportes útiles y exportables."}
                   </p>
                   {hasPayments ? (
-                    <div className="mt-4 rounded-3xl border border-white/70 bg-white/80 p-4">
+                    <div className="mt-4 rounded-xl border border-border/50 bg-white/80 p-4">
                       <div className="flex items-center justify-between gap-4 text-xs tracking-[0.16em] uppercase">
                         <p className="text-muted">A principal</p>
                         <p className="text-muted">
@@ -543,7 +556,7 @@ export function ReportsPanel({
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  <div className="rounded-3xl border border-white/70 bg-white/82 p-4">
+                  <div className="rounded-xl border border-border/50 bg-white/82 p-4">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Pagos registrados
                     </p>
@@ -552,7 +565,7 @@ export function ReportsPanel({
                     </p>
                   </div>
                   {topDebt ? (
-                    <div className="rounded-3xl border border-white/70 bg-white/82 p-4">
+                    <div className="rounded-xl border border-border/50 bg-white/82 p-4">
                       <p className="text-muted text-xs tracking-[0.16em] uppercase">
                         Mayor flujo
                       </p>
@@ -562,7 +575,7 @@ export function ReportsPanel({
                     </div>
                   ) : null}
                   {topCategory ? (
-                    <div className="rounded-3xl border border-white/70 bg-white/82 p-4">
+                    <div className="rounded-xl border border-border/50 bg-white/82 p-4">
                       <p className="text-muted text-xs tracking-[0.16em] uppercase">
                         Categoría líder
                       </p>
@@ -575,7 +588,7 @@ export function ReportsPanel({
               </div>
             </div>
 
-            <div className="border-primary/12 rounded-[1.75rem] border bg-[rgba(255,248,241,0.86)] p-5">
+            <div className="border-primary/12 rounded-2xl border bg-[rgba(255,248,241,0.86)] p-5">
               <p className="section-kicker">
                 Hitos del período
               </p>
@@ -589,7 +602,7 @@ export function ReportsPanel({
                 {reportMilestones.map((milestone) => (
                   <div
                     key={milestone.label}
-                    className="rounded-3xl border border-white/70 bg-white/85 p-5"
+                    className="rounded-xl border border-border/50 bg-white/85 p-5"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-foreground text-sm font-semibold">
@@ -627,7 +640,7 @@ export function ReportsPanel({
 
           {premiumInsightsEnabled ? (
             <div className="grid gap-5 2xl:grid-cols-[1.08fr_0.92fr]">
-              <div className="border-primary/15 rounded-[1.75rem] border bg-[rgba(255,248,241,0.82)] p-5">
+              <div className="border-primary/15 rounded-2xl border bg-[rgba(255,248,241,0.82)] p-5">
                 <div className="grid gap-5">
                   <div className="min-w-0">
                     <p className="section-kicker">
@@ -644,7 +657,7 @@ export function ReportsPanel({
                     </p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-3xl border border-white/70 bg-white/82 p-4">
+                    <div className="rounded-xl border border-border/50 bg-white/82 p-4">
                       <p className="text-muted text-xs tracking-[0.16em] uppercase">
                         Estado del período
                       </p>
@@ -656,7 +669,7 @@ export function ReportsPanel({
                             : "Sin actividad"}
                       </p>
                     </div>
-                    <div className="rounded-3xl border border-white/70 bg-white/82 p-4">
+                    <div className="rounded-xl border border-border/50 bg-white/82 p-4">
                       <p className="text-muted text-xs tracking-[0.16em] uppercase">
                         Principal
                       </p>
@@ -664,7 +677,7 @@ export function ReportsPanel({
                         {summary.principalSharePct}%
                       </p>
                     </div>
-                    <div className="rounded-3xl border border-white/70 bg-white/82 p-4 sm:col-span-2">
+                    <div className="rounded-xl border border-border/50 bg-white/82 p-4 sm:col-span-2">
                       <p className="text-muted text-xs tracking-[0.16em] uppercase">
                         Intereses y cargos
                       </p>
@@ -676,7 +689,7 @@ export function ReportsPanel({
                 </div>
               </div>
 
-              <div className="border-primary/12 rounded-[1.75rem] border bg-[rgba(240,248,245,0.92)] p-5">
+              <div className="border-primary/12 rounded-2xl border bg-[rgba(240,248,245,0.92)] p-5">
                 <p className="section-kicker">
                   Comparado con el período anterior
                 </p>
@@ -687,7 +700,7 @@ export function ReportsPanel({
                   {summary.comparison.summary}
                 </p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-3xl border border-white/70 bg-white/80 p-4">
+                  <div className="rounded-xl border border-border/50 bg-white/80 p-4">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Estado comparativo
                     </p>
@@ -702,7 +715,7 @@ export function ReportsPanel({
                     </p>
                   </div>
                   {summary.comparison.previousPrincipalSharePct !== null ? (
-                    <div className="rounded-3xl border border-white/70 bg-white/80 p-4">
+                    <div className="rounded-xl border border-border/50 bg-white/80 p-4">
                       <p className="text-muted text-xs tracking-[0.16em] uppercase">
                         Principal antes
                       </p>
@@ -712,14 +725,14 @@ export function ReportsPanel({
                     </div>
                   ) : null}
                 </div>
-                <div className="text-foreground mt-4 rounded-3xl border border-white/70 bg-white/80 p-5 text-sm leading-7">
+                <div className="text-foreground mt-4 rounded-xl border border-border/50 bg-white/80 p-5 text-sm leading-7">
                   Usa esta comparación para saber si el plan está ganando
                   calidad o si se está estancando aunque sigas pagando.
                 </div>
               </div>
             </div>
-          ) : (
-            <div className="border-primary/20 rounded-[1.75rem] border border-dashed bg-[rgba(255,248,241,0.82)] p-5">
+          ) : showReportsUpgradePrompt ? (
+            <div className="border-primary/20 rounded-2xl border border-dashed bg-[rgba(255,248,241,0.82)] p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="max-w-5xl">
                   <p className="text-primary text-sm font-semibold tracking-[0.16em] uppercase">
@@ -760,7 +773,7 @@ export function ReportsPanel({
                   <Button
                     onClick={() => navigate(premiumPlanHref)}
                   >
-                    Desbloquear Premium
+                    {MEMBERSHIP_COMMERCIAL_COPY.contextualCta.reportsPremium}
                   </Button>
                   <Button
                     variant="secondary"
@@ -771,7 +784,7 @@ export function ReportsPanel({
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
         </CardContent>
       </Card>
 
@@ -788,7 +801,7 @@ export function ReportsPanel({
               summary.debtSummary.map((row) => (
                 <div
                   key={row.debtId}
-                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-[1.75rem] border p-5 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:grid-cols-[minmax(0,1fr)_190px] sm:items-center"
+                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-2xl border p-5 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:grid-cols-[minmax(0,1fr)_190px] sm:items-center"
                 >
                   <div className="min-w-0">
                     <p className="text-foreground min-w-0 font-semibold">
@@ -798,7 +811,7 @@ export function ReportsPanel({
                       Flujo aplicado en este período.
                     </p>
                   </div>
-                  <div className="rounded-3xl border border-white/70 bg-white/85 px-4 py-3 sm:text-right">
+                  <div className="rounded-xl border border-border/50 bg-white/85 px-4 py-3 sm:text-right">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Pagado
                     </p>
@@ -809,7 +822,7 @@ export function ReportsPanel({
                 </div>
               ))
             ) : (
-              <div className="border-border rounded-3xl border border-dashed p-8 text-center">
+              <div className="border-border rounded-2xl border border-dashed p-8 text-center">
                 <p className="text-foreground text-base font-semibold">
                   Todavía no hay pagos en este rango.
                 </p>
@@ -840,7 +853,7 @@ export function ReportsPanel({
               summary.categorySummary.map((row) => (
                 <div
                   key={row.type}
-                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-[1.75rem] border p-5 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:grid-cols-[minmax(0,1fr)_190px] sm:items-center"
+                  className="border-border bg-secondary/70 grid min-w-0 gap-4 rounded-2xl border p-5 transition-all duration-200 ease-out hover:-translate-y-[1px] hover:border-primary/18 hover:bg-white/92 hover:shadow-[0_18px_34px_-26px_rgba(23,56,74,0.24)] active:scale-[0.997] sm:grid-cols-[minmax(0,1fr)_190px] sm:items-center"
                 >
                   <div className="min-w-0">
                     <p className="text-foreground min-w-0 font-semibold">
@@ -850,7 +863,7 @@ export function ReportsPanel({
                       Distribución por tipo de deuda.
                     </p>
                   </div>
-                  <div className="rounded-3xl border border-white/70 bg-white/85 px-4 py-3 sm:text-right">
+                  <div className="rounded-xl border border-border/50 bg-white/85 px-4 py-3 sm:text-right">
                     <p className="text-muted text-xs tracking-[0.16em] uppercase">
                       Pagado
                     </p>
@@ -861,7 +874,7 @@ export function ReportsPanel({
                 </div>
               ))
             ) : (
-              <div className="border-border text-muted rounded-3xl border border-dashed p-8 text-center text-sm">
+              <div className="border-border text-muted rounded-2xl border border-dashed p-8 text-center text-sm">
                 Aún no hay suficiente actividad en este período para mostrar
                 categorías.
               </div>

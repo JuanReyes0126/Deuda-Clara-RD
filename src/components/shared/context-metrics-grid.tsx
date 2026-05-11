@@ -48,7 +48,7 @@ export function ContextMetricsGrid({
         <div
           key={`${item.label}-${item.value}`}
           className={cn(
-            "min-w-0 rounded-[1.75rem] border border-white/80 bg-white/92 p-4 shadow-[0_14px_32px_rgba(24,49,59,0.06)] sm:p-5",
+            "min-w-0 rounded-2xl border border-border/55 bg-white/92 p-4 shadow-[0_14px_32px_rgba(24,49,59,0.06)] sm:p-5",
             item.span === 2 ? "sm:col-span-2" : "",
             itemClassName,
           )}

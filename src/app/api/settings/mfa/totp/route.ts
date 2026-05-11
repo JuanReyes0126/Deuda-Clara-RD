@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
       key: buildRateLimitKey(request, "mfa-totp-setup", session.user.id),
       limit: 5,
       windowMs: 10 * 60 * 1000,
+      requireDistributedStore: true,
     });
 
     if (!rateLimit.success) {
@@ -95,6 +96,20 @@ export async function PATCH(request: NextRequest) {
 
     await assertRecentAuth(session.user.id);
 
+    const rateLimit = await assertRateLimit({
+      key: buildRateLimitKey(request, "mfa-totp-verify", session.user.id),
+      limit: 10,
+      windowMs: 10 * 60 * 1000,
+      requireDistributedStore: true,
+    });
+
+    if (!rateLimit.success) {
+      return apiRateLimited(
+        "Demasiados intentos. Intenta de nuevo más tarde.",
+        rateLimit.resetAt,
+      );
+    }
+
     const parsed = verifyTotpSetupSchema.safeParse(await request.json());
 
     if (!parsed.success) {
@@ -129,6 +144,20 @@ export async function DELETE(request: NextRequest) {
     }
 
     await assertRecentAuth(session.user.id);
+
+    const rateLimit = await assertRateLimit({
+      key: buildRateLimitKey(request, "mfa-totp-disable", session.user.id),
+      limit: 8,
+      windowMs: 10 * 60 * 1000,
+      requireDistributedStore: true,
+    });
+
+    if (!rateLimit.success) {
+      return apiRateLimited(
+        "Demasiados intentos. Intenta de nuevo más tarde.",
+        rateLimit.resetAt,
+      );
+    }
 
     const parsed = disableTotpSchema.safeParse(await request.json());
 

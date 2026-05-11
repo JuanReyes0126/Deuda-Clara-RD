@@ -6,6 +6,10 @@ import { spawnSync } from "node:child_process";
 const cwd = process.cwd();
 const envPath = path.join(cwd, ".env");
 const envLocalPath = path.join(cwd, ".env.local");
+const explicitEnvFiles = (process.env.ENV_FILE || "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
 
 function parseEnvFile(raw) {
   const env = {};
@@ -47,12 +51,23 @@ function commandExists(command) {
   return result.status === 0;
 }
 
+function resolveEnvFiles() {
+  const defaultFiles = [envPath, envLocalPath];
+  const selectedFiles = explicitEnvFiles.length
+    ? [envPath, ...explicitEnvFiles.map((file) => path.join(cwd, file))]
+    : defaultFiles;
+
+  return [...new Set(selectedFiles)];
+}
+
 function readLocalEnv() {
-  if (!fs.existsSync(envPath) && !fs.existsSync(envLocalPath)) {
+  const files = resolveEnvFiles();
+
+  if (!files.some((filePath) => fs.existsSync(filePath))) {
     return null;
   }
 
-  return [envPath, envLocalPath].reduce((env, filePath) => {
+  return files.reduce((env, filePath) => {
     if (!fs.existsSync(filePath)) {
       return env;
     }
@@ -84,6 +99,14 @@ function warnValue(label, isValid, detail) {
   return false;
 }
 
+function summarizeMissingVars(env, keys) {
+  const missing = keys.filter((key) => !env[key]);
+  return {
+    ok: missing.length === 0,
+    missing,
+  };
+}
+
 function tcpCheck(host, port, timeoutMs = 2500) {
   return new Promise((resolve) => {
     const socket = new net.Socket();
@@ -109,6 +132,11 @@ function tcpCheck(host, port, timeoutMs = 2500) {
 
 console.log("Deuda Clara RD · Diagnóstico local");
 console.log("");
+
+if (explicitEnvFiles.length) {
+  console.log(`Archivos de entorno evaluados: .env + ${explicitEnvFiles.join(", ")}`);
+  console.log("");
+}
 
 const env = readLocalEnv();
 
@@ -202,27 +230,57 @@ warnValue(
 
 console.log("");
 console.log("Servicios opcionales para lanzamiento");
+const resendSummary = summarizeMissingVars(env, [
+  "RESEND_API_KEY",
+  "RESEND_FROM_EMAIL",
+]);
 warnValue(
   "Email transaccional",
-  Boolean(env.RESEND_API_KEY && env.RESEND_FROM_EMAIL),
-  env.RESEND_API_KEY && env.RESEND_FROM_EMAIL
+  resendSummary.ok,
+  resendSummary.ok
     ? "Resend configurado"
-    : "Si falta, recuperación y recordatorios por email no se enviarán.",
+    : `Faltan: ${resendSummary.missing.join(", ")}`,
 );
+const azulSummary = summarizeMissingVars(env, [
+  "BILLING_PROVIDER",
+  "AZUL_PAYMENT_URL",
+  "AZUL_MERCHANT_ID",
+  "AZUL_MERCHANT_NAME",
+  "AZUL_MERCHANT_TYPE",
+  "AZUL_AUTH_KEY",
+  "AZUL_CURRENCY_CODE",
+]);
 warnValue(
   "AZUL",
-  Boolean(
-    env.BILLING_PROVIDER === "AZUL" &&
-      env.AZUL_PAYMENT_URL &&
-      env.AZUL_MERCHANT_ID &&
-      env.AZUL_MERCHANT_NAME &&
-      env.AZUL_MERCHANT_TYPE &&
-      env.AZUL_AUTH_KEY &&
-      env.AZUL_CURRENCY_CODE
-  ),
-  env.AZUL_PAYMENT_URL
+  azulSummary.ok && env.BILLING_PROVIDER === "AZUL",
+  azulSummary.ok && env.BILLING_PROVIDER === "AZUL"
     ? "AZUL configurado para probar checkout de membresías"
-    : "Si falta, los planes pagos no se podrán probar.",
+    : azulSummary.missing.length
+      ? `Faltan: ${azulSummary.missing.join(", ")}`
+      : "BILLING_PROVIDER debe ser AZUL.",
+);
+const passkeySummary = summarizeMissingVars(env, [
+  "PASSKEY_RP_ID",
+  "PASSKEY_RP_NAME",
+  "PASSKEY_ALLOWED_ORIGINS",
+]);
+warnValue(
+  "Passkeys",
+  passkeySummary.ok,
+  passkeySummary.ok
+    ? "Passkeys configuradas para el dominio actual"
+    : `Faltan: ${passkeySummary.missing.join(", ")}`,
+);
+const redisSummary = summarizeMissingVars(env, [
+  "UPSTASH_REDIS_REST_URL",
+  "UPSTASH_REDIS_REST_TOKEN",
+]);
+warnValue(
+  "Rate limit persistente",
+  redisSummary.ok,
+  redisSummary.ok
+    ? "Upstash Redis configurado"
+    : `Faltan: ${redisSummary.missing.join(", ")}`,
 );
 warnValue(
   "CRON_SECRET",
@@ -243,12 +301,16 @@ checkValue(
     : "Deshabilitado en este entorno",
 );
 checkValue(
-  "Host secondary password",
-  env.HOST_PANEL_ENABLED === "true" ? Boolean(env.HOST_SECONDARY_PASSWORD) : true,
+  "Host secondary protection",
   env.HOST_PANEL_ENABLED === "true"
-    ? env.HOST_SECONDARY_PASSWORD
-      ? "Capa secundaria configurada"
-      : "Opcional, pero recomendada para producción."
+    ? Boolean(env.HOST_SECONDARY_TOTP_SECRET || env.HOST_SECONDARY_PASSWORD)
+    : true,
+  env.HOST_PANEL_ENABLED === "true"
+    ? env.HOST_SECONDARY_TOTP_SECRET
+      ? "Capa secundaria configurada con TOTP"
+      : env.HOST_SECONDARY_PASSWORD
+        ? "Capa secundaria configurada con contraseña"
+        : "Falta capa secundaria de acceso para el panel interno."
     : "No aplica mientras el panel interno esté deshabilitado",
 );
 
@@ -269,18 +331,24 @@ if (databaseReachable && appReachable) {
   console.log("- También puedes revisar salud en `/api/health`.");
 }
 
-if (
-  !(
-    env.BILLING_PROVIDER === "AZUL" &&
-    env.AZUL_PAYMENT_URL &&
-    env.AZUL_MERCHANT_ID &&
-    env.AZUL_MERCHANT_NAME &&
-    env.AZUL_MERCHANT_TYPE &&
-    env.AZUL_AUTH_KEY &&
-    env.AZUL_CURRENCY_CODE
-  )
-) {
-  console.log("- Si quieres probar activación de planes, configura AZUL en sandbox/test.");
+if (!(azulSummary.ok && env.BILLING_PROVIDER === "AZUL")) {
+  console.log(
+    `- Completa billing antes de cobrar membresías: ${
+      azulSummary.missing.length ? azulSummary.missing.join(", ") : "BILLING_PROVIDER=AZUL"
+    }.`,
+  );
+}
+
+if (!resendSummary.ok) {
+  console.log(`- Completa email transaccional: ${resendSummary.missing.join(", ")}.`);
+}
+
+if (!passkeySummary.ok) {
+  console.log(`- Completa passkeys antes de lanzar: ${passkeySummary.missing.join(", ")}.`);
+}
+
+if (!redisSummary.ok) {
+  console.log(`- Configura Upstash antes de producción: ${redisSummary.missing.join(", ")}.`);
 }
 
 if (env.HOST_PANEL_ENABLED === "true" && !env.HOST_ALLOWED_EMAILS) {

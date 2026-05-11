@@ -228,7 +228,7 @@ function filterSimulatorResultForAccess(
           cardId: null,
           monthlySpendStopped: 0,
         },
-    refinancePlan: access.canSeeOptimizedSavings
+    refinancePlan: access.canSeeRefinanceScenario
       ? result.refinancePlan
       : {
           ...baseLockedPlan,
@@ -257,6 +257,15 @@ export async function runSimulator(userId: string, input: SimulatorInput): Promi
   }
 
   const access = await getUserFeatureAccess(userId);
+  const sanitizedInput: SimulatorInput =
+    access.canSeeRefinanceScenario
+      ? input
+      : {
+          ...input,
+          refinanceDebtId: undefined,
+          refinancedRate: undefined,
+          refinancedMinimumPayment: undefined,
+        };
 
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
@@ -273,7 +282,7 @@ export async function runSimulator(userId: string, input: SimulatorInput): Promi
     },
   });
 
-  const result = buildSimulatorResult(user.debts, input, {
+  const result = buildSimulatorResult(user.debts, sanitizedInput, {
     hybridRateWeight: user.settings?.hybridRateWeight,
     hybridBalanceWeight: user.settings?.hybridBalanceWeight,
   });

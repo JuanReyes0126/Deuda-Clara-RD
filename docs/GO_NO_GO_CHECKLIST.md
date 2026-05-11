@@ -1,6 +1,6 @@
 # GO / NO-GO CHECKLIST
 
-Usa este documento después de ejecutar el runbook completo.
+Usa este documento como cierre de lanzamiento. La idea no es revisar todo con el mismo peso, sino decidir con prioridades claras.
 
 ## 1. Información general
 
@@ -9,109 +9,148 @@ Usa este documento después de ejecutar el runbook completo.
 - Versión / commit:
 - Responsable de decisión:
 
-## 2. Estado general
+## 2. Estado real del producto
 
-### App / Código
+### Código y experiencia principal
 
-- auth, sesiones, permisos, CSP, MFA y passkeys funcionando
-- build limpio sin errores
-- pruebas E2E críticas pasando
+- [ ] `npm run typecheck`
+- [ ] `npm run build`
+- [ ] `npm run test:unit`
+- [ ] `npm run test:integration`
+- [ ] smoke browser crítico pasando
+- [ ] login, registro, onboarding y dashboard funcionan
+- [ ] móvil validado en iPhone/Safari
+- [ ] móvil validado en Android/Chrome
 
 Estado: [GO / GO WITH RISK / NO-GO]
 
 ### Infraestructura
 
-- Vercel configurado correctamente
-- Neon conectado y estable
-- variables cargadas correctamente
-- migraciones aplicadas
+- [ ] proyecto Vercel correcto
+- [ ] Neon conectado y estable
+- [ ] variables cargadas correctamente
+- [ ] migraciones aplicadas
+- [ ] dominio principal apuntando al despliegue correcto
 
 Estado: [GO / GO WITH RISK / NO-GO]
 
 ### Seguridad
 
-- rate limiting activo
-- CSRF activo
-- passkeys correctamente configuradas (`PASSKEY_RP_ID`, `PASSKEY_ALLOWED_ORIGINS`)
-- MFA funcional
-- `DEMO_MODE_ENABLED=false` en producción
+- [ ] rate limiting activo
+- [ ] CSRF activo
+- [ ] `DEMO_MODE_ENABLED=false`
+- [ ] `HOST_PANEL_ENABLED=false` o restringido por allowlist + MFA
+- [ ] `PASSKEY_RP_ID` y `PASSKEY_ALLOWED_ORIGINS` correctos
+- [ ] MFA funcional
+- [ ] secretos de producción únicos y largos
 
 Estado: [GO / GO WITH RISK / NO-GO]
 
 ### Billing
 
-- AZUL en ambiente correcto (`test/sandbox` o producción)
-- credenciales, merchant y moneda configurados
-- flujo de pago probado
+- [ ] `BILLING_PROVIDER=AZUL`
+- [ ] merchant, `AuthKey`, moneda y URL correctos
+- [ ] pago aprobado validado
+- [ ] pago declinado validado
+- [ ] pago cancelado validado
+- [ ] activación de membresía validada tras confirmación
 
 Estado: [GO / GO WITH RISK / NO-GO]
 
 ### Observabilidad
 
-- logs funcionando
-- errores visibles
-- alertas mínimas configuradas (login fallido, errores críticos)
+- [ ] logs disponibles
+- [ ] errores visibles
+- [ ] monitoreo mínimo activo para login, auth y billing
+- [ ] procedimiento claro de rollback
 
 Estado: [GO / GO WITH RISK / NO-GO]
 
 ### Base de Datos
 
-- backups activos
-- restore test realizado
-- datos consistentes
+- [ ] backups activos
+- [ ] restore verificado al menos una vez
+- [ ] datos consistentes
+- [ ] conexiones estables después del despliegue
 
 Estado: [GO / GO WITH RISK / NO-GO]
 
-## 3. Bloqueadores absolutos
+## 3. Prioridades de lanzamiento
 
-Si alguno está presente: NO-GO automático
+### P1 · Bloqueadores absolutos
 
-- ❌ variables críticas mal configuradas, especialmente passkeys
-- ❌ migraciones no aplicadas
-- ❌ login o registro roto
-- ❌ billing no funcional, si es requerido
-- ❌ `DEMO_MODE_ENABLED=true` en producción
-- ❌ errores críticos sin visibilidad
+Si uno falla: NO-GO automático
 
-## 4. Riesgos aceptables
+- [ ] login y registro sanos en dominio real
+- [ ] onboarding y dashboard sanos en dominio real
+- [ ] migraciones aplicadas
+- [ ] variables críticas correctas
+- [ ] `DEMO_MODE_ENABLED=false`
+- [ ] build de producción sano
+- [ ] callbacks de AZUL funcionando si el cobro es parte del lanzamiento
+- [ ] errores críticos visibles en logs
 
-No bloquean salida, pero deben quedar documentados
+### P2 · Requeridos para salir bien
 
-- mejoras de UI pendientes
-- logs no centralizados completamente
-- WAF no completamente optimizado
-- tests no críticos pendientes
+No deberían bloquear si hay excepción aprobada, pero sí requieren dueño y fecha
 
-## 5. Smoke test final
+- [ ] QA manual completa en iPhone/Safari
+- [ ] QA manual completa en Android/Chrome
+- [ ] passkeys validadas en dominio real
+- [ ] MFA validado extremo a extremo
+- [ ] recordatorios/correos validados con remitente real
+- [ ] restore de base de datos documentado
+- [ ] rollback documentado y ensayado
+
+### P3 · Mejoras posteriores al go-live
+
+No bloquean salida, pero conviene calendarizarlas antes de crecer tráfico
+
+- [ ] WAF/reglas avanzadas afinadas
+- [ ] dashboards de observabilidad más completos
+- [ ] optimización fina de prompts comerciales
+- [ ] automatización extra de soporte/alertas
+- [ ] capa 2 de AZUL para tokenización y recurrencia
+
+## 4. Smoke test final
 
 Obligatorio antes de decidir GO
 
 - [ ] registro de usuario nuevo
 - [ ] onboarding completo
 - [ ] login con contraseña
-- [ ] login con passkey
 - [ ] activación de MFA
 - [ ] logout + login nuevamente
 - [ ] acceso a dashboard
+- [ ] navegación móvil en dashboard, deudas, pagos y simulador
 - [ ] flujo de pago, si aplica
 - [ ] recuperación de cuenta, si aplica
 
-Todos deben funcionar sin errores.
+Todos deben funcionar sin errores visibles ni pantallas rotas.
 
-## 6. Validación final
+## 5. Validación final de entorno
 
-- [ ] variables correctas en entorno
+- [ ] `APP_URL` correcto
 - [ ] dominio correcto configurado
 - [ ] `PASSKEY_ALLOWED_ORIGINS` coincide con dominio real
-- [ ] `DEMO_MODE_ENABLED=false` en producción
-- [ ] build desplegado sin errores
-- [ ] runbook ejecutado completo
+- [ ] `AUTH_SECRET`, `DATA_ENCRYPTION_KEY`, `CRON_SECRET`, `HEALTHCHECK_SECRET` cargados
+- [ ] `AZUL_*` correctas
+- [ ] `RESEND_*` correctas
+- [ ] `UPSTASH_*` correctas si rate limit/colas dependen de ello
 
-## 7. Decisión final
+## 6. Decisión final
 
 - ✅ GO → listo para producción
 - ⚠️ GO WITH RISK → salir con riesgos documentados
 - ❌ NO-GO → no salir, requiere fixes
+
+## 7. Riesgos documentados
+
+- riesgo:
+- impacto:
+- mitigación:
+- responsable:
+- fecha objetivo:
 
 ## 8. Notas
 

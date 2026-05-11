@@ -30,6 +30,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       key: buildRateLimitKey(request, "passkey-delete", session.user.id),
       limit: 10,
       windowMs: 10 * 60 * 1000,
+      requireDistributedStore: true,
     });
 
     if (!rateLimit.success) {

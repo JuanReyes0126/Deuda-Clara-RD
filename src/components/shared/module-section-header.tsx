@@ -20,17 +20,17 @@ export function ModuleSectionHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-4 md:flex-row md:items-end md:justify-between",
+        "flex flex-col gap-3 md:flex-row md:items-end md:justify-between md:gap-4",
         className,
       )}
     >
       <div className="min-w-0 max-w-none md:max-w-4xl">
         {kicker ? <p className="section-kicker">{kicker}</p> : null}
-        <h2 className="font-display text-foreground mt-3 text-[clamp(1.42rem,5.4vw,2.45rem)] leading-[1.05] tracking-tight sm:text-[clamp(1.55rem,6vw,2.45rem)]">
+        <h2 className="font-display text-foreground mt-2.5 text-[clamp(1.34rem,5vw,2.28rem)] leading-[1.06] tracking-tight sm:text-[clamp(1.48rem,5.2vw,2.36rem)]">
           {title}
         </h2>
         {description ? (
-          <p className="section-summary mt-3 max-w-none text-pretty md:max-w-3xl">
+          <p className="section-summary mt-2.5 max-w-none text-pretty text-sm leading-6 md:max-w-3xl">
             {description}
           </p>
         ) : null}

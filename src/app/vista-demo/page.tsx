@@ -46,6 +46,7 @@ export default function DemoPreviewPage() {
           data={dashboardData}
           conversionSnapshot={membershipConversionSnapshot}
           premiumWelcome
+          claraStorageKey="vista-demo-gui"
         />
 
         <MembershipPanel

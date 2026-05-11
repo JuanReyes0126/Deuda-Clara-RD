@@ -3,9 +3,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { getRequestMeta } from "@/lib/security/request-meta";
+import {
+  assertRateLimit,
+  buildRateLimitKey,
+} from "@/lib/security/rate-limit";
 import { paymentSchema } from "@/lib/validations/payments";
 import { deletePayment, updatePayment } from "@/server/payments/payment-service";
-import { apiBadRequest, handleApiError } from "@/server/api/api-response";
+import {
+  apiBadRequest,
+  apiRateLimited,
+  handleApiError,
+} from "@/server/api/api-response";
 import { isInfrastructureUnavailableError } from "@/server/services/infrastructure-error";
 
 type RouteContext = {
@@ -22,6 +30,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     if (!session) {
       return apiBadRequest("No autenticado.", 401);
+    }
+
+    const rateLimit = await assertRateLimit({
+      key: buildRateLimitKey(request, "payments:update", session.user.id),
+      limit: 60,
+      windowMs: 10 * 60 * 1000,
+    });
+
+    if (!rateLimit.success) {
+      return apiRateLimited(
+        "Demasiadas actualizaciones de pagos. Intenta más tarde.",
+        rateLimit.resetAt,
+      );
     }
 
     const parsed = paymentSchema.safeParse(await request.json());
@@ -59,6 +80,19 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
     if (!session) {
       return apiBadRequest("No autenticado.", 401);
+    }
+
+    const rateLimit = await assertRateLimit({
+      key: buildRateLimitKey(request, "payments:delete", session.user.id),
+      limit: 30,
+      windowMs: 10 * 60 * 1000,
+    });
+
+    if (!rateLimit.success) {
+      return apiRateLimited(
+        "Demasiadas eliminaciones de pagos. Intenta más tarde.",
+        rateLimit.resetAt,
+      );
     }
 
     const { paymentId } = await context.params;

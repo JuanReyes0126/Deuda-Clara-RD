@@ -34,6 +34,8 @@ function decodeDebts(value: string | undefined) {
     return (parsed as DebtItemDto[]).map((debt) => ({
       ...debt,
       notificationsEnabled: debt.notificationsEnabled ?? true,
+      interestRateMode: debt.interestRateMode ?? "FIXED",
+      paymentAmountType: debt.paymentAmountType ?? "FIXED",
     }));
   } catch {
     return null;
@@ -125,8 +127,10 @@ function buildDebtDto(input: DebtInput, existing?: DebtItemDto): DebtItemDto {
     effectiveBalance,
     interestRate: toMoneyNumber(input.interestRate),
     interestRateType: input.interestRateType,
+    interestRateMode: input.interestRateMode,
     monthlyInterestEstimate,
     minimumPayment: toMoneyNumber(input.minimumPayment),
+    paymentAmountType: input.paymentAmountType,
     statementDay: input.statementDay ?? null,
     dueDay: input.dueDay ?? null,
     nextDueDate: input.nextDueDate?.toISOString() ?? null,

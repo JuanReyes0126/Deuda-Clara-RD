@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentSession } from "@/lib/auth/session";
 import { assertSameOrigin } from "@/lib/security/origin";
-import { apiBadRequest, handleApiError } from "@/server/api/api-response";
+import { assertRateLimit, buildRateLimitKey } from "@/lib/security/rate-limit";
+import {
+  apiBadRequest,
+  apiRateLimited,
+  handleApiError,
+} from "@/server/api/api-response";
 import { markNotificationAsRead } from "@/server/notifications/notification-service";
 
 type RouteContext = {
@@ -19,6 +24,19 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     if (!session) {
       return apiBadRequest("No autenticado.", 401);
+    }
+
+    const rateLimit = await assertRateLimit({
+      key: buildRateLimitKey(request, "notifications:read-one", session.user.id),
+      limit: 120,
+      windowMs: 10 * 60 * 1000,
+    });
+
+    if (!rateLimit.success) {
+      return apiRateLimited(
+        "Demasiadas solicitudes para actualizar notificaciones. Intenta más tarde.",
+        rateLimit.resetAt,
+      );
     }
 
     const { notificationId } = await context.params;
