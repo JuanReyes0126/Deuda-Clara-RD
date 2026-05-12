@@ -5,35 +5,56 @@ import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from "recharts";
 import { TrendingUp, AlertCircle, CheckCircle2, DollarSign, Target } from "lucide-react";
-import type { Debt, DebtStatus } from "@prisma/client";
+import type { Debt } from "@prisma/client";
 
 interface VisualPortfolioProps {
   debts: Debt[];
   totalAmount: number;
 }
 
-const STATUS_COLORS: Record<DebtStatus, string> = {
+const STATUS_COLORS: Record<string, string> = {
   "AL_DIA": "#10b981",
   "ATRASADA": "#f59e0b",
   "CRITICA": "#ef4444",
+  "al-dia": "#10b981",
+  "atrasada": "#f59e0b",
+  "critica": "#ef4444",
 };
 
-const STATUS_LABELS: Record<DebtStatus, string> = {
+const STATUS_LABELS: Record<string, string> = {
   "AL_DIA": "Al día",
   "ATRASADA": "Atrasada",
   "CRITICA": "Crítica",
+  "al-dia": "Al día",
+  "atrasada": "Atrasada",
+  "critica": "Crítica",
+};
+
+const STATUS_ICONS: Record<string, any> = {
+  "AL_DIA": CheckCircle2,
+  "ATRASADA": AlertCircle,
+  "CRITICA": AlertCircle,
+  "al-dia": CheckCircle2,
+  "atrasada": AlertCircle,
+  "critica": AlertCircle,
 };
 
 export function VisualPortfolio({ debts, totalAmount }: VisualPortfolioProps) {
+  const getStatusKey = (status: string) => {
+    const key = status.toUpperCase().replace("-", "_");
+    if (STATUS_COLORS[key]) return key;
+    if (STATUS_COLORS[status]) return status;
+    return "AL_DIA";
+  };
+
   const distribution = [
-    { name: "Al día", value: debts.filter(d => d.status === "AL_DIA").reduce((sum, d) => sum + d.amount, 0), color: STATUS_COLORS["AL_DIA"] },
-    { name: "Atrasada", value: debts.filter(d => d.status === "ATRASADA").reduce((sum, d) => sum + d.amount, 0), color: STATUS_COLORS["ATRASADA"] },
-    { name: "Crítica", value: debts.filter(d => d.status === "CRITICA").reduce((sum, d) => sum + d.amount, 0), color: STATUS_COLORS["CRITICA"] },
+    { name: "Al día", value: debts.filter(d => getStatusKey(d.status) === "AL_DIA" || getStatusKey(d.status) === "al-dia").reduce((sum, d) => sum + d.amount, 0), color: "#10b981" },
+    { name: "Atrasada", value: debts.filter(d => getStatusKey(d.status) === "ATRASADA" || getStatusKey(d.status) === "atrasada").reduce((sum, d) => sum + d.amount, 0), color: "#f59e0b" },
+    { name: "Crítica", value: debts.filter(d => getStatusKey(d.status) === "CRITICA" || getStatusKey(d.status) === "critica").reduce((sum, d) => sum + d.amount, 0), color: "#ef4444" },
   ].filter(item => item.value > 0);
 
-  const financialHealth = debts.length > 0 
-    ? Math.round((debts.filter(d => d.status === "AL_DIA").length / debts.length) * 100)
-    : 100;
+  const healthyCount = debts.filter(d => getStatusKey(d.status) === "AL_DIA" || getStatusKey(d.status) === "al-dia").length;
+  const financialHealth = debts.length > 0 ? Math.round((healthyCount / debts.length) * 100) : 100;
 
   return (
     <div className="space-y-6">
@@ -113,25 +134,34 @@ export function VisualPortfolio({ debts, totalAmount }: VisualPortfolioProps) {
                 {debts.length === 0 ? (
                   <div className="text-center py-8 text-slate-400"><DollarSign className="w-12 h-12 mx-auto mb-2 opacity-50" /><p>No tienes deudas registradas</p></div>
                 ) : (
-                  debts.map((debt, index) => (
-                    <motion.div key={debt.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }} className="group p-4 rounded-xl bg-gradient-to-r from-slate-50 to-white border border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all duration-300">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-full ${debt.status === "AL_DIA" ? "bg-emerald-100" : debt.status === "ATRASADA" ? "bg-amber-100" : "bg-red-100"}`}>
-                            {debt.status === "AL_DIA" ? (<CheckCircle2 className="w-5 h-5 text-emerald-600" />) : (<AlertCircle className="w-5 h-5 text-amber-600" />)}
+                  debts.map((debt, index) => {
+                    const statusKey = getStatusKey(debt.status);
+                    const IconComponent = STATUS_ICONS[statusKey] || AlertCircle;
+                    const bgColor = statusKey === "AL_DIA" || statusKey === "al-dia" ? "bg-emerald-100" : statusKey === "ATRASADA" || statusKey === "atrasada" ? "bg-amber-100" : "bg-red-100";
+                    const textColor = statusKey === "AL_DIA" || statusKey === "al-dia" ? "text-emerald-700" : statusKey === "ATRASADA" || statusKey === "atrasada" ? "text-amber-700" : "text-red-700";
+                    const badgeBg = statusKey === "AL_DIA" || statusKey === "al-dia" ? "bg-emerald-100" : statusKey === "ATRASADA" || statusKey === "atrasada" ? "bg-amber-100" : "bg-red-100";
+                    const badgeText = statusKey === "AL_DIA" || statusKey === "al-dia" ? "text-emerald-700" : statusKey === "ATRASADA" || statusKey === "atrasada" ? "text-amber-700" : "text-red-700";
+                    
+                    return (
+                      <motion.div key={debt.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }} className="group p-4 rounded-xl bg-gradient-to-r from-slate-50 to-white border border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all duration-300">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-full ${bgColor}`}>
+                              <IconComponent className="w-5 h-5" style={{ color: textColor.replace('text-', '').replace('-700', '') === 'emerald' ? '#059669' : textColor.replace('text-', '').replace('-700', '') === 'amber' ? '#d97706' : '#dc2626' }} />
+                            </div>
+                            <div>
+                              <div className="font-semibold text-slate-800">{debt.name}</div>
+                              <div className="text-xs text-slate-500">{debt.interestRate ? `${debt.interestRate}% interés` : 'Sin interés'}</div>
+                            </div>
                           </div>
-                          <div>
-                            <div className="font-semibold text-slate-800">{debt.name}</div>
-                            <div className="text-xs text-slate-500">{debt.interestRate ? `${debt.interestRate}% interés` : 'Sin interés'}</div>
+                          <div className="text-right">
+                            <div className="font-bold text-slate-800">${debt.amount.toLocaleString('es-DO')}</div>
+                            <Badge variant="secondary" className={`text-xs ${badgeBg} ${badgeText}`}>{STATUS_LABELS[statusKey] || debt.status}</Badge>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="font-bold text-slate-800">${debt.amount.toLocaleString('es-DO')}</div>
-                          <Badge variant="secondary" className={`text-xs ${debt.status === "AL_DIA" ? "bg-emerald-100 text-emerald-700" : debt.status === "ATRASADA" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>{STATUS_LABELS[debt.status]}</Badge>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))
+                      </motion.div>
+                    );
+                  })
                 )}
               </div>
             </CardContent>
