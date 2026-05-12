@@ -5,34 +5,34 @@ import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from "recharts";
 import { TrendingUp, AlertCircle, CheckCircle2, DollarSign, Target } from "lucide-react";
-import type { Debt } from "@prisma/client";
+import type { Debt, DebtStatus } from "@prisma/client";
 
 interface VisualPortfolioProps {
   debts: Debt[];
   totalAmount: number;
 }
 
-const STATUS_COLORS = {
-  "al-dia": "#10b981",
-  "atrasada": "#f59e0b",
-  "critica": "#ef4444",
+const STATUS_COLORS: Record<DebtStatus, string> = {
+  "AL_DIA": "#10b981",
+  "ATRASADA": "#f59e0b",
+  "CRITICA": "#ef4444",
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  "al-dia": "Al día",
-  "atrasada": "Atrasada",
-  "critica": "Crítica",
+const STATUS_LABELS: Record<DebtStatus, string> = {
+  "AL_DIA": "Al día",
+  "ATRASADA": "Atrasada",
+  "CRITICA": "Crítica",
 };
 
 export function VisualPortfolio({ debts, totalAmount }: VisualPortfolioProps) {
   const distribution = [
-    { name: "Al día", value: debts.filter(d => d.status === "al-dia").reduce((sum, d) => sum + d.amount, 0), color: STATUS_COLORS["al-dia"] as string },
-    { name: "Atrasada", value: debts.filter(d => d.status === "atrasada").reduce((sum, d) => sum + d.amount, 0), color: STATUS_COLORS["atrasada"] as string },
-    { name: "Crítica", value: debts.filter(d => d.status === "critica").reduce((sum, d) => sum + d.amount, 0), color: STATUS_COLORS["critica"] as string },
+    { name: "Al día", value: debts.filter(d => d.status === "AL_DIA").reduce((sum, d) => sum + d.amount, 0), color: STATUS_COLORS["AL_DIA"] },
+    { name: "Atrasada", value: debts.filter(d => d.status === "ATRASADA").reduce((sum, d) => sum + d.amount, 0), color: STATUS_COLORS["ATRASADA"] },
+    { name: "Crítica", value: debts.filter(d => d.status === "CRITICA").reduce((sum, d) => sum + d.amount, 0), color: STATUS_COLORS["CRITICA"] },
   ].filter(item => item.value > 0);
 
   const financialHealth = debts.length > 0 
-    ? Math.round((debts.filter(d => d.status === "al-dia").length / debts.length) * 100)
+    ? Math.round((debts.filter(d => d.status === "AL_DIA").length / debts.length) * 100)
     : 100;
 
   return (
@@ -117,8 +117,8 @@ export function VisualPortfolio({ debts, totalAmount }: VisualPortfolioProps) {
                     <motion.div key={debt.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }} className="group p-4 rounded-xl bg-gradient-to-r from-slate-50 to-white border border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all duration-300">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-full ${debt.status === "al-dia" ? "bg-emerald-100" : debt.status === "atrasada" ? "bg-amber-100" : "bg-red-100"}`}>
-                            {debt.status === "al-dia" ? (<CheckCircle2 className="w-5 h-5 text-emerald-600" />) : (<AlertCircle className="w-5 h-5 text-amber-600" />)}
+                          <div className={`p-2 rounded-full ${debt.status === "AL_DIA" ? "bg-emerald-100" : debt.status === "ATRASADA" ? "bg-amber-100" : "bg-red-100"}`}>
+                            {debt.status === "AL_DIA" ? (<CheckCircle2 className="w-5 h-5 text-emerald-600" />) : (<AlertCircle className="w-5 h-5 text-amber-600" />)}
                           </div>
                           <div>
                             <div className="font-semibold text-slate-800">{debt.name}</div>
@@ -127,7 +127,7 @@ export function VisualPortfolio({ debts, totalAmount }: VisualPortfolioProps) {
                         </div>
                         <div className="text-right">
                           <div className="font-bold text-slate-800">${debt.amount.toLocaleString('es-DO')}</div>
-                          <Badge variant="secondary" className={`text-xs ${debt.status === "al-dia" ? "bg-emerald-100 text-emerald-700" : debt.status === "atrasada" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>{STATUS_LABELS[debt.status]}</Badge>
+                          <Badge variant="secondary" className={`text-xs ${debt.status === "AL_DIA" ? "bg-emerald-100 text-emerald-700" : debt.status === "ATRASADA" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>{STATUS_LABELS[debt.status]}</Badge>
                         </div>
                       </div>
                     </motion.div>
