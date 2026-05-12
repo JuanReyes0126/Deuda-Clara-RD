@@ -24,7 +24,7 @@ export function Providers({ children }: { children: ReactNode }) {
 
       // Escuchar actualizaciones del Service Worker
       navigator.serviceWorker.addEventListener("updatefound", () => {
-        const newWorker = navigator.serviceWorker.installing;
+        const newWorker = navigator.serviceWorker.active || navigator.serviceWorker.installing;
         if (newWorker) {
           newWorker.addEventListener("statechange", () => {
             if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
