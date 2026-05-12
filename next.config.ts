@@ -11,7 +11,6 @@ const nextConfig: NextConfig = {
     ],
   },
   // PWA Configuration
-  manifest: "/manifest.json",
   
   async headers() {
     return [
