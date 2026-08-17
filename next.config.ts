@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
       "./node_modules/@prisma/client/**/*",
     ],
   },
+  
   async headers() {
     return [
       {
@@ -30,6 +31,47 @@ const nextConfig: NextConfig = {
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
+          },
+        ],
+      },
+      // Cache strategy for static assets (PWA)
+      {
+        source: "/brand/:all*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        source: "/(.*).png",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        source: "/(.*).ico",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        source: "/manifest.json",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, must-revalidate",
+          },
+          {
+            key: "Content-Type",
+            value: "application/manifest+json",
           },
         ],
       },

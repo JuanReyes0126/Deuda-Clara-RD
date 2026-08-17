@@ -1,34 +1,49 @@
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+```
+# Dependencies
+node_modules/
 
-# testing
-/coverage
-test-results/
+# Build artifacts
+dist/
+build/
+target/
 
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.ENV
+.python-version
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+.MF
+.TemporaryItems
+.deps
+.nfs*
+._*
 .DS_Store
-*.pem
-.runtime/private-app.local.*
-
-# env files (MUY IMPORTANTE)
-.env
-.env.local
-.env.*.local
-
-# Vercel — salida local de `vercel build` (Build Output API / prebuilt).
-# No versionar: se regenera en cada build y contiene rutas absolutas del equipo.
-.vercel/output/
+.DS_Store?
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Icon?
+Thumbs.db
+.VolumeIcon.icns
+com.apple.timemachine.donotpresent
+```

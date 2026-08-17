@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { VisualPortfolio } from "@/components/dashboard/visual-portfolio";
 import { MEMBERSHIP_COMMERCIAL_COPY } from "@/config/membership-commercial-copy";
 import type { ResolvedFeatureAccess } from "@/lib/feature-access";
 import { fetchWithCsrf } from "@/lib/http/fetch-with-csrf";
@@ -613,7 +614,33 @@ export function SimulatorPortfolioProjection({
       ) : null}
 
       {result ? (
-        <div className="grid gap-4 lg:grid-cols-[1fr_minmax(0,1fr)]">
+        <div className="space-y-6">
+          {/* Nuevo diseño VisualPortfolio estilo Qik */}
+          <VisualPortfolio 
+            debts={result.debts.map(d => ({
+              id: d.id,
+              name: d.name,
+              amount: d.currentBalance,
+              interestRate: d.interestRate ?? 0,
+              status: d.status as "al-dia" | "atrasada" | "critica",
+              currency: d.currency,
+              minimumPayment: d.minimumPayment,
+              type: d.type,
+              startedAt: null,
+              currentBalance: d.currentBalance,
+              originalBalance: d.originalBalance,
+              interestRateType: d.interestRateType,
+              interestRateMode: d.interestRateMode,
+              paymentAmountType: d.paymentAmountType,
+              lateFeeAmount: d.lateFeeAmount,
+              extraChargesAmount: d.extraChargesAmount,
+              nextDueDate: d.nextDueDate,
+            }))}
+            totalAmount={result.basePlan.totalPaid}
+          />
+
+          {/* Tarjetas de resumen del plan */}
+          <div className="grid gap-4 lg:grid-cols-[1fr_minmax(0,1fr)]">
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Resumen del plan base</CardTitle>
@@ -863,6 +890,8 @@ export function SimulatorPortfolioProjection({
               )}
             </CardContent>
           </Card>
+        </div>
+          </div>
         </div>
       ) : !error && !loading ? (
         <p className="text-sm text-muted">Generando la primera proyección…</p>
