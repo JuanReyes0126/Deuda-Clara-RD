@@ -1,0 +1,76 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+import { HOST_PANEL_ROUTE } from "@/lib/host/panel";
+import { assertSameOrigin } from "@/lib/security/origin";
+import { assertRateLimit, buildRateLimitKey } from "@/lib/security/rate-limit";
+import { apiBadRequest, apiRateLimited, handleApiError } from "@/server/api/api-response";
+import { logSecurityEvent, logServerWarn } from "@/server/observability/logger";
+import {
+  assertHostPanelApiAccess,
+  setHostPanelGateCookie,
+  verifyHostSecondaryPassword,
+} from "@/server/host/host-access";
+
+const hostGateSchema = z.object({
+  password: z.string().min(1, "La clave secundaria es obligatoria."),
+});
+
+export async function POST(request: NextRequest) {
+  try {
+    assertSameOrigin(request);
+
+    const decision = await assertHostPanelApiAccess({
+      allowMissingSecondary: true,
+    });
+
+    if (decision.outcome === "LOGIN") {
+      return apiBadRequest("No autenticado.", 401);
+    }
+
+    if (decision.outcome === "NOT_FOUND") {
+      return apiBadRequest("No encontrado.", 404);
+    }
+
+    if (decision.outcome === "MFA_SETUP_REQUIRED") {
+      return apiBadRequest("Activa MFA en Configuración antes de usar el panel interno.", 403);
+    }
+
+    const parsed = hostGateSchema.safeParse(await request.json());
+
+    if (!parsed.success) {
+      return apiBadRequest(parsed.error.issues[0]?.message ?? "Datos inválidos.");
+    }
+
+    const rateLimit = await assertRateLimit({
+      key: buildRateLimitKey(request, "host-gate", decision.user.id),
+      limit: 10,
+      windowMs: 10 * 60 * 1000,
+    });
+
+    if (!rateLimit.success) {
+      logSecurityEvent("rate_limit_host_gate", {
+        userId: decision.user.id,
+      });
+      return apiRateLimited(
+        "Demasiados intentos. Intenta más tarde.",
+        rateLimit.resetAt,
+      );
+    }
+
+    const validPassword = await verifyHostSecondaryPassword(parsed.data.password);
+
+    if (!validPassword) {
+      logServerWarn("Host secondary password rejected", {
+        email: decision.user.email,
+      });
+      return apiBadRequest("La clave secundaria no coincide.", 401);
+    }
+
+    await setHostPanelGateCookie();
+
+    return NextResponse.json({ ok: true, redirectTo: HOST_PANEL_ROUTE });
+  } catch (error) {
+    return handleApiError(error, "No se pudo desbloquear el panel interno.");
+  }
+}

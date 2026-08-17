@@ -1,0 +1,27 @@
+{
+  "name": "Deuda Clara RD",
+  "short_name": "DeudaClara",
+  "description": "Aplicación para entender deudas, intereses y construir un plan inteligente de salida en República Dominicana",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/brand/deuda-clara-logo-20260408.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["finance", "productivity"],
+  "lang": "es",
+  "dir": "ltr"
+}
